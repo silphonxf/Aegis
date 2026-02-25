@@ -70,17 +70,16 @@
       <pre id="templateCreateResult"></pre>
     </section>
 
-
     <section class="card">
       <h2>状态快照上报（自动算红黄绿）</h2>
       <input id="snapSystemId" placeholder="system_id" />
       <div class="grid2">
-        <input id="snapHostOnline" placeholder="host_online(normal/abnormal)" value="normal" />
-        <input id="snapPortOk" placeholder="port_ok(normal/abnormal)" value="normal" />
+        <input id="snapHostOnline" placeholder="host_online(normal/abnormal/unknown)" value="normal" />
+        <input id="snapPortOk" placeholder="port_ok(normal/abnormal/unknown)" value="normal" />
         <input id="snapCpu" type="number" placeholder="cpu_usage(%)" value="60" />
         <input id="snapMem" type="number" placeholder="mem_usage(%)" value="65" />
         <input id="snapDisk" type="number" placeholder="disk_usage(%)" value="70" />
-        <input id="snapSelfcheck" placeholder="last_selfcheck_result" value="normal" />
+        <input id="snapSelfcheck" placeholder="last_selfcheck_result(normal/warning/critical/unknown)" value="normal" />
       </div>
       <button id="btnCreateSnapshot">提交状态快照</button>
       <pre id="snapshotResult"></pre>
@@ -104,8 +103,21 @@
     </section>
 
     <section class="card">
-      <h2>审计日志</h2>
-      <button id="btnAudit">读取审计日志</button>
+      <h2>审计日志（支持筛选）</h2>
+      <div class="grid3">
+        <input id="auditAction" placeholder="action，例如 create_user" />
+        <input id="auditUsername" placeholder="username，例如 admin" />
+        <input id="auditResource" placeholder="resource，例如 system" />
+      </div>
+      <div class="grid3">
+        <input id="auditStartAt" placeholder="start_at，例如 2026-02-25T00:00:00" />
+        <input id="auditEndAt" placeholder="end_at，例如 2026-02-25T23:59:59" />
+        <input id="auditKeyword" placeholder="keyword（detail模糊匹配）" />
+      </div>
+      <div class="grid2">
+        <button id="btnAudit">按筛选读取审计日志</button>
+        <button id="btnAuditClear">清空筛选</button>
+      </div>
       <pre id="audit"></pre>
     </section>
   </main>

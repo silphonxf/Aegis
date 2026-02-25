@@ -4,10 +4,24 @@ let token = localStorage.getItem('aegis_admin_token') || '';
 function base(){ return $('apiBase').value.trim().replace(/\/$/, ''); }
 function headers(){ const h = {'Content-Type':'application/json'}; if(token) h.Authorization = `Bearer ${token}`; return h; }
 
+function forceRelogin(message = '登录已失效，请重新登录') {
+  token = '';
+  localStorage.removeItem('aegis_admin_token');
+  $('state').textContent = message;
+}
+
 async function request(path, options={}){
   const r = await fetch(`${base()}${path}`, options);
   const d = await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+
+  if (!r.ok) {
+    const code = d?.code;
+    const msg = d?.message || `HTTP ${r.status}`;
+    if (code === 'TOKEN_EXPIRED' || code === 'TOKEN_INVALID' || code === 'USER_DISABLED' || code === 'USER_NOT_FOUND') {
+      forceRelogin(`${msg}（请重新登录）`);
+    }
+    throw new Error(`${code ? `[${code}] ` : ''}${msg}`);
+  }
   return d;
 }
 
@@ -52,7 +66,15 @@ $('btnMonitoring').onclick = async () => {
 $('btnExportAbnormal').onclick = async () => {
   try {
     const resp = await fetch(`${base()}/api/v1/monitoring/abnormal/export`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (!resp.ok) {
+      const d = await resp.json().catch(()=>({}));
+      const code = d?.code;
+      const msg = d?.message || `HTTP ${resp.status}`;
+      if (code === 'TOKEN_EXPIRED' || code === 'TOKEN_INVALID' || code === 'USER_DISABLED' || code === 'USER_NOT_FOUND') {
+        forceRelogin(`${msg}（请重新登录）`);
+      }
+      throw new Error(`${code ? `[${code}] ` : ''}${msg}`);
+    }
     const blob = await resp.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -93,20 +115,19 @@ $('btnCreateTemplate').onclick = async () => {
   } catch(e){ $('templateCreateResult').textContent = e.message; }
 };
 
-
 $('btnCreateSnapshot').onclick = async () => {
   try {
     const sid = Number($('snapSystemId').value);
     const d = await request(`/api/v1/systems/${sid}/status/snapshot`, {
       method:'POST', headers:headers(),
       body: JSON.stringify({
-        host_online: $('snapHostOnline').value || 'normal',
-        port_ok: $('snapPortOk').value || 'normal',
+        host_online: $('snapHostOnline').value || 'unknown',
+        port_ok: $('snapPortOk').value || 'unknown',
         cpu_usage: Number($('snapCpu').value),
         mem_usage: Number($('snapMem').value),
         disk_usage: Number($('snapDisk').value),
         last_inspection_result: 'normal',
-        last_selfcheck_result: $('snapSelfcheck').value || 'normal'
+        last_selfcheck_result: $('snapSelfcheck').value || 'unknown'
       })
     });
     $('snapshotResult').textContent = JSON.stringify(d, null, 2);
@@ -135,9 +156,36 @@ $('btnSaveRules').onclick = async () => {
   } catch (e) { $('ruleResult').textContent = e.message; }
 };
 
+function buildAuditQuery() {
+  const params = new URLSearchParams({ page: '1', size: '20' });
+  const action = $('auditAction').value.trim();
+  const username = $('auditUsername').value.trim();
+  const resource = $('auditResource').value.trim();
+  const startAt = $('auditStartAt').value.trim();
+  const endAt = $('auditEndAt').value.trim();
+  const keyword = $('auditKeyword').value.trim();
+
+  if (action) params.set('action', action);
+  if (username) params.set('username', username);
+  if (resource) params.set('resource', resource);
+  if (startAt) params.set('start_at', startAt);
+  if (endAt) params.set('end_at', endAt);
+  if (keyword) params.set('keyword', keyword);
+
+  return params.toString();
+}
+
 $('btnAudit').onclick = async () => {
-  try { $('audit').textContent = JSON.stringify(await request('/api/v1/admin/audit-logs?page=1&size=20',{headers:headers()}), null, 2); }
-  catch(e){ $('audit').textContent = e.message; }
+  try {
+    const qs = buildAuditQuery();
+    const data = await request(`/api/v1/admin/audit-logs?${qs}`, {headers:headers()});
+    $('audit').textContent = JSON.stringify(data, null, 2);
+  } catch(e){ $('audit').textContent = e.message; }
+};
+
+$('btnAuditClear').onclick = () => {
+  ['auditAction','auditUsername','auditResource','auditStartAt','auditEndAt','auditKeyword'].forEach(id => $(id).value = '');
+  $('audit').textContent = '已清空筛选条件';
 };
 
 $('state').textContent = token ? '已加载本地Token' : '未登录';

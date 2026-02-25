@@ -35,3 +35,7 @@ python3 -m http.server 5174
 4) 后台查看监控总览（`/monitoring/overview`）
 5) 后台读取/更新状态规则（`/monitoring/rules`）
 6) 后台查看审计日志
+
+## 6. 新增联调点
+- 后台审计日志支持 action/username/resource/time/keyword 组合筛选
+- 当 token 过期或失效时，后台页面会自动清除本地 token 并提示重新登录
