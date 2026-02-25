@@ -23,6 +23,11 @@ $('btnLogin').onclick = async () => {
   } catch(e){ $('state').textContent = `登录失败: ${e.message}`; }
 };
 
+$('btnMonitoring').onclick = async () => {
+  try { $('monitoring').textContent = JSON.stringify(await request('/api/v1/monitoring/overview',{headers:headers()}), null, 2); }
+  catch(e){ $('monitoring').textContent = e.message; }
+};
+
 $('btnCreateUser').onclick = async () => {
   try {
     const d = await request('/api/v1/admin/users', {
@@ -65,9 +70,36 @@ $('btnCreateTemplate').onclick = async () => {
   } catch(e){ $('templateCreateResult').textContent = e.message; }
 };
 
-$('btnOverview').onclick = async () => {
-  try { $('overview').textContent = JSON.stringify(await request('/api/v1/systems/status/overview',{headers:headers()}), null, 2); }
-  catch(e){ $('overview').textContent = e.message; }
+$('btnLoadRules').onclick = async () => {
+  try {
+    const r = await request('/api/v1/monitoring/rules', { headers: headers() });
+    $('cpuWarn').value = r.cpu_warn;
+    $('cpuCritical').value = r.cpu_critical;
+    $('memWarn').value = r.mem_warn;
+    $('memCritical').value = r.mem_critical;
+    $('diskWarn').value = r.disk_warn;
+    $('diskCritical').value = r.disk_critical;
+    $('ruleResult').textContent = JSON.stringify(r, null, 2);
+  } catch (e) { $('ruleResult').textContent = e.message; }
+};
+
+$('btnSaveRules').onclick = async () => {
+  try {
+    const payload = {
+      cpu_warn: Number($('cpuWarn').value),
+      cpu_critical: Number($('cpuCritical').value),
+      mem_warn: Number($('memWarn').value),
+      mem_critical: Number($('memCritical').value),
+      disk_warn: Number($('diskWarn').value),
+      disk_critical: Number($('diskCritical').value),
+    };
+    const d = await request('/api/v1/monitoring/rules', {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify(payload),
+    });
+    $('ruleResult').textContent = JSON.stringify({ ...d, payload }, null, 2);
+  } catch (e) { $('ruleResult').textContent = e.message; }
 };
 
 $('btnAudit').onclick = async () => {
@@ -75,29 +107,4 @@ $('btnAudit').onclick = async () => {
   catch(e){ $('audit').textContent = e.message; }
 };
 
-function loadRules(){
-  const raw = localStorage.getItem('aegis_status_rules');
-  if(!raw) return;
-  try {
-    const r = JSON.parse(raw);
-    ['cpuWarn','cpuCritical','memWarn','memCritical','diskWarn','diskCritical'].forEach(k => {
-      if (r[k] !== undefined) $(k).value = r[k];
-    });
-  } catch {}
-}
-
-$('btnSaveRules').onclick = () => {
-  const rules = {
-    cpuWarn: Number($('cpuWarn').value),
-    cpuCritical: Number($('cpuCritical').value),
-    memWarn: Number($('memWarn').value),
-    memCritical: Number($('memCritical').value),
-    diskWarn: Number($('diskWarn').value),
-    diskCritical: Number($('diskCritical').value),
-  };
-  localStorage.setItem('aegis_status_rules', JSON.stringify(rules));
-  $('ruleResult').textContent = JSON.stringify({ message: '已保存到本地（后续接后端配置）', rules }, null, 2);
-};
-
 $('state').textContent = token ? '已加载本地Token' : '未登录';
-loadRules();

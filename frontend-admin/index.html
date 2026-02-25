@@ -19,6 +19,12 @@
     </section>
 
     <section class="card">
+      <h2>监控总览（初版）</h2>
+      <button id="btnMonitoring">刷新监控总览</button>
+      <pre id="monitoring"></pre>
+    </section>
+
+    <section class="card">
       <h2>创建用户</h2>
       <input id="newUserName" placeholder="username" />
       <input id="newUserPassword" placeholder="password" type="password" />
@@ -46,20 +52,7 @@
     </section>
 
     <section class="card">
-      <h2>系统总览</h2>
-      <button id="btnOverview">刷新状态总览</button>
-      <pre id="overview"></pre>
-    </section>
-
-    <section class="card">
-      <h2>审计日志</h2>
-      <button id="btnAudit">读取审计日志</button>
-      <pre id="audit"></pre>
-    </section>
-
-    <section class="card">
-      <h2>状态规则配置（前端占位）</h2>
-      <p>先作为配置草案保存在浏览器本地，后续接后端配置中心。</p>
+      <h2>状态规则配置（后端版）</h2>
       <div class="grid2">
         <label>CPU 黄阈值(%)<input id="cpuWarn" type="number" value="70" /></label>
         <label>CPU 红阈值(%)<input id="cpuCritical" type="number" value="90" /></label>
@@ -68,8 +61,17 @@
         <label>磁盘 黄阈值(%)<input id="diskWarn" type="number" value="80" /></label>
         <label>磁盘 红阈值(%)<input id="diskCritical" type="number" value="95" /></label>
       </div>
-      <button id="btnSaveRules">保存规则到本地</button>
+      <div class="grid2">
+        <button id="btnLoadRules">读取后端规则</button>
+        <button id="btnSaveRules">保存到后端</button>
+      </div>
       <pre id="ruleResult"></pre>
+    </section>
+
+    <section class="card">
+      <h2>审计日志</h2>
+      <button id="btnAudit">读取审计日志</button>
+      <pre id="audit"></pre>
     </section>
   </main>
   <script src="./app.js"></script>

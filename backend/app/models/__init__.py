@@ -1,6 +1,7 @@
 from .audit import AuditLog
 from .base import Base
 from .inspection import InspectionPoint, InspectionRecord
+from .rule import StatusRule
 from .selfcheck import ChecklistTemplate, SelfcheckRecord
 from .system import System, SystemStatusSnapshot
 from .user import Role, User
@@ -16,4 +17,5 @@ __all__ = [
     "ChecklistTemplate",
     "SelfcheckRecord",
     "AuditLog",
+    "StatusRule",
 ]

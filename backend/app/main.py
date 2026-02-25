@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from sqlalchemy.orm import Session
 
-from app.api import admin, auth, health, inspections, reports, selfchecks, systems
+from app.api import admin, auth, health, inspections, monitoring, reports, selfchecks, systems
 from app.core.config import settings
 from app.core.security import get_password_hash
 from app.db.session import SessionLocal, engine
@@ -17,6 +17,7 @@ app.include_router(auth.router, prefix=settings.API_PREFIX)
 app.include_router(inspections.router, prefix=settings.API_PREFIX)
 app.include_router(selfchecks.router, prefix=settings.API_PREFIX)
 app.include_router(systems.router, prefix=settings.API_PREFIX)
+app.include_router(monitoring.router, prefix=settings.API_PREFIX)
 app.include_router(reports.router, prefix=settings.API_PREFIX)
 app.include_router(admin.router, prefix=settings.API_PREFIX)
 

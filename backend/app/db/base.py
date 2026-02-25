@@ -1,5 +1,6 @@
 from app.models.audit import AuditLog
 from app.models.inspection import InspectionPoint, InspectionRecord
+from app.models.rule import StatusRule
 from app.models.selfcheck import ChecklistTemplate, SelfcheckRecord
 from app.models.system import System, SystemStatusSnapshot
 from app.models.user import Role, User
@@ -14,4 +15,5 @@ __all__ = [
     "SelfcheckRecord",
     "SystemStatusSnapshot",
     "AuditLog",
+    "StatusRule",
 ]
