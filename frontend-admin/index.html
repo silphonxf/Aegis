@@ -20,8 +20,27 @@
 
     <section class="card">
       <h2>监控总览（初版）</h2>
-      <button id="btnMonitoring">刷新监控总览</button>
+      <div class="grid2">
+        <button id="btnMonitoring">刷新监控总览</button>
+        <button id="btnExportAbnormal">导出异常清单 CSV</button>
+      </div>
+      <div class="kpis">
+        <div class="kpi green"><span>绿色</span><strong id="kpiGreen">0</strong></div>
+        <div class="kpi yellow"><span>黄色</span><strong id="kpiYellow">0</strong></div>
+        <div class="kpi red"><span>红色</span><strong id="kpiRed">0</strong></div>
+        <div class="kpi total"><span>总系统</span><strong id="kpiTotal">0</strong></div>
+      </div>
       <pre id="monitoring"></pre>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>系统</th><th>环境</th><th>状态</th><th>CPU</th><th>MEM</th><th>DISK</th>
+            </tr>
+          </thead>
+          <tbody id="abnormalTbody"></tbody>
+        </table>
+      </div>
     </section>
 
     <section class="card">

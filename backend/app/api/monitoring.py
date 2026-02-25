@@ -1,5 +1,8 @@
+import csv
+from io import StringIO
+
 from fastapi import APIRouter, Depends
-from sqlalchemy import case
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -13,47 +16,7 @@ from app.services.audit import log_action
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
 
-@router.get("/rules")
-def get_rules(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    rule = db.query(StatusRule).order_by(StatusRule.id.asc()).first()
-    if not rule:
-        rule = StatusRule()
-        db.add(rule)
-        db.commit()
-        db.refresh(rule)
-    return {
-        "cpu_warn": rule.cpu_warn,
-        "cpu_critical": rule.cpu_critical,
-        "mem_warn": rule.mem_warn,
-        "mem_critical": rule.mem_critical,
-        "disk_warn": rule.disk_warn,
-        "disk_critical": rule.disk_critical,
-    }
-
-
-@router.put("/rules")
-def update_rules(
-    payload: StatusRuleUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("super_admin")),
-):
-    rule = db.query(StatusRule).order_by(StatusRule.id.asc()).first()
-    if not rule:
-        rule = StatusRule()
-        db.add(rule)
-        db.flush()
-
-    for k, v in payload.model_dump().items():
-        setattr(rule, k, v)
-
-    db.commit()
-    db.refresh(rule)
-    log_action(db, "update_status_rules", "status_rules", current_user, payload.model_dump())
-    return {"updated": True}
-
-
-@router.get("/overview")
-def monitoring_overview(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+def _build_overview(db: Session):
     systems = db.query(System).all()
 
     items = []
@@ -97,5 +60,77 @@ def monitoring_overview(db: Session = Depends(get_db), _: User = Depends(get_cur
     }
 
     abnormal = [i for i in items if i["status_color"] in {"yellow", "red"}]
+    return summary, items, abnormal
 
+
+@router.get("/rules")
+def get_rules(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    rule = db.query(StatusRule).order_by(StatusRule.id.asc()).first()
+    if not rule:
+        rule = StatusRule()
+        db.add(rule)
+        db.commit()
+        db.refresh(rule)
+    return {
+        "cpu_warn": rule.cpu_warn,
+        "cpu_critical": rule.cpu_critical,
+        "mem_warn": rule.mem_warn,
+        "mem_critical": rule.mem_critical,
+        "disk_warn": rule.disk_warn,
+        "disk_critical": rule.disk_critical,
+    }
+
+
+@router.put("/rules")
+def update_rules(
+    payload: StatusRuleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+):
+    rule = db.query(StatusRule).order_by(StatusRule.id.asc()).first()
+    if not rule:
+        rule = StatusRule()
+        db.add(rule)
+        db.flush()
+
+    for k, v in payload.model_dump().items():
+        setattr(rule, k, v)
+
+    db.commit()
+    db.refresh(rule)
+    log_action(db, "update_status_rules", "status_rules", current_user, payload.model_dump())
+    return {"updated": True}
+
+
+@router.get("/overview")
+def monitoring_overview(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    summary, items, abnormal = _build_overview(db)
     return {"summary": summary, "items": items, "abnormal_items": abnormal[:20]}
+
+
+@router.get("/abnormal/export")
+def export_abnormal_csv(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    _, _, abnormal = _build_overview(db)
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["system_id", "system_code", "system_name", "env", "status_color", "cpu_level", "mem_level", "disk_level", "captured_at"])
+    for i in abnormal:
+        writer.writerow([
+            i["system_id"],
+            i["system_code"],
+            i["system_name"],
+            i["env"],
+            i["status_color"],
+            i["cpu_level"],
+            i["mem_level"],
+            i["disk_level"],
+            i["captured_at"],
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=monitoring_abnormal.csv"},
+    )

@@ -1,4 +1,4 @@
-# 运维助手 API 草案（v1.2 可联调）
+# 运维助手 API 草案（v1.3 可联调）
 
 Base URL: `/api/v1`
 
@@ -21,10 +21,11 @@ Base URL: `/api/v1`
 - `GET /systems/status/overview`
 - `POST /systems/{system_id}/status/snapshot?status_color=green`
 
-## 5. 监控（新增）
+## 5. 监控
 - `GET /monitoring/overview`（总览 + 异常列表）
 - `GET /monitoring/rules`（读取阈值规则）
 - `PUT /monitoring/rules`（更新阈值规则，super_admin）
+- `GET /monitoring/abnormal/export`（导出异常清单 CSV）
 
 ## 6. 报表
 - `GET /reports/inspections`
