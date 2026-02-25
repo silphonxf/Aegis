@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from sqlalchemy.orm import Session
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.api import admin, auth, health, inspections, monitoring, reports, selfchecks, systems
 from app.core.config import settings
@@ -65,6 +67,29 @@ def on_startup():
         init_seed(db)
     finally:
         db.close()
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "code": "VALIDATION_ERROR",
+            "message": "请求参数校验失败",
+            "errors": exc.errors(),
+        },
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "code": "HTTP_ERROR",
+            "message": str(exc.detail),
+        },
+    )
 
 
 @app.get("/")

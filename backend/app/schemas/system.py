@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 
 class SystemCreate(BaseModel):
@@ -9,10 +11,12 @@ class SystemCreate(BaseModel):
 
 
 class StatusSnapshotCreate(BaseModel):
-    host_online: str = "unknown"
-    port_ok: str = "unknown"
-    cpu_usage: int | None = None
-    mem_usage: int | None = None
-    disk_usage: int | None = None
-    last_inspection_result: str = "unknown"
-    last_selfcheck_result: str = "unknown"
+    host_online: Literal["normal", "abnormal", "unknown"] = "unknown"
+    port_ok: Literal["normal", "abnormal", "unknown"] = "unknown"
+
+    cpu_usage: int | None = Field(default=None, ge=0, le=100)
+    mem_usage: int | None = Field(default=None, ge=0, le=100)
+    disk_usage: int | None = Field(default=None, ge=0, le=100)
+
+    last_inspection_result: Literal["normal", "abnormal", "unknown"] = "unknown"
+    last_selfcheck_result: Literal["normal", "warning", "critical", "unknown"] = "unknown"

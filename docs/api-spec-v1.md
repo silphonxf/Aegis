@@ -55,3 +55,21 @@ Base URL: `/api/v1`
 
 ## 8. 健康检查
 - `GET /healthz`
+
+
+## 9. 错误响应约定（新增）
+- 参数校验失败：
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "请求参数校验失败",
+  "errors": [ ... ]
+}
+```
+- 业务/权限错误：
+```json
+{
+  "code": "HTTP_ERROR",
+  "message": "具体错误信息"
+}
+```
