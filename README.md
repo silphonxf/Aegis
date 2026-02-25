@@ -34,3 +34,4 @@ cd /home/xf/.openclaw/workspace/code/aegis
 - `docs/release-v1.0.0.md`
 - `docs/release-note-v0.3.md`
 - `docs/iteration3-acceptance.md`
+- `docs/dameng-setup.md`
