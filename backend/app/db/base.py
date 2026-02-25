@@ -1,3 +1,4 @@
+from app.models.audit import AuditLog
 from app.models.inspection import InspectionPoint, InspectionRecord
 from app.models.selfcheck import ChecklistTemplate, SelfcheckRecord
 from app.models.system import System, SystemStatusSnapshot
@@ -12,4 +13,5 @@ __all__ = [
     "ChecklistTemplate",
     "SelfcheckRecord",
     "SystemStatusSnapshot",
+    "AuditLog",
 ]

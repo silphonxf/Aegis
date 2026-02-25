@@ -5,6 +5,7 @@ from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.system import System, SystemStatusSnapshot
 from app.models.user import User
+from app.services.audit import log_action
 
 router = APIRouter(prefix="/systems", tags=["systems"])
 
@@ -36,10 +37,11 @@ def create_status_snapshot(
     system_id: int,
     status_color: str = "green",
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "super_admin")),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
     snap = SystemStatusSnapshot(system_id=system_id, status_color=status_color)
     db.add(snap)
     db.commit()
     db.refresh(snap)
+    log_action(db, "create_status_snapshot", "system_status_snapshot", current_user, {"snapshot_id": snap.id})
     return {"id": snap.id, "system_id": system_id, "saved": True}
