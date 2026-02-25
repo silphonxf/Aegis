@@ -19,17 +19,30 @@
     </section>
 
     <section class="card">
-      <h2>监控总览（初版）</h2>
+      <h2>全局看板（系统 + 资产）</h2>
       <div class="grid2">
         <button id="btnMonitoring">刷新监控总览</button>
         <button id="btnExportAbnormal">导出异常清单 CSV</button>
       </div>
+      <div class="grid2">
+        <button id="btnAssetSummary">刷新资产概览</button>
+        <button id="btnRefreshDashboard">一键刷新全看板</button>
+      </div>
+      <h3>系统状态</h3>
       <div class="kpis">
         <div class="kpi green"><span>绿色</span><strong id="kpiGreen">0</strong></div>
         <div class="kpi yellow"><span>黄色</span><strong id="kpiYellow">0</strong></div>
         <div class="kpi red"><span>红色</span><strong id="kpiRed">0</strong></div>
         <div class="kpi total"><span>总系统</span><strong id="kpiTotal">0</strong></div>
       </div>
+      <h3>资产概览</h3>
+      <div class="kpis">
+        <div class="kpi total"><span>总资产</span><strong id="assetTotal">0</strong></div>
+        <div class="kpi green"><span>在用</span><strong id="assetInUse">0</strong></div>
+        <div class="kpi yellow"><span>维修中</span><strong id="assetRepair">0</strong></div>
+        <div class="kpi red"><span>停用</span><strong id="assetRetired">0</strong></div>
+      </div>
+      <pre id="assetSummary"></pre>
       <pre id="monitoring"></pre>
       <div class="table-wrap">
         <table>

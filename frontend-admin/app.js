@@ -71,6 +71,15 @@ function renderMonitoring(data){
   $('abnormalTbody').innerHTML = rows || '<tr><td colspan="7">暂无异常系统</td></tr>';
 }
 
+function renderAssetSummary(data) {
+  const byStatus = Object.fromEntries((data.by_status || []).map(i => [i.status, i.count]));
+  $('assetTotal').textContent = data.total ?? 0;
+  $('assetInUse').textContent = byStatus.in_use ?? 0;
+  $('assetRepair').textContent = byStatus.repair ?? 0;
+  $('assetRetired').textContent = byStatus.retired ?? 0;
+  $('assetSummary').textContent = JSON.stringify(data, null, 2);
+}
+
 $('btnLogin').onclick = async () => {
   try {
     const d = await request('/api/v1/auth/login', {
@@ -86,6 +95,24 @@ $('btnLogin').onclick = async () => {
 $('btnMonitoring').onclick = async () => {
   try { renderMonitoring(await request('/api/v1/monitoring/overview',{headers:headers()})); }
   catch(e){ $('monitoring').textContent = e.message; }
+};
+
+$('btnAssetSummary').onclick = async () => {
+  try { renderAssetSummary(await request('/api/v1/admin/assets/summary', { headers: headers() })); }
+  catch(e){ $('assetSummary').textContent = e.message; }
+};
+
+$('btnRefreshDashboard').onclick = async () => {
+  try {
+    const [monitoring, assets] = await Promise.all([
+      request('/api/v1/monitoring/overview', { headers: headers() }),
+      request('/api/v1/admin/assets/summary', { headers: headers() }),
+    ]);
+    renderMonitoring(monitoring);
+    renderAssetSummary(assets);
+  } catch (e) {
+    $('monitoring').textContent = `看板刷新失败: ${e.message}`;
+  }
 };
 
 $('btnExportAbnormal').onclick = async () => {

@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
@@ -200,6 +201,22 @@ def list_assets(
             }
             for a in items
         ],
+    }
+
+
+@router.get("/assets/summary")
+def assets_summary(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    total = db.query(func.count(Asset.id)).scalar() or 0
+    by_status_rows = db.query(Asset.status, func.count(Asset.id)).group_by(Asset.status).all()
+    by_category_rows = db.query(Asset.category, func.count(Asset.id)).group_by(Asset.category).all()
+
+    return {
+        "total": total,
+        "by_status": [{"status": row[0], "count": row[1]} for row in by_status_rows],
+        "by_category": [{"category": row[0], "count": row[1]} for row in by_category_rows],
     }
 
 
