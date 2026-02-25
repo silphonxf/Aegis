@@ -44,30 +44,42 @@
     </section>
 
     <section class="card">
-      <h2>创建用户</h2>
+      <h2>用户管理</h2>
       <input id="newUserName" placeholder="username" />
       <input id="newUserPassword" placeholder="password" type="password" />
       <select id="newUserRole"><option value="inspector">inspector</option><option value="admin">admin</option><option value="super_admin">super_admin</option></select>
-      <button id="btnCreateUser">创建用户</button>
+      <div class="grid2">
+        <button id="btnCreateUser">创建用户</button>
+        <button id="btnListUsers">刷新用户列表</button>
+      </div>
       <pre id="userCreateResult"></pre>
+      <pre id="userListResult"></pre>
     </section>
 
     <section class="card">
-      <h2>创建系统</h2>
+      <h2>系统管理</h2>
       <input id="newSystemCode" placeholder="system_code" />
       <input id="newSystemName" placeholder="name" />
       <input id="newSystemEnv" placeholder="env (prod/test/dev)" value="prod" />
-      <button id="btnCreateSystem">创建系统</button>
+      <div class="grid2">
+        <button id="btnCreateSystem">创建系统</button>
+        <button id="btnListSystems">刷新系统列表</button>
+      </div>
       <pre id="systemCreateResult"></pre>
+      <pre id="systemListResult"></pre>
     </section>
 
     <section class="card">
-      <h2>创建自检模板</h2>
+      <h2>自检模板管理</h2>
       <input id="tplSystemId" placeholder="system_id" />
       <select id="tplCheckType"><option value="daily">daily</option><option value="weekly">weekly</option><option value="yearly">yearly</option></select>
       <input id="tplName" placeholder="模板名称" />
-      <button id="btnCreateTemplate">创建模板</button>
+      <div class="grid2">
+        <button id="btnCreateTemplate">创建模板</button>
+        <button id="btnListTemplates">刷新模板列表</button>
+      </div>
       <pre id="templateCreateResult"></pre>
+      <pre id="templateListResult"></pre>
     </section>
 
     <section class="card">

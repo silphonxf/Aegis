@@ -135,6 +135,20 @@ $('btnCreateSystem').onclick = async () => {
   } catch(e){ $('systemCreateResult').textContent = e.message; }
 };
 
+$('btnListUsers').onclick = async () => {
+  try {
+    const d = await request('/api/v1/admin/users?page=1&size=50', { headers: headers() });
+    $('userListResult').textContent = JSON.stringify(d, null, 2);
+  } catch (e) { $('userListResult').textContent = e.message; }
+};
+
+$('btnListSystems').onclick = async () => {
+  try {
+    const d = await request('/api/v1/admin/systems?page=1&size=50', { headers: headers() });
+    $('systemListResult').textContent = JSON.stringify(d, null, 2);
+  } catch (e) { $('systemListResult').textContent = e.message; }
+};
+
 $('btnCreateTemplate').onclick = async () => {
   try {
     const d = await request('/api/v1/selfchecks/templates', {
@@ -143,6 +157,13 @@ $('btnCreateTemplate').onclick = async () => {
     });
     $('templateCreateResult').textContent = JSON.stringify(d, null, 2);
   } catch(e){ $('templateCreateResult').textContent = e.message; }
+};
+
+$('btnListTemplates').onclick = async () => {
+  try {
+    const d = await request('/api/v1/selfchecks/templates?page=1&size=50', { headers: headers() });
+    $('templateListResult').textContent = JSON.stringify(d, null, 2);
+  } catch (e) { $('templateListResult').textContent = e.message; }
 };
 
 $('btnCreateSnapshot').onclick = async () => {
