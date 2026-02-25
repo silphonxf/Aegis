@@ -120,6 +120,28 @@
       </div>
       <pre id="audit"></pre>
     </section>
+
+    <section class="card">
+      <h2>错误码说明</h2>
+      <ul class="code-list">
+        <li><code>TOKEN_EXPIRED</code>：Token 过期，需要重新登录</li>
+        <li><code>TOKEN_INVALID</code>：Token 无效或格式错误</li>
+        <li><code>USER_DISABLED</code>：账号已禁用</li>
+        <li><code>USER_NOT_FOUND</code>：账号不存在</li>
+        <li><code>FORBIDDEN</code>：权限不足</li>
+        <li><code>VALIDATION_ERROR</code>：参数校验失败</li>
+        <li><code>HTTP_ERROR</code>：通用业务错误</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>接口调试历史（最近20条）</h2>
+      <div class="grid2">
+        <button id="btnRefreshHistory">刷新历史</button>
+        <button id="btnClearHistory">清空历史</button>
+      </div>
+      <pre id="requestHistory"></pre>
+    </section>
   </main>
   <script src="./app.js"></script>
 </body>

@@ -20,3 +20,6 @@ table { width:100%; border-collapse: collapse; background:#fff; }
 th,td { border-bottom:1px solid #d8dee4; padding:8px; text-align:left; font-size:13px; }
 @media (max-width: 900px){ .kpis{ grid-template-columns:1fr 1fr; } .grid3{ grid-template-columns:1fr 1fr; } }
 @media (max-width: 640px){ .grid2{ grid-template-columns:1fr; } .grid3{ grid-template-columns:1fr; } .kpis{ grid-template-columns:1fr; } }
+
+.code-list { margin: 0; padding-left: 18px; }
+.code-list li { margin: 6px 0; }

@@ -37,5 +37,7 @@ python3 -m http.server 5174
 6) 后台查看审计日志
 
 ## 6. 新增联调点
+- 后台新增“错误码说明”面板，便于联调快速定位
+- 后台新增“接口调试历史”（最近20条请求）
 - 后台审计日志支持 action/username/resource/time/keyword 组合筛选
 - 当 token 过期或失效时，后台页面会自动清除本地 token 并提示重新登录

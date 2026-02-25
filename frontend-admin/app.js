@@ -1,8 +1,25 @@
 const $ = (id) => document.getElementById(id);
 let token = localStorage.getItem('aegis_admin_token') || '';
 
+const REQ_HISTORY_KEY = 'aegis_admin_request_history';
+
 function base(){ return $('apiBase').value.trim().replace(/\/$/, ''); }
 function headers(){ const h = {'Content-Type':'application/json'}; if(token) h.Authorization = `Bearer ${token}`; return h; }
+
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem(REQ_HISTORY_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function pushHistory(item) {
+  const arr = getHistory();
+  arr.unshift(item);
+  localStorage.setItem(REQ_HISTORY_KEY, JSON.stringify(arr.slice(0, 20)));
+}
+
+function renderHistory() {
+  $('requestHistory').textContent = JSON.stringify(getHistory(), null, 2);
+}
 
 function forceRelogin(message = '登录已失效，请重新登录') {
   token = '';
@@ -11,18 +28,26 @@ function forceRelogin(message = '登录已失效，请重新登录') {
 }
 
 async function request(path, options={}){
-  const r = await fetch(`${base()}${path}`, options);
-  const d = await r.json().catch(()=>({}));
+  const startedAt = new Date().toISOString();
+  const method = options.method || 'GET';
+  const resp = await fetch(`${base()}${path}`, options);
+  const data = await resp.json().catch(()=>({}));
 
-  if (!r.ok) {
-    const code = d?.code;
-    const msg = d?.message || `HTTP ${r.status}`;
+  if (!resp.ok) {
+    const code = data?.code;
+    const msg = data?.message || `HTTP ${resp.status}`;
+    pushHistory({ startedAt, method, path, ok: false, status: resp.status, code: code || null, message: msg });
+    renderHistory();
+
     if (code === 'TOKEN_EXPIRED' || code === 'TOKEN_INVALID' || code === 'USER_DISABLED' || code === 'USER_NOT_FOUND') {
       forceRelogin(`${msg}（请重新登录）`);
     }
     throw new Error(`${code ? `[${code}] ` : ''}${msg}`);
   }
-  return d;
+
+  pushHistory({ startedAt, method, path, ok: true, status: resp.status, code: null, message: 'OK' });
+  renderHistory();
+  return data;
 }
 
 function renderMonitoring(data){
@@ -64,12 +89,15 @@ $('btnMonitoring').onclick = async () => {
 };
 
 $('btnExportAbnormal').onclick = async () => {
+  const startedAt = new Date().toISOString();
   try {
     const resp = await fetch(`${base()}/api/v1/monitoring/abnormal/export`, { headers: { Authorization: `Bearer ${token}` } });
     if (!resp.ok) {
       const d = await resp.json().catch(()=>({}));
       const code = d?.code;
       const msg = d?.message || `HTTP ${resp.status}`;
+      pushHistory({ startedAt, method: 'GET', path: '/api/v1/monitoring/abnormal/export', ok: false, status: resp.status, code: code || null, message: msg });
+      renderHistory();
       if (code === 'TOKEN_EXPIRED' || code === 'TOKEN_INVALID' || code === 'USER_DISABLED' || code === 'USER_NOT_FOUND') {
         forceRelogin(`${msg}（请重新登录）`);
       }
@@ -82,6 +110,8 @@ $('btnExportAbnormal').onclick = async () => {
     a.download = 'monitoring_abnormal.csv';
     a.click();
     URL.revokeObjectURL(url);
+    pushHistory({ startedAt, method: 'GET', path: '/api/v1/monitoring/abnormal/export', ok: true, status: resp.status, code: null, message: 'CSV downloaded' });
+    renderHistory();
   } catch (e) { $('monitoring').textContent = `导出失败: ${e.message}`; }
 };
 
@@ -188,4 +218,8 @@ $('btnAuditClear').onclick = () => {
   $('audit').textContent = '已清空筛选条件';
 };
 
+$('btnRefreshHistory').onclick = () => renderHistory();
+$('btnClearHistory').onclick = () => { localStorage.removeItem(REQ_HISTORY_KEY); renderHistory(); };
+
 $('state').textContent = token ? '已加载本地Token' : '未登录';
+renderHistory();
