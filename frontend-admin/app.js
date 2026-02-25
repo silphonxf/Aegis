@@ -63,9 +63,9 @@ function renderMonitoring(data){
       <td>${i.system_code} / ${i.system_name}</td>
       <td>${i.env}</td>
       <td>${i.status_color}</td>
-      <td>${i.cpu_level || 'unknown'}</td>
-      <td>${i.mem_level || 'unknown'}</td>
-      <td>${i.disk_level || 'unknown'}</td>
+      <td>${i.cpu_usage ?? '-'}% (${i.cpu_level || 'unknown'})</td>
+      <td>${i.mem_usage ?? '-'}% (${i.mem_level || 'unknown'})</td>
+      <td>${i.disk_usage ?? '-'}% (${i.disk_level || 'unknown'})</td>
       <td>${i.captured_at || '-'}</td>
     </tr>
   `).join('');

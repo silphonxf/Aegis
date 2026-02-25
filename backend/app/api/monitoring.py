@@ -1,5 +1,4 @@
 import csv
-import os
 import shutil
 import socket
 import time
@@ -33,12 +32,16 @@ def _build_overview(db: Session):
         )
         if snap:
             color = snap.status_color
+            cpu_usage = snap.cpu_usage
+            mem_usage = snap.mem_usage
+            disk_usage = snap.disk_usage
             cpu_level = snap.cpu_level
             mem_level = snap.mem_level
             disk_level = snap.disk_level
             captured_at = snap.captured_at
         else:
             color = "green"
+            cpu_usage = mem_usage = disk_usage = None
             cpu_level = mem_level = disk_level = "unknown"
             captured_at = None
 
@@ -49,6 +52,9 @@ def _build_overview(db: Session):
                 "system_name": s.name,
                 "env": s.env,
                 "status_color": color,
+                "cpu_usage": cpu_usage,
+                "mem_usage": mem_usage,
+                "disk_usage": disk_usage,
                 "cpu_level": cpu_level,
                 "mem_level": mem_level,
                 "disk_level": disk_level,
@@ -222,6 +228,9 @@ def collect_local_snapshot(
         system_id=system.id,
         host_online=host_online,
         port_ok=port_ok,
+        cpu_usage=cpu_usage,
+        mem_usage=mem_usage,
+        disk_usage=disk_usage,
         cpu_level=cpu_level,
         mem_level=mem_level,
         disk_level=disk_level,
