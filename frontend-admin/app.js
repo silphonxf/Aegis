@@ -115,6 +115,20 @@ $('btnRefreshDashboard').onclick = async () => {
   }
 };
 
+$('btnCollectLocal').onclick = async () => {
+  try {
+    const code = $('localSystemCode').value.trim() || 'HOST-LOCAL-001';
+    const d = await request(`/api/v1/monitoring/collect/local?system_code=${encodeURIComponent(code)}`, {
+      method: 'POST',
+      headers: headers(),
+    });
+    $('monitoring').textContent = `本机采集成功:\n${JSON.stringify(d, null, 2)}`;
+    $('btnRefreshDashboard').click();
+  } catch (e) {
+    $('monitoring').textContent = `本机采集失败: ${e.message}`;
+  }
+};
+
 $('btnExportAbnormal').onclick = async () => {
   const startedAt = new Date().toISOString();
   try {

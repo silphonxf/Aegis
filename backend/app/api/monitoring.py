@@ -1,4 +1,8 @@
 import csv
+import os
+import shutil
+import socket
+import time
 from io import StringIO
 
 from fastapi import APIRouter, Depends
@@ -63,6 +67,72 @@ def _build_overview(db: Session):
     return summary, items, abnormal
 
 
+def _normalize_metric(value: int | None, warn: int, critical: int) -> str:
+    if value is None:
+        return "unknown"
+    if value >= critical:
+        return "critical"
+    if value >= warn:
+        return "warning"
+    return "normal"
+
+
+def _calc_color(levels: list[str], host_online: str, port_ok: str, last_inspection_result: str, last_selfcheck_result: str) -> str:
+    if host_online == "abnormal" or port_ok == "abnormal":
+        return "red"
+    if last_inspection_result == "abnormal" or last_selfcheck_result == "critical":
+        return "red"
+    if "critical" in levels:
+        return "red"
+    if last_selfcheck_result == "warning" or "warning" in levels:
+        return "yellow"
+    return "green"
+
+
+def _cpu_percent() -> int:
+    def read_cpu_times() -> tuple[int, int]:
+        with open("/proc/stat", "r", encoding="utf-8") as f:
+            first = f.readline().split()
+        values = [int(x) for x in first[1:]]
+        idle = values[3] + (values[4] if len(values) > 4 else 0)
+        total = sum(values)
+        return idle, total
+
+    idle1, total1 = read_cpu_times()
+    time.sleep(0.2)
+    idle2, total2 = read_cpu_times()
+    total_diff = max(total2 - total1, 1)
+    idle_diff = max(idle2 - idle1, 0)
+    usage = int(round((1 - idle_diff / total_diff) * 100))
+    return max(0, min(100, usage))
+
+
+def _mem_percent() -> int:
+    info = {}
+    with open("/proc/meminfo", "r", encoding="utf-8") as f:
+        for line in f:
+            k, v = line.split(":", 1)
+            info[k] = int(v.strip().split()[0])
+    total = max(info.get("MemTotal", 1), 1)
+    available = info.get("MemAvailable", 0)
+    usage = int(round((1 - available / total) * 100))
+    return max(0, min(100, usage))
+
+
+def _disk_percent(path: str = "/") -> int:
+    usage = shutil.disk_usage(path)
+    pct = int(round((usage.used / max(usage.total, 1)) * 100))
+    return max(0, min(100, pct))
+
+
+def _tcp_check(host: str = "127.0.0.1", port: int = 8000, timeout: float = 1.0) -> str:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return "normal"
+    except OSError:
+        return "abnormal"
+
+
 @router.get("/rules")
 def get_rules(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     rule = db.query(StatusRule).order_by(StatusRule.id.asc()).first()
@@ -106,6 +176,77 @@ def update_rules(
 def monitoring_overview(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     summary, items, abnormal = _build_overview(db)
     return {"summary": summary, "items": items, "abnormal_items": abnormal[:20]}
+
+
+@router.post("/collect/local")
+def collect_local_snapshot(
+    system_code: str = "HOST-LOCAL-001",
+    env: str = "prod",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    hostname = socket.gethostname()
+    system = db.query(System).filter(System.system_code == system_code).first()
+    if not system:
+        system = System(system_code=system_code, name=f"本机-{hostname}", env=env)
+        db.add(system)
+        db.commit()
+        db.refresh(system)
+
+    rule = db.query(StatusRule).order_by(StatusRule.id.asc()).first()
+    if not rule:
+        rule = StatusRule()
+        db.add(rule)
+        db.commit()
+        db.refresh(rule)
+
+    cpu_usage = _cpu_percent()
+    mem_usage = _mem_percent()
+    disk_usage = _disk_percent("/")
+    host_online = "normal"
+    port_ok = _tcp_check("127.0.0.1", 8000)
+
+    cpu_level = _normalize_metric(cpu_usage, rule.cpu_warn, rule.cpu_critical)
+    mem_level = _normalize_metric(mem_usage, rule.mem_warn, rule.mem_critical)
+    disk_level = _normalize_metric(disk_usage, rule.disk_warn, rule.disk_critical)
+
+    status_color = _calc_color(
+        [cpu_level, mem_level, disk_level],
+        host_online=host_online,
+        port_ok=port_ok,
+        last_inspection_result="unknown",
+        last_selfcheck_result="unknown",
+    )
+
+    snap = SystemStatusSnapshot(
+        system_id=system.id,
+        host_online=host_online,
+        port_ok=port_ok,
+        cpu_level=cpu_level,
+        mem_level=mem_level,
+        disk_level=disk_level,
+        last_inspection_result="unknown",
+        last_selfcheck_result="unknown",
+        status_color=status_color,
+    )
+    db.add(snap)
+    db.commit()
+    db.refresh(snap)
+
+    payload = {
+        "system_id": system.id,
+        "system_code": system.system_code,
+        "hostname": hostname,
+        "cpu_usage": cpu_usage,
+        "mem_usage": mem_usage,
+        "disk_usage": disk_usage,
+        "cpu_level": cpu_level,
+        "mem_level": mem_level,
+        "disk_level": disk_level,
+        "status_color": status_color,
+    }
+    log_action(db, "collect_local_snapshot", "monitoring", current_user, payload)
+    return payload
 
 
 @router.get("/abnormal/export")
