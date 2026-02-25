@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -53,6 +53,15 @@ def create_selfcheck_record(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    if payload.template_id <= 0:
+        raise HTTPException(status_code=400, detail={"code": "TEMPLATE_INVALID", "message": "template_id 必须为正整数"})
+
+    tpl = db.query(ChecklistTemplate).filter(ChecklistTemplate.id == payload.template_id).first()
+    if not tpl:
+        raise HTTPException(status_code=400, detail={"code": "TEMPLATE_NOT_FOUND", "message": "自检模板不存在"})
+    if tpl.system_id != payload.system_id:
+        raise HTTPException(status_code=400, detail={"code": "TEMPLATE_SYSTEM_MISMATCH", "message": "模板与系统不匹配"})
+
     r = SelfcheckRecord(
         system_id=payload.system_id,
         template_id=payload.template_id,
