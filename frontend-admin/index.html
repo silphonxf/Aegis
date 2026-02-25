@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>运维助手 - 管理后台联调版</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header><h1>运维助手（管理后台）</h1></header>
+  <main>
+    <section class="card">
+      <h2>登录</h2>
+      <input id="apiBase" value="http://127.0.0.1:8000" />
+      <input id="username" value="admin" />
+      <input id="password" type="password" value="admin123" />
+      <button id="btnLogin">登录</button>
+      <p id="state"></p>
+    </section>
+
+    <section class="card">
+      <h2>系统总览</h2>
+      <button id="btnOverview">刷新状态总览</button>
+      <pre id="overview"></pre>
+    </section>
+
+    <section class="card">
+      <h2>审计日志</h2>
+      <button id="btnAudit">读取审计日志</button>
+      <pre id="audit"></pre>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
