@@ -270,6 +270,46 @@ $('btnLoadRules').onclick = async () => {
   }
 };
 
+$('btnToolPing').onclick = async () => {
+  try {
+    const data = await api('/api/v1/toolbox/ping', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ host: $('tbPingHost').value.trim(), count: 1 }),
+    });
+    show('toolboxResult', data);
+  } catch (e) { show('toolboxResult', e.message); }
+};
+
+$('btnToolPort').onclick = async () => {
+  try {
+    const data = await api('/api/v1/toolbox/port-check', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ host: $('tbPortHost').value.trim(), port: Number($('tbPort').value), timeout_ms: 1200 }),
+    });
+    show('toolboxResult', data);
+  } catch (e) { show('toolboxResult', e.message); }
+};
+
+$('btnToolRestart').onclick = async () => {
+  try {
+    const data = await api('/api/v1/toolbox/restart-task', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ target: $('tbRestartTarget').value.trim(), reason: 'mobile-toolbox-mock' }),
+    });
+    show('toolboxResult', data);
+  } catch (e) { show('toolboxResult', e.message); }
+};
+
+$('btnAiDiagnose').onclick = async () => {
+  try {
+    const data = await api('/api/v1/ai/diagnose', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ title: $('aiTitle').value.trim(), detail: $('aiDetail').value.trim(), severity: $('aiSeverity').value }),
+    });
+    show('aiResult', data);
+  } catch (e) { show('aiResult', e.message); }
+};
+
 $('btnExportLogs').onclick = exportDebugLogs;
 $('btnClearLogs').onclick = () => {
   state.requestLogs = [];

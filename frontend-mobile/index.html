@@ -82,6 +82,35 @@
       </section>
 
       <section class="card">
+        <h2>移动端工具箱（迭代3）</h2>
+        <div class="grid two">
+          <label>Ping 主机<input id="tbPingHost" value="127.0.0.1" /></label>
+          <label>端口检测 host<input id="tbPortHost" value="127.0.0.1" /></label>
+          <label>端口<input id="tbPort" type="number" value="8000" /></label>
+          <label>重启任务目标<input id="tbRestartTarget" value="local-host" /></label>
+        </div>
+        <div class="actions">
+          <button id="btnToolPing">执行 Ping</button>
+          <button id="btnToolPort" class="secondary">检测端口</button>
+          <button id="btnToolRestart">创建重启任务(审批)</button>
+        </div>
+        <pre id="toolboxResult"></pre>
+      </section>
+
+      <section class="card">
+        <h2>AI 诊断（Mock）</h2>
+        <div class="grid two">
+          <label>标题<input id="aiTitle" value="数据库连接超时" /></label>
+          <label>严重级别
+            <select id="aiSeverity"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option></select>
+          </label>
+          <label class="full">详情<input id="aiDetail" value="业务高峰期出现 timeout，怀疑连接池打满" /></label>
+        </div>
+        <button id="btnAiDiagnose">生成诊断建议</button>
+        <pre id="aiResult"></pre>
+      </section>
+
+      <section class="card">
         <h2>错误码说明 + 请求历史</h2>
         <pre id="errorCodeDoc"></pre>
         <div class="actions">

@@ -5,6 +5,7 @@ from .inspection import InspectionPoint, InspectionRecord
 from .rule import StatusRule
 from .selfcheck import ChecklistTemplate, SelfcheckRecord
 from .system import System, SystemStatusSnapshot
+from .tool_task import ToolTask
 from .user import Role, User
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "AuditLog",
     "StatusRule",
     "Asset",
+    "ToolTask",
 ]

@@ -35,6 +35,8 @@ uvicorn app.main:app --reload --port 8000
 - 提交巡检记录 + 查看巡检历史
 - 提交自检记录 + 查看自检历史
 - 监控总览与规则查询
+- 移动端工具箱（Ping、端口检测、重启任务审批mock）
+- AI 诊断接口（mock）
 - 错误码说明面板（AUTH_INVALID / VALIDATION_ERROR 等）
 - 请求历史（自动记录 method/url/status/耗时/请求体/响应体）
 - 一键导出联调日志 JSON（用于排障与复盘）
