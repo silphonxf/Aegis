@@ -57,18 +57,19 @@ function renderMonitoring(data){
   $('kpiTotal').textContent = data.summary?.total ?? 0;
   $('monitoring').textContent = JSON.stringify(data.summary, null, 2);
 
-  const rows = (data.abnormal_items || []).map(i => `
+  const rows = (data.items || []).map(i => `
     <tr>
       <td>${i.system_id}</td>
       <td>${i.system_code} / ${i.system_name}</td>
       <td>${i.env}</td>
       <td>${i.status_color}</td>
-      <td>${i.cpu_level}</td>
-      <td>${i.mem_level}</td>
-      <td>${i.disk_level}</td>
+      <td>${i.cpu_level || 'unknown'}</td>
+      <td>${i.mem_level || 'unknown'}</td>
+      <td>${i.disk_level || 'unknown'}</td>
+      <td>${i.captured_at || '-'}</td>
     </tr>
   `).join('');
-  $('abnormalTbody').innerHTML = rows || '<tr><td colspan="7">暂无异常系统</td></tr>';
+  $('abnormalTbody').innerHTML = rows || '<tr><td colspan="8">暂无系统数据</td></tr>';
 }
 
 function renderAssetSummary(data) {
