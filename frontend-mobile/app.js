@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 const state = {
   token: localStorage.getItem('aegis_token') || '',
   requestLogs: JSON.parse(localStorage.getItem('aegis_request_logs') || '[]'),
+  lastAppPanel: 'panel-overview',
 };
 
 const ERROR_CODE_DOC = {
@@ -24,9 +25,34 @@ function show(id, data) { $(id).textContent = typeof data === 'string' ? data : 
 function switchScreen(loggedIn) {
   $('loginScreen').classList.toggle('active', !loggedIn);
   $('appScreen').classList.toggle('active', loggedIn);
+  $('listScreen').classList.remove('active');
+}
+
+function openListScreen(title, rows = [], fields = []) {
+  $('listTitle').textContent = title;
+  $('listMeta').textContent = `共 ${rows.length} 条`;
+  const container = $('listContainer');
+  if (!rows.length) {
+    container.innerHTML = '<div class="list-item"><h3>暂无数据</h3></div>';
+  } else {
+    container.innerHTML = rows.map((row, idx) => {
+      const kv = fields.map((f) => `<div class="k">${f.label}</div><div class="v">${row[f.key] ?? '-'}</div>`).join('');
+      return `<article class="list-item"><h3>#${idx + 1}</h3><div class="list-kv">${kv}</div></article>`;
+    }).join('');
+  }
+  $('appScreen').classList.remove('active');
+  $('loginScreen').classList.remove('active');
+  $('listScreen').classList.add('active');
+}
+
+function closeListScreen() {
+  $('listScreen').classList.remove('active');
+  $('appScreen').classList.add('active');
+  switchPanel(state.lastAppPanel || 'panel-overview');
 }
 
 function switchPanel(panelId) {
+  state.lastAppPanel = panelId;
   document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
   document.querySelectorAll('.menu-tabs .tab').forEach((t) => t.classList.remove('active'));
   const panel = document.getElementById(panelId);
@@ -127,21 +153,70 @@ $('btnLogout').onclick = () => {
 $('btnMe').onclick = async () => { try { show('meResult', await api('/api/v1/auth/me', { headers: authHeaders() })); } catch (e) { show('meResult', e.message); } };
 $('btnResolve').onclick = async () => { try { const qr = encodeURIComponent($('qrContent').value.trim()); const data = await api(`/api/v1/inspections/points/resolve?qr_content=${qr}`, { headers: authHeaders() }); show('resolveResult', data); $('insSystemId').value = data.system_id; $('insPointId').value = data.point_id; if (!$('scSystemId').value) $('scSystemId').value = data.system_id; } catch (e) { show('resolveResult', e.message); } };
 $('btnCreateInspection').onclick = async () => { try { show('inspectionResult', await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ system_id: Number($('insSystemId').value), point_id: Number($('insPointId').value), result: $('insResult').value, note: $('insNote').value || null, inspected_at: new Date().toISOString() }) })); } catch (e) { show('inspectionResult', e.message); } };
-$('btnLoadInspectionHistory').onclick = async () => { try { const sid = $('insSystemId').value.trim(); const q = sid ? `?system_id=${encodeURIComponent(sid)}&page=1&size=20` : '?page=1&size=20'; show('inspectionHistory', await api(`/api/v1/inspections/records${q}`, { headers: authHeaders() })); } catch (e) { show('inspectionHistory', e.message); } };
+$('btnLoadInspectionHistory').onclick = async () => {
+  try {
+    const sid = $('insSystemId').value.trim();
+    const q = sid ? `?system_id=${encodeURIComponent(sid)}&page=1&size=20` : '?page=1&size=20';
+    const data = await api(`/api/v1/inspections/records${q}`, { headers: authHeaders() });
+    openListScreen('巡检历史', data.items || [], [
+      { key: 'id', label: 'ID' },
+      { key: 'system_id', label: '系统ID' },
+      { key: 'result', label: '结果' },
+      { key: 'inspected_at', label: '巡检时间' },
+    ]);
+  } catch (e) { show('inspectionHistory', e.message); }
+};
 $('btnCreateSelfcheck').onclick = async () => { try { show('selfcheckResult', await api('/api/v1/selfchecks/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ system_id: Number($('scSystemId').value), template_id: Number($('scTemplateId').value), result: $('scResult').value, summary: $('scSummary').value || null, checked_at: new Date().toISOString() }) })); } catch (e) { show('selfcheckResult', e.message); } };
-$('btnLoadSelfcheckHistory').onclick = async () => { try { const sid = $('scSystemId').value.trim(); const q = sid ? `?system_id=${encodeURIComponent(sid)}&page=1&size=20` : '?page=1&size=20'; show('selfcheckHistory', await api(`/api/v1/selfchecks/records${q}`, { headers: authHeaders() })); } catch (e) { show('selfcheckHistory', e.message); } };
+$('btnLoadSelfcheckHistory').onclick = async () => {
+  try {
+    const sid = $('scSystemId').value.trim();
+    const q = sid ? `?system_id=${encodeURIComponent(sid)}&page=1&size=20` : '?page=1&size=20';
+    const data = await api(`/api/v1/selfchecks/records${q}`, { headers: authHeaders() });
+    openListScreen('自检历史', data.items || [], [
+      { key: 'id', label: 'ID' },
+      { key: 'system_id', label: '系统ID' },
+      { key: 'result', label: '结果' },
+      { key: 'checked_at', label: '自检时间' },
+    ]);
+  } catch (e) { show('selfcheckHistory', e.message); }
+};
 $('btnLoadOverview').onclick = async () => { try { show('overviewResult', await api('/api/v1/monitoring/overview', { headers: authHeaders() })); } catch (e) { show('overviewResult', e.message); } };
 $('btnLoadRules').onclick = async () => { try { show('rulesResult', await api('/api/v1/monitoring/rules', { headers: authHeaders() })); } catch (e) { show('rulesResult', e.message); } };
 $('btnToolPing').onclick = async () => { try { show('toolboxResult', await api('/api/v1/toolbox/ping', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ host: $('tbPingHost').value.trim(), count: 1 }) })); } catch (e) { show('toolboxResult', e.message); } };
 $('btnToolPort').onclick = async () => { try { show('toolboxResult', await api('/api/v1/toolbox/port-check', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ host: $('tbPortHost').value.trim(), port: Number($('tbPort').value), timeout_ms: 1200 }) })); } catch (e) { show('toolboxResult', e.message); } };
 $('btnToolRestart').onclick = async () => { try { show('toolboxResult', await api('/api/v1/toolbox/restart-task', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ target: $('tbRestartTarget').value.trim(), reason: 'mobile-toolbox-mock' }) })); } catch (e) { show('toolboxResult', e.message); } };
-$('btnTaskList').onclick = async () => { try { const s = $('taskStatusFilter').value; const q = s ? `?page=1&size=20&status=${encodeURIComponent(s)}` : '?page=1&size=20'; show('taskResult', await api(`/api/v1/toolbox/tasks${q}`, { headers: authHeaders() })); } catch (e) { show('taskResult', e.message); } };
+$('btnTaskList').onclick = async () => {
+  try {
+    const s = $('taskStatusFilter').value;
+    const q = s ? `?page=1&size=20&status=${encodeURIComponent(s)}` : '?page=1&size=20';
+    const data = await api(`/api/v1/toolbox/tasks${q}`, { headers: authHeaders() });
+    openListScreen('工具任务列表', data.items || [], [
+      { key: 'id', label: '任务ID' },
+      { key: 'action', label: '动作' },
+      { key: 'target', label: '目标' },
+      { key: 'status', label: '状态' },
+      { key: 'created_at', label: '创建时间' },
+    ]);
+  } catch (e) { show('taskResult', e.message); }
+};
 $('btnTaskUpdate').onclick = async () => { try { const taskId = Number($('taskId').value); show('taskResult', await api(`/api/v1/toolbox/tasks/${taskId}/status`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ status: $('taskToStatus').value, note: $('taskNote').value || null }) })); } catch (e) { show('taskResult', e.message); } };
 $('btnAiDiagnose').onclick = async () => { try { show('aiResult', await api('/api/v1/ai/diagnose', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ title: $('aiTitle').value.trim(), detail: $('aiDetail').value.trim(), severity: $('aiSeverity').value }) })); } catch (e) { show('aiResult', e.message); } };
-$('btnAiHistory').onclick = async () => { try { const sev = $('aiSeverity').value; show('aiHistory', await api(`/api/v1/ai/diagnoses?page=1&size=20&severity=${encodeURIComponent(sev)}`, { headers: authHeaders() })); } catch (e) { show('aiHistory', e.message); } };
+$('btnAiHistory').onclick = async () => {
+  try {
+    const sev = $('aiSeverity').value;
+    const data = await api(`/api/v1/ai/diagnoses?page=1&size=20&severity=${encodeURIComponent(sev)}`, { headers: authHeaders() });
+    openListScreen('AI诊断历史', data.items || [], [
+      { key: 'id', label: 'ID' },
+      { key: 'title', label: '标题' },
+      { key: 'severity', label: '级别' },
+      { key: 'created_at', label: '时间' },
+    ]);
+  } catch (e) { show('aiHistory', e.message); }
+};
 
 $('btnExportLogs').onclick = exportDebugLogs;
 $('btnClearLogs').onclick = () => { state.requestLogs = []; localStorage.removeItem('aegis_request_logs'); renderHistory(); };
+$('btnListBack').onclick = closeListScreen;
 
 setLoginState(state.token ? '已加载本地 Token，可直接进入主界面' : '未登录');
 upsertErrorDoc();

@@ -25,6 +25,32 @@ body {
 }
 .screen { display: none; }
 .screen.active { display: block; }
+.visual-list {
+  display: grid;
+  gap: 8px;
+  max-height: 72vh;
+  overflow: auto;
+  padding-right: 2px;
+}
+.list-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+.list-item h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #1e293b;
+}
+.list-kv {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 6px;
+  font-size: 12px;
+}
+.list-kv .k { color: #64748b; }
+.list-kv .v { color: #0f172a; word-break: break-word; }
 .topbar {
   position: sticky;
   top: 0;
