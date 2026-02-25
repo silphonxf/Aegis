@@ -93,6 +93,26 @@ $('btnCreateTemplate').onclick = async () => {
   } catch(e){ $('templateCreateResult').textContent = e.message; }
 };
 
+
+$('btnCreateSnapshot').onclick = async () => {
+  try {
+    const sid = Number($('snapSystemId').value);
+    const d = await request(`/api/v1/systems/${sid}/status/snapshot`, {
+      method:'POST', headers:headers(),
+      body: JSON.stringify({
+        host_online: $('snapHostOnline').value || 'normal',
+        port_ok: $('snapPortOk').value || 'normal',
+        cpu_usage: Number($('snapCpu').value),
+        mem_usage: Number($('snapMem').value),
+        disk_usage: Number($('snapDisk').value),
+        last_inspection_result: 'normal',
+        last_selfcheck_result: $('snapSelfcheck').value || 'normal'
+      })
+    });
+    $('snapshotResult').textContent = JSON.stringify(d, null, 2);
+  } catch (e) { $('snapshotResult').textContent = e.message; }
+};
+
 $('btnLoadRules').onclick = async () => {
   try {
     const r = await request('/api/v1/monitoring/rules', { headers: headers() });

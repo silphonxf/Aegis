@@ -1,4 +1,4 @@
-# 运维助手 API 草案（v1.3 可联调）
+# 运维助手 API 草案（v1.4 可联调）
 
 Base URL: `/api/v1`
 
@@ -19,7 +19,20 @@ Base URL: `/api/v1`
 
 ## 4. 系统状态
 - `GET /systems/status/overview`
-- `POST /systems/{system_id}/status/snapshot?status_color=green`
+- `POST /systems/{system_id}/status/snapshot`
+  - req:
+  ```json
+  {
+    "host_online": "normal",
+    "port_ok": "normal",
+    "cpu_usage": 68,
+    "mem_usage": 72,
+    "disk_usage": 80,
+    "last_inspection_result": "normal",
+    "last_selfcheck_result": "warning"
+  }
+  ```
+  - resp: 自动计算 `cpu_level/mem_level/disk_level` 与 `status_color`
 
 ## 5. 监控
 - `GET /monitoring/overview`（总览 + 异常列表）

@@ -70,6 +70,22 @@
       <pre id="templateCreateResult"></pre>
     </section>
 
+
+    <section class="card">
+      <h2>状态快照上报（自动算红黄绿）</h2>
+      <input id="snapSystemId" placeholder="system_id" />
+      <div class="grid2">
+        <input id="snapHostOnline" placeholder="host_online(normal/abnormal)" value="normal" />
+        <input id="snapPortOk" placeholder="port_ok(normal/abnormal)" value="normal" />
+        <input id="snapCpu" type="number" placeholder="cpu_usage(%)" value="60" />
+        <input id="snapMem" type="number" placeholder="mem_usage(%)" value="65" />
+        <input id="snapDisk" type="number" placeholder="disk_usage(%)" value="70" />
+        <input id="snapSelfcheck" placeholder="last_selfcheck_result" value="normal" />
+      </div>
+      <button id="btnCreateSnapshot">提交状态快照</button>
+      <pre id="snapshotResult"></pre>
+    </section>
+
     <section class="card">
       <h2>状态规则配置（后端版）</h2>
       <div class="grid2">
