@@ -6,7 +6,7 @@ python3 -m http.server 5174
 
 打开：`http://127.0.0.1:5174`
 
-## 当前可测能力（迭代2进行中）
+## 当前可测能力（迭代3进行中）
 
 - 登录与 Token 持久化
 - 全局看板：监控总览（含CPU/MEM/DISK百分比）+ 资产概览 + 异常CSV导出 + 本机监控样本采集
@@ -17,4 +17,6 @@ python3 -m http.server 5174
 - 状态快照上报
 - 资产管理（单条创建、筛选列表、批量JSON导入、CSV导出）
 - 审计日志筛选查询
+- 工具任务审批（pending_approval -> approved/rejected -> done）
+- AI诊断记录查询（按严重级别筛选）
 - 错误码说明 + 接口调试历史

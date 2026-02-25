@@ -1,3 +1,4 @@
+from .ai_diagnosis import AIDiagnosis
 from .asset import Asset
 from .audit import AuditLog
 from .base import Base
@@ -22,4 +23,5 @@ __all__ = [
     "StatusRule",
     "Asset",
     "ToolTask",
+    "AIDiagnosis",
 ]

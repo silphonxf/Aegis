@@ -361,6 +361,36 @@ $('btnAuditClear').onclick = () => {
   $('audit').textContent = '已清空筛选条件';
 };
 
+$('btnToolTaskList').onclick = async () => {
+  try {
+    const s = $('toolTaskStatusFilter').value.trim();
+    const q = s ? `?page=1&size=50&status=${encodeURIComponent(s)}` : '?page=1&size=50';
+    const d = await request(`/api/v1/toolbox/tasks${q}`, { headers: headers() });
+    $('toolTaskResult').textContent = JSON.stringify(d, null, 2);
+  } catch (e) { $('toolTaskResult').textContent = e.message; }
+};
+
+$('btnToolTaskUpdate').onclick = async () => {
+  try {
+    const taskId = Number($('toolTaskId').value);
+    const d = await request(`/api/v1/toolbox/tasks/${taskId}/status`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify({ status: $('toolTaskActionStatus').value, note: $('toolTaskNote').value || null }),
+    });
+    $('toolTaskResult').textContent = JSON.stringify(d, null, 2);
+  } catch (e) { $('toolTaskResult').textContent = e.message; }
+};
+
+$('btnDiagList').onclick = async () => {
+  try {
+    const s = $('diagSeverityFilter').value.trim();
+    const q = s ? `?page=1&size=20&severity=${encodeURIComponent(s)}` : '?page=1&size=20';
+    const d = await request(`/api/v1/ai/diagnoses${q}`, { headers: headers() });
+    $('diagListResult').textContent = JSON.stringify(d, null, 2);
+  } catch (e) { $('diagListResult').textContent = e.message; }
+};
+
 $('btnRefreshHistory').onclick = () => renderHistory();
 $('btnClearHistory').onclick = () => { localStorage.removeItem(REQ_HISTORY_KEY); renderHistory(); };
 

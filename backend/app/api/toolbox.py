@@ -3,14 +3,14 @@ import socket
 import subprocess
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.tool_task import ToolTask
 from app.models.user import User
-from app.schemas.toolbox import PingRequest, PortCheckRequest, RestartTaskRequest
+from app.schemas.toolbox import PingRequest, PortCheckRequest, RestartTaskRequest, TaskStatusUpdateRequest
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/toolbox", tags=["toolbox"])
@@ -87,18 +87,22 @@ def create_restart_task(
 def list_tasks(
     page: int = 1,
     size: int = 20,
+    status: str | None = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
     page = max(page, 1)
     size = min(max(size, 1), 100)
     q = db.query(ToolTask)
+    if status:
+        q = q.filter(ToolTask.status == status)
     total = q.count()
     items = q.order_by(ToolTask.created_at.desc()).offset((page - 1) * size).limit(size).all()
     return {
         "page": page,
         "size": size,
         "total": total,
+        "filters": {"status": status},
         "items": [
             {
                 "id": t.id,
@@ -111,3 +115,41 @@ def list_tasks(
             for t in items
         ],
     }
+
+
+@router.put("/tasks/{task_id}/status")
+def update_task_status(
+    task_id: int,
+    payload: TaskStatusUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+):
+    task = db.query(ToolTask).filter(ToolTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail={"code": "TASK_NOT_FOUND", "message": "任务不存在"})
+
+    current = task.status
+    target = payload.status
+    allowed = {
+        "pending_approval": {"approved", "rejected"},
+        "approved": {"done"},
+        "rejected": set(),
+        "done": set(),
+    }
+    if target not in allowed.get(current, set()):
+        raise HTTPException(status_code=400, detail={"code": "TASK_STATUS_INVALID", "message": f"不允许从 {current} 变更到 {target}"})
+
+    task.status = target
+    if payload.note:
+        task.result = json.dumps({"note": payload.note, "updated_by": current_user.username}, ensure_ascii=False)
+    db.commit()
+    db.refresh(task)
+
+    log_action(
+        db,
+        "toolbox_update_task_status",
+        "tool_task",
+        current_user,
+        {"task_id": task.id, "from": current, "to": target},
+    )
+    return {"id": task.id, "status": task.status}

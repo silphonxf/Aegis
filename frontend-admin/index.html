@@ -186,6 +186,30 @@
     </section>
 
     <section class="card">
+      <h2>工具任务审批（迭代3）</h2>
+      <div class="grid4">
+        <input id="toolTaskStatusFilter" placeholder="筛选status，如 pending_approval" />
+        <input id="toolTaskId" placeholder="task_id" />
+        <select id="toolTaskActionStatus"><option value="approved">approved</option><option value="rejected">rejected</option><option value="done">done</option></select>
+        <input id="toolTaskNote" placeholder="备注（可选）" />
+      </div>
+      <div class="grid2">
+        <button id="btnToolTaskList">刷新工具任务</button>
+        <button id="btnToolTaskUpdate">更新任务状态</button>
+      </div>
+      <pre id="toolTaskResult"></pre>
+    </section>
+
+    <section class="card">
+      <h2>AI诊断记录（迭代3）</h2>
+      <div class="grid2">
+        <input id="diagSeverityFilter" placeholder="severity筛选：low/medium/high" />
+        <button id="btnDiagList">刷新诊断记录</button>
+      </div>
+      <pre id="diagListResult"></pre>
+    </section>
+
+    <section class="card">
       <h2>错误码说明</h2>
       <ul class="code-list">
         <li><code>TOKEN_EXPIRED</code>：Token 过期，需要重新登录</li>

@@ -1,3 +1,4 @@
+from app.models.ai_diagnosis import AIDiagnosis
 from app.models.asset import Asset
 from app.models.audit import AuditLog
 from app.models.inspection import InspectionPoint, InspectionRecord
@@ -20,4 +21,5 @@ __all__ = [
     "StatusRule",
     "Asset",
     "ToolTask",
+    "AIDiagnosis",
 ]

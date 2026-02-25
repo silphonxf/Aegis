@@ -15,3 +15,8 @@ class PortCheckRequest(BaseModel):
 class RestartTaskRequest(BaseModel):
     target: str = Field(default="local-host", min_length=1, max_length=255)
     reason: str | None = Field(default=None, max_length=255)
+
+
+class TaskStatusUpdateRequest(BaseModel):
+    status: str = Field(pattern="^(approved|rejected|done)$")
+    note: str | None = Field(default=None, max_length=255)
