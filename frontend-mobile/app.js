@@ -145,7 +145,7 @@ function exportDebugLogs() {
 
 $('btnPing').onclick = async () => {
   try {
-    const data = await api('/api/v1/health');
+    const data = await api('/healthz');
     alert(`后端可用：${data.status || 'ok'}`);
   } catch (e) {
     alert(`连通失败：${e.message}`);
