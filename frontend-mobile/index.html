@@ -15,12 +15,10 @@
   <main>
     <section class="card">
       <h2>1) 登录</h2>
+      <div class="row"><input id="apiBase" value="http://127.0.0.1:8000" /></div>
       <div class="row">
-        <input id="apiBase" placeholder="API Base，例如 http://127.0.0.1:8000" value="http://127.0.0.1:8000" />
-      </div>
-      <div class="row">
-        <input id="username" placeholder="用户名" value="admin" />
-        <input id="password" placeholder="密码" type="password" value="admin123" />
+        <input id="username" value="admin" />
+        <input id="password" type="password" value="admin123" />
       </div>
       <button id="btnLogin">登录并保存 Token</button>
       <p id="loginState" class="hint">未登录</p>
@@ -28,46 +26,37 @@
 
     <section class="card">
       <h2>2) 扫码解析巡检点</h2>
-      <div class="row">
-        <input id="qrContent" placeholder="二维码内容，例如 QR://DEMO-SYS-001/P-001" value="QR://DEMO-SYS-001/P-001"/>
-      </div>
+      <div class="row"><input id="qrContent" value="QR://DEMO-SYS-001/P-001"/></div>
       <button id="btnResolve">解析巡检点</button>
       <pre id="resolveResult"></pre>
     </section>
 
     <section class="card">
       <h2>3) 提交巡检记录</h2>
-      <div class="row">
-        <input id="insSystemId" placeholder="system_id" />
-        <input id="insPointId" placeholder="point_id" />
-      </div>
-      <div class="row">
-        <select id="insResult">
-          <option value="normal">normal</option>
-          <option value="abnormal">abnormal</option>
-        </select>
-        <input id="insNote" placeholder="备注（可选）" />
-      </div>
+      <div class="row"><input id="insSystemId" placeholder="system_id" /><input id="insPointId" placeholder="point_id" /></div>
+      <div class="row"><select id="insResult"><option value="normal">normal</option><option value="abnormal">abnormal</option></select><input id="insNote" placeholder="备注（可选）" /></div>
       <button id="btnCreateInspection">提交巡检</button>
       <pre id="inspectionResult"></pre>
     </section>
 
     <section class="card">
       <h2>4) 提交自检记录</h2>
-      <div class="row">
-        <input id="scSystemId" placeholder="system_id" />
-        <input id="scTemplateId" placeholder="template_id" />
-      </div>
-      <div class="row">
-        <select id="scResult">
-          <option value="normal">normal</option>
-          <option value="warning">warning</option>
-          <option value="critical">critical</option>
-        </select>
-        <input id="scSummary" placeholder="结论摘要" />
-      </div>
+      <div class="row"><input id="scSystemId" placeholder="system_id" /><input id="scTemplateId" placeholder="template_id" /></div>
+      <div class="row"><select id="scResult"><option value="normal">normal</option><option value="warning">warning</option><option value="critical">critical</option></select><input id="scSummary" placeholder="结论摘要" /></div>
       <button id="btnCreateSelfcheck">提交自检</button>
       <pre id="selfcheckResult"></pre>
+    </section>
+
+    <section class="card">
+      <h2>5) 巡检历史</h2>
+      <div class="row"><input id="historySystemId" placeholder="按 system_id 筛选（可选）" /><button id="btnLoadInspectionHistory">刷新巡检历史</button></div>
+      <pre id="inspectionHistory"></pre>
+    </section>
+
+    <section class="card">
+      <h2>6) 自检历史</h2>
+      <div class="row"><input id="historySelfcheckSystemId" placeholder="按 system_id 筛选（可选）" /><button id="btnLoadSelfcheckHistory">刷新自检历史</button></div>
+      <pre id="selfcheckHistory"></pre>
     </section>
   </main>
 

@@ -1,22 +1,14 @@
 const $ = (id) => document.getElementById(id);
 
-const state = {
-  token: localStorage.getItem('aegis_token') || '',
-};
+const state = { token: localStorage.getItem('aegis_token') || '' };
 
-function getBase() {
-  return $('apiBase').value.trim().replace(/\/$/, '');
-}
-
+function getBase() { return $('apiBase').value.trim().replace(/\/$/, ''); }
 function headers() {
   const h = { 'Content-Type': 'application/json' };
   if (state.token) h.Authorization = `Bearer ${state.token}`;
   return h;
 }
-
-function setLoginState(text) {
-  $('loginState').textContent = text;
-}
+function setLoginState(text) { $('loginState').textContent = text; }
 
 async function api(path, options = {}) {
   const resp = await fetch(`${getBase()}${path}`, options);
@@ -35,30 +27,24 @@ $('btnLogin').onclick = async () => {
     state.token = data.access_token;
     localStorage.setItem('aegis_token', state.token);
     setLoginState('登录成功，Token 已保存');
-  } catch (e) {
-    setLoginState(`登录失败：${e.message}`);
-  }
+  } catch (e) { setLoginState(`登录失败：${e.message}`); }
 };
 
 $('btnResolve').onclick = async () => {
   try {
     const qr = encodeURIComponent($('qrContent').value.trim());
-    const data = await api(`/api/v1/inspections/points/resolve?qr_content=${qr}`, {
-      headers: headers(),
-    });
+    const data = await api(`/api/v1/inspections/points/resolve?qr_content=${qr}`, { headers: headers() });
     $('resolveResult').textContent = JSON.stringify(data, null, 2);
     $('insSystemId').value = data.system_id;
     $('insPointId').value = data.point_id;
-  } catch (e) {
-    $('resolveResult').textContent = e.message;
-  }
+    if (!$('historySystemId').value) $('historySystemId').value = data.system_id;
+  } catch (e) { $('resolveResult').textContent = e.message; }
 };
 
 $('btnCreateInspection').onclick = async () => {
   try {
     const data = await api('/api/v1/inspections/records', {
-      method: 'POST',
-      headers: headers(),
+      method: 'POST', headers: headers(),
       body: JSON.stringify({
         system_id: Number($('insSystemId').value),
         point_id: Number($('insPointId').value),
@@ -68,16 +54,13 @@ $('btnCreateInspection').onclick = async () => {
       }),
     });
     $('inspectionResult').textContent = JSON.stringify(data, null, 2);
-  } catch (e) {
-    $('inspectionResult').textContent = e.message;
-  }
+  } catch (e) { $('inspectionResult').textContent = e.message; }
 };
 
 $('btnCreateSelfcheck').onclick = async () => {
   try {
     const data = await api('/api/v1/selfchecks/records', {
-      method: 'POST',
-      headers: headers(),
+      method: 'POST', headers: headers(),
       body: JSON.stringify({
         system_id: Number($('scSystemId').value),
         template_id: Number($('scTemplateId').value),
@@ -87,9 +70,25 @@ $('btnCreateSelfcheck').onclick = async () => {
       }),
     });
     $('selfcheckResult').textContent = JSON.stringify(data, null, 2);
-  } catch (e) {
-    $('selfcheckResult').textContent = e.message;
-  }
+  } catch (e) { $('selfcheckResult').textContent = e.message; }
+};
+
+$('btnLoadInspectionHistory').onclick = async () => {
+  try {
+    const sid = $('historySystemId').value.trim();
+    const q = sid ? `?system_id=${encodeURIComponent(sid)}&page=1&size=20` : '?page=1&size=20';
+    const data = await api(`/api/v1/inspections/records${q}`, { headers: headers() });
+    $('inspectionHistory').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { $('inspectionHistory').textContent = e.message; }
+};
+
+$('btnLoadSelfcheckHistory').onclick = async () => {
+  try {
+    const sid = $('historySelfcheckSystemId').value.trim();
+    const q = sid ? `?system_id=${encodeURIComponent(sid)}&page=1&size=20` : '?page=1&size=20';
+    const data = await api(`/api/v1/selfchecks/records${q}`, { headers: headers() });
+    $('selfcheckHistory').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { $('selfcheckHistory').textContent = e.message; }
 };
 
 setLoginState(state.token ? '已加载本地 Token（可直接联调）' : '未登录');

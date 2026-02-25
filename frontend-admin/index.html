@@ -19,6 +19,33 @@
     </section>
 
     <section class="card">
+      <h2>创建用户</h2>
+      <input id="newUserName" placeholder="username" />
+      <input id="newUserPassword" placeholder="password" type="password" />
+      <select id="newUserRole"><option value="inspector">inspector</option><option value="admin">admin</option><option value="super_admin">super_admin</option></select>
+      <button id="btnCreateUser">创建用户</button>
+      <pre id="userCreateResult"></pre>
+    </section>
+
+    <section class="card">
+      <h2>创建系统</h2>
+      <input id="newSystemCode" placeholder="system_code" />
+      <input id="newSystemName" placeholder="name" />
+      <input id="newSystemEnv" placeholder="env (prod/test/dev)" value="prod" />
+      <button id="btnCreateSystem">创建系统</button>
+      <pre id="systemCreateResult"></pre>
+    </section>
+
+    <section class="card">
+      <h2>创建自检模板</h2>
+      <input id="tplSystemId" placeholder="system_id" />
+      <select id="tplCheckType"><option value="daily">daily</option><option value="weekly">weekly</option><option value="yearly">yearly</option></select>
+      <input id="tplName" placeholder="模板名称" />
+      <button id="btnCreateTemplate">创建模板</button>
+      <pre id="templateCreateResult"></pre>
+    </section>
+
+    <section class="card">
       <h2>系统总览</h2>
       <button id="btnOverview">刷新状态总览</button>
       <pre id="overview"></pre>
@@ -28,6 +55,21 @@
       <h2>审计日志</h2>
       <button id="btnAudit">读取审计日志</button>
       <pre id="audit"></pre>
+    </section>
+
+    <section class="card">
+      <h2>状态规则配置（前端占位）</h2>
+      <p>先作为配置草案保存在浏览器本地，后续接后端配置中心。</p>
+      <div class="grid2">
+        <label>CPU 黄阈值(%)<input id="cpuWarn" type="number" value="70" /></label>
+        <label>CPU 红阈值(%)<input id="cpuCritical" type="number" value="90" /></label>
+        <label>内存 黄阈值(%)<input id="memWarn" type="number" value="75" /></label>
+        <label>内存 红阈值(%)<input id="memCritical" type="number" value="90" /></label>
+        <label>磁盘 黄阈值(%)<input id="diskWarn" type="number" value="80" /></label>
+        <label>磁盘 红阈值(%)<input id="diskCritical" type="number" value="95" /></label>
+      </div>
+      <button id="btnSaveRules">保存规则到本地</button>
+      <pre id="ruleResult"></pre>
     </section>
   </main>
   <script src="./app.js"></script>
