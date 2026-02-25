@@ -227,11 +227,57 @@ $('btnCreateAsset').onclick = async () => {
   } catch (e) { $('assetResult').textContent = e.message; }
 };
 
+function buildAssetQuery() {
+  const params = new URLSearchParams({ page: '1', size: '50' });
+  const systemId = $('assetFilterSystemId').value.trim();
+  const category = $('assetFilterCategory').value.trim();
+  const status = $('assetFilterStatus').value.trim();
+  const keyword = $('assetFilterKeyword').value.trim();
+
+  if (systemId) params.set('system_id', systemId);
+  if (category) params.set('category', category);
+  if (status) params.set('status', status);
+  if (keyword) params.set('keyword', keyword);
+  return params.toString();
+}
+
 $('btnListAssets').onclick = async () => {
   try {
-    const d = await request('/api/v1/admin/assets?page=1&size=50', { headers: headers() });
+    const d = await request(`/api/v1/admin/assets?${buildAssetQuery()}`, { headers: headers() });
     $('assetListResult').textContent = JSON.stringify(d, null, 2);
   } catch (e) { $('assetListResult').textContent = e.message; }
+};
+
+$('btnAssetExport').onclick = async () => {
+  const startedAt = new Date().toISOString();
+  const path = `/api/v1/admin/assets/export?${buildAssetQuery()}`;
+  try {
+    const resp = await fetch(`${base()}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!resp.ok) {
+      const d = await resp.json().catch(()=>({}));
+      const code = d?.code;
+      const msg = d?.message || `HTTP ${resp.status}`;
+      pushHistory({ startedAt, method: 'GET', path, ok: false, status: resp.status, code: code || null, message: msg });
+      renderHistory();
+      throw new Error(`${code ? `[${code}] ` : ''}${msg}`);
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'assets.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    pushHistory({ startedAt, method: 'GET', path, ok: true, status: resp.status, code: null, message: 'CSV downloaded' });
+    renderHistory();
+  } catch (e) {
+    $('assetResult').textContent = `导出失败: ${e.message}`;
+  }
+};
+
+$('btnAssetFilterClear').onclick = () => {
+  ['assetFilterSystemId', 'assetFilterCategory', 'assetFilterStatus', 'assetFilterKeyword'].forEach((id) => $(id).value = '');
+  $('assetResult').textContent = '已清空资产筛选条件';
 };
 
 $('btnBatchAssets').onclick = async () => {

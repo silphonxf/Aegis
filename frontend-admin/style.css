@@ -8,6 +8,7 @@ button{ background:#2da44e; color:#fff; border:none; border-radius:8px; }
 pre { background:#0d1117; color:#c9d1d9; padding:10px; border-radius:8px; overflow:auto; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.grid4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; }
 .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:10px 0; }
 .kpi { border-radius:10px; padding:10px; color:#fff; }
 .kpi span{ display:block; font-size:12px; opacity:.9; }
@@ -19,8 +20,8 @@ pre { background:#0d1117; color:#c9d1d9; padding:10px; border-radius:8px; overfl
 .table-wrap { overflow:auto; }
 table { width:100%; border-collapse: collapse; background:#fff; }
 th,td { border-bottom:1px solid #d8dee4; padding:8px; text-align:left; font-size:13px; }
-@media (max-width: 900px){ .kpis{ grid-template-columns:1fr 1fr; } .grid3{ grid-template-columns:1fr 1fr; } }
-@media (max-width: 640px){ .grid2{ grid-template-columns:1fr; } .grid3{ grid-template-columns:1fr; } .kpis{ grid-template-columns:1fr; } }
+@media (max-width: 900px){ .kpis{ grid-template-columns:1fr 1fr; } .grid3{ grid-template-columns:1fr 1fr; } .grid4{ grid-template-columns:1fr 1fr; } }
+@media (max-width: 640px){ .grid2{ grid-template-columns:1fr; } .grid3{ grid-template-columns:1fr; } .grid4{ grid-template-columns:1fr; } .kpis{ grid-template-columns:1fr; } }
 
 .code-list { margin: 0; padding-left: 18px; }
 .code-list li { margin: 6px 0; }

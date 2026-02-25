@@ -126,6 +126,16 @@
         <button id="btnCreateAsset">创建资产</button>
         <button id="btnListAssets">刷新资产列表</button>
       </div>
+      <div class="grid4">
+        <input id="assetFilterSystemId" placeholder="筛选: system_id" />
+        <input id="assetFilterCategory" placeholder="筛选: category" />
+        <input id="assetFilterStatus" placeholder="筛选: status" />
+        <input id="assetFilterKeyword" placeholder="筛选: keyword" />
+      </div>
+      <div class="grid2">
+        <button id="btnAssetExport">按筛选导出资产 CSV</button>
+        <button id="btnAssetFilterClear">清空资产筛选</button>
+      </div>
       <p>批量导入 JSON（数组）：</p>
       <textarea id="assetBatchJson" rows="6" style="width:100%;padding:10px;">[
   {"asset_code":"AST-001","name":"应用服务器01","category":"server","system_id":1,"location":"机房A","status":"in_use"}

@@ -1,6 +1,9 @@
 from datetime import datetime
+from io import StringIO
+import csv
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -158,6 +161,19 @@ def list_audit_logs(
     }
 
 
+def _asset_query(db: Session, system_id: int | None, category: str | None, status: str | None, keyword: str | None):
+    q = db.query(Asset)
+    if system_id is not None:
+        q = q.filter(Asset.system_id == system_id)
+    if category:
+        q = q.filter(Asset.category == category)
+    if status:
+        q = q.filter(Asset.status == status)
+    if keyword:
+        q = q.filter((Asset.asset_code.like(f"%{keyword}%")) | (Asset.name.like(f"%{keyword}%")))
+    return q
+
+
 @router.get("/assets")
 def list_assets(
     page: int = 1,
@@ -172,16 +188,7 @@ def list_assets(
     page = max(page, 1)
     size = min(max(size, 1), 100)
 
-    q = db.query(Asset)
-    if system_id is not None:
-        q = q.filter(Asset.system_id == system_id)
-    if category:
-        q = q.filter(Asset.category == category)
-    if status:
-        q = q.filter(Asset.status == status)
-    if keyword:
-        q = q.filter((Asset.asset_code.like(f"%{keyword}%")) | (Asset.name.like(f"%{keyword}%")))
-
+    q = _asset_query(db, system_id, category, status, keyword)
     total = q.count()
     items = q.order_by(Asset.id.desc()).offset((page - 1) * size).limit(size).all()
     return {
@@ -202,6 +209,30 @@ def list_assets(
             for a in items
         ],
     }
+
+
+@router.get("/assets/export")
+def export_assets_csv(
+    system_id: int | None = None,
+    category: str | None = None,
+    status: str | None = None,
+    keyword: str | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    q = _asset_query(db, system_id, category, status, keyword)
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id", "asset_code", "name", "category", "system_id", "location", "status", "created_at"])
+    for a in q.order_by(Asset.id.desc()).all():
+        writer.writerow([a.id, a.asset_code, a.name, a.category, a.system_id, a.location or "", a.status, a.created_at])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=assets.csv"},
+    )
 
 
 @router.get("/assets/summary")
