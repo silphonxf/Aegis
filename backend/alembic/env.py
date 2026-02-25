@@ -1,6 +1,8 @@
 from logging.config import fileConfig
 
 from alembic import context
+from alembic.ddl import impl
+from alembic.ddl.oracle import OracleImpl
 from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
@@ -14,6 +16,11 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+
+# dmSQLAlchemy uses dialect name "dm"; Alembic has no built-in DM impl.
+# Reuse Oracle impl for online migrations in DM environments.
+if "dm" not in impl._impls:
+    impl._impls["dm"] = OracleImpl
 
 
 def run_migrations_offline() -> None:

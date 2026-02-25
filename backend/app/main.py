@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api import admin, ai, auth, health, inspections, monitoring, reports, selfchecks, systems, toolbox
@@ -40,17 +41,25 @@ app.include_router(toolbox.router, prefix=settings.API_PREFIX)
 app.include_router(ai.router, prefix=settings.API_PREFIX)
 
 
+def _next_id(db: Session, model) -> int:
+    current = db.query(func.max(model.id)).scalar()
+    return (current or 0) + 1
+
+
 def init_seed(db: Session):
     role_codes = ["inspector", "admin", "super_admin"]
+    next_role_id = _next_id(db, Role)
     for code in role_codes:
         if not db.query(Role).filter(Role.code == code).first():
-            db.add(Role(code=code, name=code))
+            db.add(Role(id=next_role_id, code=code, name=code))
+            next_role_id += 1
     db.commit()
 
     super_admin_role = db.query(Role).filter(Role.code == "super_admin").first()
     if not db.query(User).filter(User.username == settings.INIT_ADMIN_USERNAME).first():
         db.add(
             User(
+                id=_next_id(db, User),
                 username=settings.INIT_ADMIN_USERNAME,
                 password_hash=get_password_hash(settings.INIT_ADMIN_PASSWORD),
                 role_id=super_admin_role.id,
@@ -60,12 +69,13 @@ def init_seed(db: Session):
         db.commit()
 
     if not db.query(System).filter(System.system_code == "DEMO-SYS-001").first():
-        sys1 = System(system_code="DEMO-SYS-001", name="示例业务系统", env="prod")
+        sys1 = System(id=_next_id(db, System), system_code="DEMO-SYS-001", name="示例业务系统", env="prod")
         db.add(sys1)
         db.commit()
         db.refresh(sys1)
         db.add(
             InspectionPoint(
+                id=_next_id(db, InspectionPoint),
                 system_id=sys1.id,
                 point_code="P-001",
                 qr_content="QR://DEMO-SYS-001/P-001",

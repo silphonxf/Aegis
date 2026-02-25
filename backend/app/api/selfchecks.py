@@ -22,7 +22,7 @@ def list_templates(
 ):
     page = max(page, 1)
     size = min(max(size, 1), 100)
-    q = db.query(ChecklistTemplate).filter(ChecklistTemplate.is_active.is_(True))
+    q = db.query(ChecklistTemplate).filter(ChecklistTemplate.is_active == True)
     total = q.count()
     items = q.offset((page - 1) * size).limit(size).all()
     return {

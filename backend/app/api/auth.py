@@ -13,7 +13,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=TokenResponse)
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == data.username, User.is_active.is_(True)).first()
+    user = db.query(User).filter(User.username == data.username, User.is_active == True).first()
     if not user or not verify_password(data.password, user.password_hash):
         log_action(
             db,
