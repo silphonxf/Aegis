@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -44,10 +46,10 @@ def create_user(
     current_user: User = Depends(require_roles("super_admin")),
 ):
     if db.query(User).filter(User.username == payload.username).first():
-        raise HTTPException(status_code=400, detail="用户名已存在")
+        raise HTTPException(status_code=400, detail={"code": "USER_EXISTS", "message": "用户名已存在"})
     role = db.query(Role).filter(Role.code == payload.role_code).first()
     if not role:
-        raise HTTPException(status_code=400, detail="角色不存在")
+        raise HTTPException(status_code=400, detail={"code": "ROLE_NOT_FOUND", "message": "角色不存在"})
     user = User(username=payload.username, password_hash=get_password_hash(payload.password), role_id=role.id)
     db.add(user)
     db.commit()
@@ -99,18 +101,46 @@ def create_system(
 def list_audit_logs(
     page: int = 1,
     size: int = 20,
+    action: str | None = None,
+    username: str | None = None,
+    resource: str | None = None,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    keyword: str | None = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("super_admin")),
 ):
     page = max(page, 1)
     size = min(max(size, 1), 100)
     q = db.query(AuditLog)
+
+    if action:
+        q = q.filter(AuditLog.action == action)
+    if username:
+        q = q.filter(AuditLog.username == username)
+    if resource:
+        q = q.filter(AuditLog.resource == resource)
+    if start_at:
+        q = q.filter(AuditLog.created_at >= start_at)
+    if end_at:
+        q = q.filter(AuditLog.created_at <= end_at)
+    if keyword:
+        q = q.filter(AuditLog.detail.like(f"%{keyword}%"))
+
     total = q.count()
     items = q.order_by(AuditLog.created_at.desc()).offset((page - 1) * size).limit(size).all()
     return {
         "page": page,
         "size": size,
         "total": total,
+        "filters": {
+            "action": action,
+            "username": username,
+            "resource": resource,
+            "start_at": start_at,
+            "end_at": end_at,
+            "keyword": keyword,
+        },
         "items": [
             {
                 "id": i.id,

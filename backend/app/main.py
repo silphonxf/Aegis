@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
-from sqlalchemy.orm import Session
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
 from app.api import admin, auth, health, inspections, monitoring, reports, selfchecks, systems
 from app.core.config import settings
@@ -83,11 +83,17 @@ async def validation_exception_handler(_: Request, exc: RequestValidationError):
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_: Request, exc: HTTPException):
+    if isinstance(exc.detail, dict):
+        code = exc.detail.get("code", "HTTP_ERROR")
+        message = exc.detail.get("message", "请求失败")
+    else:
+        code = "HTTP_ERROR"
+        message = str(exc.detail)
     return JSONResponse(
         status_code=exc.status_code,
         content={
-            "code": "HTTP_ERROR",
-            "message": str(exc.detail),
+            "code": code,
+            "message": message,
         },
     )
 
