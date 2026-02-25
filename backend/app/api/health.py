@@ -5,4 +5,4 @@ router = APIRouter()
 
 @router.get("/healthz")
 def healthz():
-    return {"status": "ok"}
+    return {"status": "ok", "service": "aegis-api"}

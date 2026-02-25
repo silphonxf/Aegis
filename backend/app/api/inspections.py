@@ -1,26 +1,65 @@
 from datetime import datetime
-from typing import Literal
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user, require_roles
+from app.db.session import get_db
+from app.models.inspection import InspectionRecord
+from app.models.user import User
+from app.schemas.inspection import InspectionCreate
 
 router = APIRouter(prefix="/inspections", tags=["inspections"])
 
 
-class InspectionCreate(BaseModel):
-    system_id: int
-    point_id: int
-    result: Literal["normal", "abnormal"]
-    note: str | None = None
-    inspected_at: datetime
-
-
 @router.post("/records")
-def create_record(payload: InspectionCreate):
-    # TODO: 持久化到DM数据库
-    return {"id": 1, **payload.model_dump(mode="json")}
+def create_record(
+    payload: InspectionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("inspector", "admin", "super_admin")),
+):
+    rec = InspectionRecord(
+        system_id=payload.system_id,
+        point_id=payload.point_id,
+        inspector_id=current_user.id,
+        result=payload.result,
+        note=payload.note,
+        inspected_at=payload.inspected_at,
+    )
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    return {"id": rec.id}
 
 
 @router.get("/records")
-def list_records(system_id: int | None = None):
-    return {"items": [], "system_id": system_id}
+def list_records(
+    system_id: int | None = None,
+    result: str | None = None,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    q = db.query(InspectionRecord)
+    if system_id is not None:
+        q = q.filter(InspectionRecord.system_id == system_id)
+    if result:
+        q = q.filter(InspectionRecord.result == result)
+    if start_at:
+        q = q.filter(InspectionRecord.inspected_at >= start_at)
+    if end_at:
+        q = q.filter(InspectionRecord.inspected_at <= end_at)
+    items = q.order_by(InspectionRecord.inspected_at.desc()).limit(200).all()
+    return {"items": [
+        {
+            "id": i.id,
+            "system_id": i.system_id,
+            "point_id": i.point_id,
+            "inspector_id": i.inspector_id,
+            "result": i.result,
+            "note": i.note,
+            "inspected_at": i.inspected_at,
+        }
+        for i in items
+    ]}

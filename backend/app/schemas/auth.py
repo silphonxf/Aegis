@@ -9,3 +9,12 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class UserProfile(BaseModel):
+    id: int
+    username: str
+    role: str
+
+    class Config:
+        from_attributes = True
