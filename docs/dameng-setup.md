@@ -37,7 +37,17 @@ alembic upgrade head
 
 ## 5. 启动服务
 
+推荐直接用脚本（已包含 `LD_LIBRARY_PATH`）：
+
 ```bash
+cd /home/xf/.openclaw/workspace/code/aegis
+./scripts/run_backend_dm.sh
+```
+
+或手工启动：
+
+```bash
+export LD_LIBRARY_PATH=/data/DMdata/dmdbms/drivers/dpi:/data/DMdata/dmdbms/drivers/dpi/dependencies:$LD_LIBRARY_PATH
 uvicorn app.main:app --reload --port 8000
 ```
 
