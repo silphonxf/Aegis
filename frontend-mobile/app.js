@@ -1,5 +1,16 @@
 const $ = (id) => document.getElementById(id);
-const state = { token: localStorage.getItem('aegis_token') || '' };
+const state = {
+  token: localStorage.getItem('aegis_token') || '',
+  requestLogs: JSON.parse(localStorage.getItem('aegis_request_logs') || '[]'),
+};
+
+const ERROR_CODE_DOC = {
+  AUTH_INVALID: '用户名或密码错误，请检查账号或重置密码。',
+  USER_EXISTS: '用户名已存在，请更换用户名。',
+  ROLE_NOT_FOUND: '角色不存在，请联系管理员检查角色配置。',
+  VALIDATION_ERROR: '请求参数校验失败，请检查必填项与字段格式。',
+  HTTP_ERROR: '通用请求错误，请查看请求历史中的响应详情。',
+};
 
 function getBase() {
   return $('apiBase').value.trim().replace(/\/$/, '');
@@ -19,21 +30,117 @@ function show(id, data) {
   $(id).textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
 }
 
+function upsertErrorDoc() {
+  const lines = Object.entries(ERROR_CODE_DOC)
+    .map(([code, desc]) => `- ${code}: ${desc}`)
+    .join('\n');
+  show('errorCodeDoc', `常见错误码说明：\n${lines}`);
+}
+
+function rememberLog(log) {
+  state.requestLogs.unshift(log);
+  if (state.requestLogs.length > 200) {
+    state.requestLogs = state.requestLogs.slice(0, 200);
+  }
+  localStorage.setItem('aegis_request_logs', JSON.stringify(state.requestLogs));
+  renderHistory();
+}
+
+function renderHistory() {
+  show('requestHistory', {
+    total: state.requestLogs.length,
+    latest: state.requestLogs.slice(0, 30),
+  });
+}
+
 function parseError(respData, fallback) {
-  if (!respData) return fallback;
-  if (typeof respData === 'string') return respData;
-  if (respData.message) return `${respData.code || 'ERROR'}: ${respData.message}`;
-  if (respData.detail && typeof respData.detail === 'string') return respData.detail;
-  return fallback;
+  if (!respData) return { code: 'HTTP_ERROR', message: fallback };
+  if (typeof respData === 'string') return { code: 'HTTP_ERROR', message: respData };
+
+  if (respData.code || respData.message) {
+    return {
+      code: respData.code || 'HTTP_ERROR',
+      message: respData.message || fallback,
+    };
+  }
+
+  if (respData.detail && typeof respData.detail === 'string') {
+    return { code: 'HTTP_ERROR', message: respData.detail };
+  }
+
+  return { code: 'HTTP_ERROR', message: fallback };
 }
 
 async function api(path, options = {}) {
-  const resp = await fetch(`${getBase()}${path}`, options);
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    throw new Error(parseError(data, `HTTP ${resp.status}`));
+  const method = options.method || 'GET';
+  const url = `${getBase()}${path}`;
+  const started = Date.now();
+
+  try {
+    const resp = await fetch(url, options);
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok) {
+      const errObj = parseError(data, `HTTP ${resp.status}`);
+      const help = ERROR_CODE_DOC[errObj.code];
+      rememberLog({
+        at: new Date().toISOString(),
+        ok: false,
+        method,
+        url,
+        status: resp.status,
+        duration_ms: Date.now() - started,
+        request_body: options.body ? JSON.parse(options.body) : null,
+        response: data,
+        error: errObj,
+      });
+
+      throw new Error(help ? `${errObj.code}: ${errObj.message}\n建议：${help}` : `${errObj.code}: ${errObj.message}`);
+    }
+
+    rememberLog({
+      at: new Date().toISOString(),
+      ok: true,
+      method,
+      url,
+      status: resp.status,
+      duration_ms: Date.now() - started,
+      request_body: options.body ? JSON.parse(options.body) : null,
+      response: data,
+    });
+    return data;
+  } catch (e) {
+    if (!String(e.message || '').includes(':')) {
+      rememberLog({
+        at: new Date().toISOString(),
+        ok: false,
+        method,
+        url,
+        status: 0,
+        duration_ms: Date.now() - started,
+        request_body: options.body ? JSON.parse(options.body) : null,
+        network_error: e.message || 'fetch failed',
+      });
+    }
+    throw e;
   }
-  return data;
+}
+
+function exportDebugLogs() {
+  const payload = {
+    exported_at: new Date().toISOString(),
+    api_base: getBase(),
+    request_logs: state.requestLogs,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `aegis-mobile-debug-${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 $('btnPing').onclick = async () => {
@@ -163,4 +270,13 @@ $('btnLoadRules').onclick = async () => {
   }
 };
 
+$('btnExportLogs').onclick = exportDebugLogs;
+$('btnClearLogs').onclick = () => {
+  state.requestLogs = [];
+  localStorage.removeItem('aegis_request_logs');
+  renderHistory();
+};
+
 setLoginState(state.token ? '已加载本地 Token（可直接联调）' : '未登录');
+upsertErrorDoc();
+renderHistory();
