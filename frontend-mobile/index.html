@@ -106,8 +106,37 @@
           </label>
           <label class="full">详情<input id="aiDetail" value="业务高峰期出现 timeout，怀疑连接池打满" /></label>
         </div>
-        <button id="btnAiDiagnose">生成诊断建议</button>
+        <div class="actions">
+          <button id="btnAiDiagnose">生成诊断建议</button>
+          <button id="btnAiHistory" class="secondary">查看诊断历史</button>
+        </div>
         <pre id="aiResult"></pre>
+        <pre id="aiHistory"></pre>
+      </section>
+
+      <section class="card">
+        <h2>工具任务状态（迭代3）</h2>
+        <div class="grid two">
+          <label>筛选状态
+            <select id="taskStatusFilter">
+              <option value="">全部</option>
+              <option value="pending_approval">pending_approval</option>
+              <option value="approved">approved</option>
+              <option value="rejected">rejected</option>
+              <option value="done">done</option>
+            </select>
+          </label>
+          <label>task_id<input id="taskId" placeholder="要更新的任务ID" /></label>
+          <label>目标状态
+            <select id="taskToStatus"><option value="approved">approved</option><option value="rejected">rejected</option><option value="done">done</option></select>
+          </label>
+          <label>备注<input id="taskNote" placeholder="可选" /></label>
+        </div>
+        <div class="actions">
+          <button id="btnTaskList">刷新任务列表</button>
+          <button id="btnTaskUpdate" class="secondary">更新任务状态</button>
+        </div>
+        <pre id="taskResult"></pre>
       </section>
 
       <section class="card">

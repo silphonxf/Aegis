@@ -310,6 +310,34 @@ $('btnAiDiagnose').onclick = async () => {
   } catch (e) { show('aiResult', e.message); }
 };
 
+$('btnAiHistory').onclick = async () => {
+  try {
+    const sev = $('aiSeverity').value;
+    const data = await api(`/api/v1/ai/diagnoses?page=1&size=20&severity=${encodeURIComponent(sev)}`, { headers: authHeaders() });
+    show('aiHistory', data);
+  } catch (e) { show('aiHistory', e.message); }
+};
+
+$('btnTaskList').onclick = async () => {
+  try {
+    const status = $('taskStatusFilter').value;
+    const q = status ? `?page=1&size=20&status=${encodeURIComponent(status)}` : '?page=1&size=20';
+    const data = await api(`/api/v1/toolbox/tasks${q}`, { headers: authHeaders() });
+    show('taskResult', data);
+  } catch (e) { show('taskResult', e.message); }
+};
+
+$('btnTaskUpdate').onclick = async () => {
+  try {
+    const taskId = Number($('taskId').value);
+    const data = await api(`/api/v1/toolbox/tasks/${taskId}/status`, {
+      method: 'PUT', headers: authHeaders(),
+      body: JSON.stringify({ status: $('taskToStatus').value, note: $('taskNote').value || null }),
+    });
+    show('taskResult', data);
+  } catch (e) { show('taskResult', e.message); }
+};
+
 $('btnExportLogs').onclick = exportDebugLogs;
 $('btnClearLogs').onclick = () => {
   state.requestLogs = [];
