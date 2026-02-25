@@ -1,3 +1,4 @@
+from .asset import Asset
 from .audit import AuditLog
 from .base import Base
 from .inspection import InspectionPoint, InspectionRecord
@@ -18,4 +19,5 @@ __all__ = [
     "SelfcheckRecord",
     "AuditLog",
     "StatusRule",
+    "Asset",
 ]

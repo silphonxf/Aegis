@@ -98,6 +98,31 @@
     </section>
 
     <section class="card">
+      <h2>资产管理（迭代2）</h2>
+      <div class="grid3">
+        <input id="assetCode" placeholder="asset_code" />
+        <input id="assetName" placeholder="name" />
+        <input id="assetCategory" placeholder="category" value="server" />
+      </div>
+      <div class="grid3">
+        <input id="assetSystemId" placeholder="system_id (可空)" />
+        <input id="assetLocation" placeholder="location" />
+        <input id="assetStatus" placeholder="status" value="in_use" />
+      </div>
+      <div class="grid2">
+        <button id="btnCreateAsset">创建资产</button>
+        <button id="btnListAssets">刷新资产列表</button>
+      </div>
+      <p>批量导入 JSON（数组）：</p>
+      <textarea id="assetBatchJson" rows="6" style="width:100%;padding:10px;">[
+  {"asset_code":"AST-001","name":"应用服务器01","category":"server","system_id":1,"location":"机房A","status":"in_use"}
+]</textarea>
+      <button id="btnBatchAssets">批量导入资产</button>
+      <pre id="assetResult"></pre>
+      <pre id="assetListResult"></pre>
+    </section>
+
+    <section class="card">
       <h2>状态规则配置（后端版）</h2>
       <div class="grid2">
         <label>CPU 黄阈值(%)<input id="cpuWarn" type="number" value="70" /></label>

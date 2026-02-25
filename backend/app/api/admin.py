@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.core.security import get_password_hash
 from app.db.session import get_db
+from app.models.asset import Asset
 from app.models.audit import AuditLog
 from app.models.system import System
 from app.models.user import Role, User
-from app.schemas.admin import CreateUserRequest
+from app.schemas.admin import BatchCreateAssetsRequest, CreateAssetRequest, CreateUserRequest
 from app.schemas.system import SystemCreate
 from app.services.audit import log_action
 
@@ -154,3 +155,95 @@ def list_audit_logs(
             for i in items
         ],
     }
+
+
+@router.get("/assets")
+def list_assets(
+    page: int = 1,
+    size: int = 20,
+    system_id: int | None = None,
+    category: str | None = None,
+    status: str | None = None,
+    keyword: str | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    page = max(page, 1)
+    size = min(max(size, 1), 100)
+
+    q = db.query(Asset)
+    if system_id is not None:
+        q = q.filter(Asset.system_id == system_id)
+    if category:
+        q = q.filter(Asset.category == category)
+    if status:
+        q = q.filter(Asset.status == status)
+    if keyword:
+        q = q.filter((Asset.asset_code.like(f"%{keyword}%")) | (Asset.name.like(f"%{keyword}%")))
+
+    total = q.count()
+    items = q.order_by(Asset.id.desc()).offset((page - 1) * size).limit(size).all()
+    return {
+        "page": page,
+        "size": size,
+        "total": total,
+        "items": [
+            {
+                "id": a.id,
+                "asset_code": a.asset_code,
+                "name": a.name,
+                "category": a.category,
+                "system_id": a.system_id,
+                "location": a.location,
+                "status": a.status,
+                "created_at": a.created_at,
+            }
+            for a in items
+        ],
+    }
+
+
+@router.post("/assets")
+def create_asset(
+    payload: CreateAssetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    if db.query(Asset).filter(Asset.asset_code == payload.asset_code).first():
+        raise HTTPException(status_code=400, detail={"code": "ASSET_EXISTS", "message": "资产编码已存在"})
+
+    asset = Asset(**payload.model_dump())
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    log_action(db, "create_asset", "asset", current_user, {"asset_id": asset.id, "asset_code": asset.asset_code})
+    return {"id": asset.id}
+
+
+@router.post("/assets/batch")
+def batch_create_assets(
+    payload: BatchCreateAssetsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    created = []
+    skipped = []
+
+    for item in payload.items:
+        if db.query(Asset).filter(Asset.asset_code == item.asset_code).first():
+            skipped.append({"asset_code": item.asset_code, "reason": "ASSET_EXISTS"})
+            continue
+        asset = Asset(**item.model_dump())
+        db.add(asset)
+        db.flush()
+        created.append({"id": asset.id, "asset_code": asset.asset_code})
+
+    db.commit()
+    log_action(
+        db,
+        "batch_create_assets",
+        "asset",
+        current_user,
+        {"created_count": len(created), "skipped_count": len(skipped)},
+    )
+    return {"created": created, "skipped": skipped}

@@ -185,6 +185,40 @@ $('btnCreateSnapshot').onclick = async () => {
   } catch (e) { $('snapshotResult').textContent = e.message; }
 };
 
+$('btnCreateAsset').onclick = async () => {
+  try {
+    const payload = {
+      asset_code: $('assetCode').value.trim(),
+      name: $('assetName').value.trim(),
+      category: $('assetCategory').value.trim() || 'server',
+      system_id: $('assetSystemId').value.trim() ? Number($('assetSystemId').value) : null,
+      location: $('assetLocation').value.trim() || null,
+      status: $('assetStatus').value.trim() || 'in_use',
+    };
+    const d = await request('/api/v1/admin/assets', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
+    $('assetResult').textContent = JSON.stringify(d, null, 2);
+  } catch (e) { $('assetResult').textContent = e.message; }
+};
+
+$('btnListAssets').onclick = async () => {
+  try {
+    const d = await request('/api/v1/admin/assets?page=1&size=50', { headers: headers() });
+    $('assetListResult').textContent = JSON.stringify(d, null, 2);
+  } catch (e) { $('assetListResult').textContent = e.message; }
+};
+
+$('btnBatchAssets').onclick = async () => {
+  try {
+    const items = JSON.parse($('assetBatchJson').value);
+    const d = await request('/api/v1/admin/assets/batch', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ items }),
+    });
+    $('assetResult').textContent = JSON.stringify(d, null, 2);
+  } catch (e) { $('assetResult').textContent = `批量导入失败: ${e.message}`; }
+};
+
 $('btnLoadRules').onclick = async () => {
   try {
     const r = await request('/api/v1/monitoring/rules', { headers: headers() });
