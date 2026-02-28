@@ -115,12 +115,11 @@
           <section class="card hidden" data-sub="selfcheck-form">
             <div class="card-head"><h2>提交自检记录</h2><button class="ghost small" data-back="selfcheck-home">返回</button></div>
             <div class="grid two">
-              <label>system_id<input id="scSystemId" placeholder="例如 1" /></label>
-              <label>template_id<input id="scTemplateId" placeholder="例如 1" /></label>
-              <label>结果
-                <select id="scResult"><option value="normal">normal</option><option value="warning">warning</option><option value="critical">critical</option></select>
+              <label class="full">自检内容<input id="scSummary" placeholder="输入自检内容" /></label>
+              <label>自检结果
+                <select id="scResult"><option value="normal">正常</option><option value="critical">异常</option></select>
               </label>
-              <label class="full">自检内容<input id="scSummary" placeholder="输入自检内容与结果" /></label>
+              <label class="full">备注<input id="scNote" placeholder="可选" /></label>
             </div>
             <div class="actions one"><button id="btnCreateSelfcheck">提交自检</button></div>
             <pre id="selfcheckResult"></pre>

@@ -315,11 +315,15 @@ $('btnRefreshStatus').onclick = refreshStatusBase;
 
 $('btnCreateSelfcheck').onclick = async () => {
   try {
+    const summary = $('scSummary').value.trim();
+    if (!summary) throw new Error('请填写自检内容');
+
+    // 当前简化 UI 下，system/template 使用默认值（后续可改为自动选择或动态加载）
     const payload = {
-      system_id: Number($('scSystemId').value),
-      template_id: Number($('scTemplateId').value),
+      system_id: 1,
+      template_id: 1,
       result: $('scResult').value,
-      summary: $('scSummary').value || null,
+      summary: $('scNote').value.trim() ? `${summary}；备注：${$('scNote').value.trim()}` : summary,
       checked_at: new Date().toISOString(),
     };
     show('selfcheckResult', await api('/api/v1/selfchecks/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) }));
