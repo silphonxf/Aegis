@@ -21,10 +21,18 @@ cd backend
 cp dameng.env.example .env
 ```
 
-核心配置：
+核心配置（二选一）：
 
 ```env
+# 方案 A：完整连接串
 DATABASE_URL=dm+dmPython://AEGIS_USER:StrongPass_123@127.0.0.1:5236/AEGIS
+
+# 方案 B：拆分字段（配置了 DM_* 时会优先于 DATABASE_URL）
+DM_HOST=127.0.0.1
+DM_PORT=5236
+DM_NAME=AEGIS
+DM_USER=AEGIS_USER
+DM_PASSWORD=StrongPass_123
 ```
 
 ## 4. 迁移建表
@@ -55,6 +63,23 @@ uvicorn app.main:app --reload --port 8000
 
 - `GET /healthz` 正常
 - 登录、巡检、资产创建均可落库
+
+也可用一键脚本自动验证：
+
+```bash
+cd /home/xf/.openclaw/workspace/code/aegis
+./scripts/check_dm_connection.sh        # 默认端口 8001
+# 或
+./scripts/check_dm_connection.sh 8002
+```
+
+脚本会依次检查：
+
+1. 达梦端口连通（127.0.0.1:5236）
+2. Alembic 迁移
+3. 后端启动
+4. `/healthz`
+5. `POST /api/v1/auth/login`
 
 ## 备注
 

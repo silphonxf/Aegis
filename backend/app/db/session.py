@@ -3,16 +3,17 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 
-connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
+db_url = settings.effective_database_url
+connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
 
-engine = create_engine(settings.DATABASE_URL, echo=False, future=True, connect_args=connect_args)
+engine = create_engine(db_url, echo=False, future=True, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 @event.listens_for(SessionLocal, "before_flush")
 def _assign_pk_for_dm(session, flush_context, instances):
     # DM current schema may use plain INTEGER PK without identity; assign id in app layer as fallback.
-    if not settings.DATABASE_URL.startswith("dm+"):
+    if not db_url.startswith("dm+"):
         return
 
     for obj in list(session.new):
