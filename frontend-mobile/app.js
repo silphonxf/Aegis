@@ -109,22 +109,59 @@ function drawLine(canvasId, values, color) {
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
   ctx.clearRect(0, 0, width, height);
+
+  const padL = 34;
+  const padR = 8;
+  const padT = 10;
+  const padB = 20;
+  const plotW = width - padL - padR;
+  const plotH = height - padT - padB;
+
+  // grid + Y axis percentage labels
   ctx.strokeStyle = '#10324a';
+  ctx.fillStyle = '#7fa8c8';
+  ctx.font = '10px sans-serif';
   ctx.lineWidth = 1;
-  for (let i = 1; i <= 4; i++) {
-    const y = (height / 5) * i;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+  for (let i = 0; i <= 4; i++) {
+    const ratio = i / 4;
+    const y = padT + plotH * ratio;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(width - padR, y); ctx.stroke();
+    const label = `${Math.round((1 - ratio) * 100)}%`;
+    ctx.fillText(label, 2, y + 3);
   }
+
+  // X axis time labels
+  const now = new Date();
+  const t0 = new Date(now.getTime() - Math.max(values.length - 1, 1) * 2500);
+  const fmt = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  ctx.fillText(fmt(t0), padL, height - 4);
+  ctx.fillText(fmt(now), width - padR - 30, height - 4);
+
+  // axis lines
+  ctx.strokeStyle = '#1d4d6d';
+  ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, height - padB); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(padL, height - padB); ctx.lineTo(width - padR, height - padB); ctx.stroke();
+
   if (!values.length) return;
+
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
   ctx.beginPath();
   values.forEach((v, i) => {
-    const x = (i / Math.max(values.length - 1, 1)) * width;
-    const y = height - (v / 100) * height;
+    const x = padL + (i / Math.max(values.length - 1, 1)) * plotW;
+    const y = padT + (1 - (v / 100)) * plotH;
     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   });
   ctx.stroke();
+
+  // latest point label
+  const last = values[values.length - 1];
+  const lx = padL + plotW;
+  const ly = padT + (1 - (last / 100)) * plotH;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#cfe9ff';
+  ctx.fillText(`${Math.round(last)}%`, Math.max(padL, lx - 28), Math.max(10, ly - 6));
 }
 
 function renderCharts() {
