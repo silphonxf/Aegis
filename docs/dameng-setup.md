@@ -21,10 +21,18 @@ cd backend
 cp dameng.env.example .env
 ```
 
-核心配置：
+核心配置（二选一）：
 
 ```env
+# 方案 A：完整连接串
 DATABASE_URL=dm+dmPython://AEGIS_USER:StrongPass_123@127.0.0.1:5236/AEGIS
+
+# 方案 B：拆分字段（配置了 DM_* 时会优先于 DATABASE_URL）
+DM_HOST=127.0.0.1
+DM_PORT=5236
+DM_NAME=AEGIS
+DM_USER=AEGIS_USER
+DM_PASSWORD=StrongPass_123
 ```
 
 ## 4. 迁移建表
