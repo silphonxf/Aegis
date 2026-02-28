@@ -330,18 +330,21 @@ $('btnCreateSelfcheck').onclick = async () => {
   } catch (e) { show('selfcheckResult', e.message); }
 };
 
-$('btnLoadErrors').onclick = () => {
-  const hours = Number($('errorRange').value);
-  const since = Date.now() - hours * 3600 * 1000;
-  const errors = state.requestLogs.filter((x) => !x.ok && new Date(x.at).getTime() >= since);
-  state.extractedErrors = errors.slice(0, 100);
-  show('errorLogsView', state.extractedErrors.length ? state.extractedErrors : '该时间范围暂无错误日志（来自本地请求历史）');
+$('btnLoadErrors').onclick = async () => {
+  try {
+    const hours = Number($('errorRange').value || 24);
+    const data = await api(`/api/v1/toolbox/error-logs?hours=${hours}&lines=5000`, { headers: authHeaders() });
+    state.extractedErrors = String(data.content || '').split('\n').filter(Boolean).slice(0, 5000).map((line) => ({ line }));
+    show('errorLogsView', `日志来源命令: ${data.source}\n\n${data.content || ''}`);
+  } catch (e) {
+    show('errorLogsView', `读取系统日志失败：${e.message}`);
+  }
 };
 
 $('btnAnalyzeErrors').onclick = async () => {
   try {
     const detail = state.extractedErrors.length
-      ? state.extractedErrors.map((e) => `${e.at} ${e.method || ''} ${e.url || ''} status=${e.status || 0} err=${e.network_error || ''}`).join('\n').slice(0, 1800)
+      ? state.extractedErrors.map((e) => e.line || `${e.at} ${e.method || ''} ${e.url || ''} status=${e.status || 0} err=${e.network_error || ''}`).join('\n').slice(0, 1800)
       : '暂无错误日志，建议先执行“提取错误日志”。';
     const payload = { title: '错误日志分析', detail, severity: $('errorAiSeverity').value };
     show('errorAiView', await api('/api/v1/ai/diagnose', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) }));
