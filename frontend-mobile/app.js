@@ -242,26 +242,21 @@ Array.from(document.querySelectorAll('.menu-tabs .tab')).forEach((tab) => {
 });
 
 // inspection
-$('btnResolve').onclick = async () => {
-  try {
-    const qr = encodeURIComponent($('qrContent').value.trim());
-    const data = await api(`/api/v1/inspections/points/resolve?qr_content=${qr}`, { headers: authHeaders() });
-    $('insSystemId').value = data.system_id || '';
-    $('insPointId').value = data.point_id || '';
-    show('inspectionResult', data);
-  } catch (e) { show('inspectionResult', e.message); }
-};
-
 $('btnCreateInspection').onclick = async () => {
   try {
+    const qrText = $('qrContent').value.trim();
+    if (!qrText) throw new Error('请先填写扫码内容');
+
+    const resolved = await api(`/api/v1/inspections/points/resolve?qr_content=${encodeURIComponent(qrText)}`, { headers: authHeaders() });
     const payload = {
-      system_id: Number($('insSystemId').value),
-      point_id: Number($('insPointId').value),
+      system_id: Number(resolved.system_id),
+      point_id: Number(resolved.point_id),
       result: $('insResult').value,
       note: $('insNote').value || null,
       inspected_at: new Date().toISOString(),
     };
-    show('inspectionResult', await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) }));
+    const created = await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
+    show('inspectionResult', { resolved_point: resolved, created_record: created });
   } catch (e) { show('inspectionResult', e.message); }
 };
 

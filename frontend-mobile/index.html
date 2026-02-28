@@ -64,16 +64,13 @@
           <section class="card hidden" data-sub="inspection-qr">
             <div class="card-head"><h2>二维码巡检</h2><button class="ghost small" data-back="inspection-home">返回</button></div>
             <div class="grid two">
-              <label>扫码内容<input id="qrContent" value="QR://DEMO-SYS-001/P-001" /></label>
-              <label>system_id<input id="insSystemId" /></label>
-              <label>point_id<input id="insPointId" /></label>
+              <label class="full">扫码内容<input id="qrContent" value="QR://DEMO-SYS-001/P-001" /></label>
               <label>结果
-                <select id="insResult"><option value="normal">normal</option><option value="abnormal">abnormal</option></select>
+                <select id="insResult"><option value="normal">正常</option><option value="abnormal">异常</option></select>
               </label>
               <label class="full">备注<input id="insNote" placeholder="可选" /></label>
             </div>
-            <div class="actions">
-              <button id="btnResolve">解析巡检点</button>
+            <div class="actions one">
               <button id="btnCreateInspection">提交巡检</button>
             </div>
             <pre id="inspectionResult"></pre>
