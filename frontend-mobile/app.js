@@ -218,7 +218,10 @@ $('btnLogin').onclick = async () => {
     });
     state.token = data.access_token;
     localStorage.setItem('aegis_token', state.token);
-    state.profile.username = $('username').value.trim() || state.profile.username || 'admin';
+    const me = await api('/api/v1/auth/me', { headers: authHeaders() });
+    state.profile.username = me.username || $('username').value.trim() || state.profile.username || 'admin';
+    state.profile.nickname = me.nickname || '';
+    state.profile.avatar = me.avatar_url || '';
     saveProfileState();
     applyProfileUI();
     setLoginState('登录成功');
@@ -239,30 +242,35 @@ $('btnLogoutInUserCenter').onclick = doLogout;
 
 $('btnSaveProfile').onclick = async () => {
   try {
-    const me = await api('/api/v1/auth/me', { headers: authHeaders() });
-    state.profile.username = me.username || $('username').value.trim() || 'admin';
-  } catch {
-    state.profile.username = $('username').value.trim() || state.profile.username || 'admin';
+    const payload = {
+      nickname: $('profileNickname').value.trim() || null,
+      avatar_url: $('profileAvatarUrl').value.trim() || null,
+    };
+    const data = await api('/api/v1/auth/profile', { method: 'PUT', headers: authHeaders(), body: JSON.stringify(payload) });
+    state.profile.username = data.username || state.profile.username || $('username').value.trim() || 'admin';
+    state.profile.nickname = data.nickname || '';
+    state.profile.avatar = data.avatar_url || '';
+    saveProfileState();
+    applyProfileUI();
+    show('profileResult', { ok: true, message: '昵称与头像已保存到后端', profile: state.profile });
+  } catch (e) {
+    show('profileResult', e.message || '保存失败');
   }
-  state.profile.nickname = $('profileNickname').value.trim() || state.profile.nickname || '';
-  state.profile.avatar = $('profileAvatarUrl').value.trim() || '';
-  saveProfileState();
-  applyProfileUI();
-  show('profileResult', { ok: true, message: '昵称与头像已保存（前端本地保存，可继续接后端接口）', profile: state.profile });
 };
 
 $('btnChangePassword').onclick = async () => {
   try {
     const oldPwd = $('oldPassword').value;
     const newPwd = $('newPassword').value;
-    const user = ($('profileUsername').value || $('username').value).trim();
     if (!oldPwd || !newPwd) throw new Error('请填写旧密码和新密码');
     if (newPwd.length < 6) throw new Error('新密码至少 6 位');
-    await api('/api/v1/auth/login', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: user, password: oldPwd }),
+
+    const data = await api('/api/v1/auth/change-password', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ old_password: oldPwd, new_password: newPwd }),
     });
-    show('passwordResult', { ok: true, message: '旧密码校验通过。当前后端暂未开放修改密码接口，此处已完成交互预留。' });
+    show('passwordResult', data);
     $('oldPassword').value = '';
     $('newPassword').value = '';
   } catch (e) {
@@ -320,18 +328,15 @@ $('btnRefreshStatus').onclick = refreshStatusBase;
 
 $('btnCreateSelfcheck').onclick = async () => {
   try {
-    const summary = $('scSummary').value.trim();
-    if (!summary) throw new Error('请填写自检内容');
+    const content = $('scSummary').value.trim();
+    if (!content) throw new Error('请填写自检内容');
 
-    // 当前简化 UI 下，system/template 使用默认值（后续可改为自动选择或动态加载）
     const payload = {
-      system_id: 1,
-      template_id: 1,
+      content,
       result: $('scResult').value,
-      summary: $('scNote').value.trim() ? `${summary}；备注：${$('scNote').value.trim()}` : summary,
-      checked_at: new Date().toISOString(),
+      note: $('scNote').value.trim() || null,
     };
-    show('selfcheckResult', await api('/api/v1/selfchecks/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) }));
+    show('selfcheckResult', await api('/api/v1/selfchecks/records/simple', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) }));
   } catch (e) { show('selfcheckResult', e.message); }
 };
 

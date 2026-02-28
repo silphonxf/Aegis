@@ -16,3 +16,10 @@ class SelfcheckRecordCreate(BaseModel):
     result: Literal["normal", "warning", "critical"]
     summary: str | None = None
     checked_at: datetime
+
+
+class SelfcheckRecordSimpleCreate(BaseModel):
+    content: str
+    result: Literal["normal", "critical"]
+    note: str | None = None
+    system_id: int | None = None
