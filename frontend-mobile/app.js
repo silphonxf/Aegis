@@ -190,13 +190,15 @@ $('btnLogin').onclick = async () => {
   } catch (e) { setLoginState(`登录失败：${e.message}`); }
 };
 
-$('btnLogout').onclick = () => {
+function doLogout() {
   state.token = '';
   localStorage.removeItem('aegis_token');
   stopStatusLoop();
   switchScreen(false);
   setLoginState('已退出登录');
-};
+}
+
+$('btnLogoutInUserCenter').onclick = doLogout;
 
 $('btnSaveProfile').onclick = async () => {
   try {
