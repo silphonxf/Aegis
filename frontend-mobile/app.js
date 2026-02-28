@@ -299,14 +299,19 @@ $('btnCreateInspection').onclick = async () => {
 
 $('btnSubmitNfc').onclick = async () => {
   try {
+    const nfcText = $('nfcTag').value.trim();
+    if (!nfcText) throw new Error('请先填写 NFC 标签内容');
+
+    const resolved = await api(`/api/v1/inspections/points/resolve?qr_content=${encodeURIComponent(nfcText)}`, { headers: authHeaders() });
     const payload = {
-      system_id: Number($('nfcSystemId').value),
-      point_id: Number($('nfcPointId').value),
+      system_id: Number(resolved.system_id),
+      point_id: Number(resolved.point_id),
       result: $('nfcResult').value,
-      note: `NFC:${$('nfcTag').value}; ${$('nfcNote').value || ''}`,
+      note: $('nfcNote').value || null,
       inspected_at: new Date().toISOString(),
     };
-    show('nfcResultView', await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) }));
+    const created = await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
+    show('nfcResultView', { resolved_point: resolved, created_record: created });
   } catch (e) { show('nfcResultView', e.message); }
 };
 

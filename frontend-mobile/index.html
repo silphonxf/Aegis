@@ -79,13 +79,11 @@
           <section class="card hidden" data-sub="inspection-nfc">
             <div class="card-head"><h2>NFC 巡检（Mock入口）</h2><button class="ghost small" data-back="inspection-home">返回</button></div>
             <div class="grid two">
-              <label>NFC 标签<input id="nfcTag" value="NFC://DEMO-SYS-001/P-002" /></label>
-              <label>system_id<input id="nfcSystemId" placeholder="例如 1" /></label>
-              <label>point_id<input id="nfcPointId" placeholder="例如 2" /></label>
+              <label class="full">NFC 标签<input id="nfcTag" value="NFC://DEMO-SYS-001/P-002" /></label>
               <label>结果
-                <select id="nfcResult"><option value="normal">normal</option><option value="abnormal">abnormal</option></select>
+                <select id="nfcResult"><option value="normal">正常</option><option value="abnormal">异常</option></select>
               </label>
-              <label class="full">备注<input id="nfcNote" placeholder="NFC 设备联调中，先手工补充字段" /></label>
+              <label class="full">备注<input id="nfcNote" placeholder="可选" /></label>
             </div>
             <div class="actions one"><button id="btnSubmitNfc">提交 NFC 巡检</button></div>
             <pre id="nfcResultView"></pre>
