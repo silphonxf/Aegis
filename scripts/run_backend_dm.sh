@@ -11,5 +11,7 @@ export LD_LIBRARY_PATH="/data/DMdata/dmdbms/drivers/dpi:/data/DMdata/dmdbms/driv
 
 # 默认端口 8000，可通过第一个参数覆盖
 PORT="${1:-8000}"
+# 默认监听全部网卡，便于局域网移动端访问
+HOST="${2:-0.0.0.0}"
 
-exec uvicorn app.main:app --reload --port "$PORT"
+exec uvicorn app.main:app --reload --host "$HOST" --port "$PORT"
