@@ -35,6 +35,15 @@ main { padding: 12px; display: grid; gap: 12px; }
   background: rgba(5, 14, 24, .92); backdrop-filter: blur(8px);
   border-bottom: 1px solid #133049;
 }
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.avatar-btn {
+  width: 38px; height: 38px; border-radius: 999px; padding: 0;
+  border: 1px solid #2a5a7a; background: #0b1f31;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.avatar-btn img {
+  width: 100%; height: 100%; border-radius: 999px; object-fit: cover;
+}
 .topbar.simple { position: static; }
 .topbar h1 { margin: 0 0 4px; font-size: 1.04rem; display: flex; gap: 8px; align-items: center; }
 .subtitle { margin: 0; font-size: .82rem; color: var(--muted); }
@@ -91,6 +100,14 @@ pre {
 pre:empty { display: none; }
 .charts { display: grid; gap: 10px; }
 canvas { width: 100%; border: 1px solid #1d3a51; border-radius: 10px; background: #071320; }
+.avatar-editor {
+  display: grid; grid-template-columns: 70px 1fr; gap: 10px; align-items: center;
+  margin-bottom: 10px;
+}
+.avatar-editor img {
+  width: 64px; height: 64px; border-radius: 999px; object-fit: cover;
+  border: 1px solid #2a5a7a; background: #0b1e2f;
+}
 .status-dot {
   margin-top: 8px; border-radius: 999px; padding: 8px 10px; font-size: 13px;
   background: #17324b; color: #cbe9ff; border: 1px solid #2a5e81;

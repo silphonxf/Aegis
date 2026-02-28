@@ -38,7 +38,12 @@
           <h1>Aegis 运维助手 <span class="badge">v1.1 UI</span></h1>
           <p class="subtitle">顶部菜单：巡检 / 自检 / 工具箱</p>
         </div>
-        <button id="btnLogout" class="ghost">退出</button>
+        <div class="header-actions">
+          <button id="btnUserCenter" class="avatar-btn" title="用户中心">
+            <img id="headerAvatar" alt="avatar" />
+          </button>
+          <button id="btnLogout" class="ghost">退出</button>
+        </div>
       </header>
 
       <nav class="menu-tabs">
@@ -181,6 +186,34 @@
               <button id="btnAppAiQa">AI 问答（Mock）</button>
             </div>
             <pre id="appToolResult"></pre>
+          </section>
+        </section>
+
+        <section id="panel-user-center" class="panel">
+          <section class="card">
+            <div class="card-head"><h2>用户中心</h2><button id="btnBackFromUser" class="ghost small">返回主页</button></div>
+            <div class="avatar-editor">
+              <img id="profileAvatarPreview" alt="avatar" />
+              <label>头像地址
+                <input id="profileAvatarUrl" placeholder="输入头像 URL，留空使用默认头像" />
+              </label>
+            </div>
+            <div class="grid two">
+              <label>昵称<input id="profileNickname" placeholder="输入昵称" /></label>
+              <label>账号<input id="profileUsername" disabled /></label>
+            </div>
+            <div class="actions one"><button id="btnSaveProfile">保存昵称与头像</button></div>
+            <pre id="profileResult"></pre>
+          </section>
+
+          <section class="card">
+            <h2>修改密码</h2>
+            <div class="grid two">
+              <label>旧密码<input id="oldPassword" type="password" /></label>
+              <label>新密码<input id="newPassword" type="password" /></label>
+            </div>
+            <div class="actions one"><button id="btnChangePassword">提交密码修改</button></div>
+            <pre id="passwordResult"></pre>
           </section>
         </section>
       </main>

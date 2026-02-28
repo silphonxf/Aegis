@@ -1,10 +1,13 @@
 const $ = (id) => document.getElementById(id);
+const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%230f2c44"/><circle cx="32" cy="24" r="12" fill="%236bd5ff"/><path d="M12 56c4-10 12-16 20-16s16 6 20 16" fill="%2338bdf8"/></svg>';
+
 const state = {
   token: localStorage.getItem('aegis_token') || '',
   requestLogs: JSON.parse(localStorage.getItem('aegis_request_logs') || '[]'),
   metricSeries: { cpu: [], mem: [], disk: [] },
   chartTimer: null,
   extractedErrors: [],
+  profile: JSON.parse(localStorage.getItem('aegis_profile') || '{}'),
 };
 
 function getBase() { return $('apiBase').value.trim().replace(/\/$/, ''); }
@@ -15,6 +18,19 @@ function authHeaders() {
 }
 function show(id, data) { $(id).textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2); }
 function setLoginState(text) { $('loginState').textContent = text; }
+
+function saveProfileState() {
+  localStorage.setItem('aegis_profile', JSON.stringify(state.profile));
+}
+
+function applyProfileUI() {
+  const avatar = state.profile.avatar || DEFAULT_AVATAR;
+  if ($('headerAvatar')) $('headerAvatar').src = avatar;
+  if ($('profileAvatarPreview')) $('profileAvatarPreview').src = avatar;
+  if ($('profileAvatarUrl')) $('profileAvatarUrl').value = state.profile.avatar || '';
+  if ($('profileNickname')) $('profileNickname').value = state.profile.nickname || '';
+  if ($('profileUsername')) $('profileUsername').value = state.profile.username || $('username').value.trim() || 'admin';
+}
 
 function rememberLog(log) {
   state.requestLogs.unshift(log);
@@ -58,6 +74,12 @@ function showSub(panelId, subName) {
 
 function initSubNavigation() {
   $('btnGoQr').onclick = () => showSub('panel-inspection', 'inspection-qr');
+  $('btnUserCenter').onclick = () => {
+    stopStatusLoop();
+    switchPanel('panel-user-center');
+    applyProfileUI();
+  };
+  $('btnBackFromUser').onclick = () => switchPanel('panel-inspection');
   $('btnGoNfc').onclick = () => showSub('panel-inspection', 'inspection-nfc');
   $('btnGoStatus').onclick = () => { showSub('panel-selfcheck', 'selfcheck-status'); startStatusLoop(); };
   $('btnGoSelfForm').onclick = () => showSub('panel-selfcheck', 'selfcheck-form');
@@ -159,6 +181,9 @@ $('btnLogin').onclick = async () => {
     });
     state.token = data.access_token;
     localStorage.setItem('aegis_token', state.token);
+    state.profile.username = $('username').value.trim() || state.profile.username || 'admin';
+    saveProfileState();
+    applyProfileUI();
     setLoginState('登录成功');
     switchScreen(true);
     switchPanel('panel-inspection');
@@ -171,6 +196,39 @@ $('btnLogout').onclick = () => {
   stopStatusLoop();
   switchScreen(false);
   setLoginState('已退出登录');
+};
+
+$('btnSaveProfile').onclick = async () => {
+  try {
+    const me = await api('/api/v1/auth/me', { headers: authHeaders() });
+    state.profile.username = me.username || $('username').value.trim() || 'admin';
+  } catch {
+    state.profile.username = $('username').value.trim() || state.profile.username || 'admin';
+  }
+  state.profile.nickname = $('profileNickname').value.trim() || state.profile.nickname || '';
+  state.profile.avatar = $('profileAvatarUrl').value.trim() || '';
+  saveProfileState();
+  applyProfileUI();
+  show('profileResult', { ok: true, message: '昵称与头像已保存（前端本地保存，可继续接后端接口）', profile: state.profile });
+};
+
+$('btnChangePassword').onclick = async () => {
+  try {
+    const oldPwd = $('oldPassword').value;
+    const newPwd = $('newPassword').value;
+    const user = ($('profileUsername').value || $('username').value).trim();
+    if (!oldPwd || !newPwd) throw new Error('请填写旧密码和新密码');
+    if (newPwd.length < 6) throw new Error('新密码至少 6 位');
+    await api('/api/v1/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: oldPwd }),
+    });
+    show('passwordResult', { ok: true, message: '旧密码校验通过。当前后端暂未开放修改密码接口，此处已完成交互预留。' });
+    $('oldPassword').value = '';
+    $('newPassword').value = '';
+  } catch (e) {
+    show('passwordResult', e.message || '修改失败');
+  }
 };
 
 // top tabs
@@ -276,6 +334,7 @@ $('btnAppRestart').onclick = () => show('appToolResult', { action: 'app_restart'
 $('btnAppAiQa').onclick = () => show('appToolResult', { action: 'ai_qa', status: 'mocked', answer: '这是 AI 问答 Mock 回答：后续接真实模型服务。' });
 
 initSubNavigation();
+applyProfileUI();
 setLoginState(state.token ? '已加载本地 Token，可直接进入主界面' : '未登录');
 switchScreen(Boolean(state.token));
 switchPanel('panel-inspection');
