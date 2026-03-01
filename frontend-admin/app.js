@@ -80,7 +80,7 @@ function pushTrend(key, value) {
   if (arr.length > 24) arr.shift();
 }
 
-function drawSparkline(canvasId, values, stroke = '#c48a42') {
+function drawSparkline(canvasId, values, stroke = '#38bdf8') {
   const canvas = $(canvasId);
   if (!canvas || !canvas.getContext) return;
   const ctx = canvas.getContext('2d');
@@ -102,9 +102,9 @@ function drawSparkline(canvasId, values, stroke = '#c48a42') {
 }
 
 function renderSparklines() {
-  drawSparkline('sparkCpu', trendSeries.cpu, '#c48a42');
-  drawSparkline('sparkMem', trendSeries.mem, '#b97736');
-  drawSparkline('sparkDisk', trendSeries.disk, '#a8642d');
+  drawSparkline('sparkCpu', trendSeries.cpu, '#38bdf8');
+  drawSparkline('sparkMem', trendSeries.mem, '#2dd4bf');
+  drawSparkline('sparkDisk', trendSeries.disk, '#7dd3fc');
 }
 
 function applyAbnormalFilters() {
@@ -249,7 +249,7 @@ function stopDashboardAutoRefresh() {
     clearInterval(dashboardTimer);
     dashboardTimer = null;
   }
-  setLiveStatus(autoRefreshEnabled ? false : false);
+  setLiveStatus(false);
 }
 
 $('btnLogin').onclick = async () => {
@@ -362,14 +362,14 @@ $('btnCreateSystem').onclick = async () => {
 $('btnListUsers').onclick = async () => {
   try {
     const d = await request('/api/v1/admin/users?page=1&size=50', { headers: headers() });
-    $('userListResult').textContent = JSON.stringify(d, null, 2);
+    $('userListResult').textContent = formatSuccess('用户列表', `共 ${d.total ?? d.items?.length ?? 0} 条`, d);
   } catch (e) { $('userListResult').textContent = formatError('用户列表', e); }
 };
 
 $('btnListSystems').onclick = async () => {
   try {
     const d = await request('/api/v1/admin/systems?page=1&size=50', { headers: headers() });
-    $('systemListResult').textContent = JSON.stringify(d, null, 2);
+    $('systemListResult').textContent = formatSuccess('系统列表', `共 ${d.total ?? d.items?.length ?? 0} 条`, d);
   } catch (e) { $('systemListResult').textContent = formatError('系统列表', e); }
 };
 
@@ -386,7 +386,7 @@ $('btnCreateTemplate').onclick = async () => {
 $('btnListTemplates').onclick = async () => {
   try {
     const d = await request('/api/v1/selfchecks/templates?page=1&size=50', { headers: headers() });
-    $('templateListResult').textContent = JSON.stringify(d, null, 2);
+    $('templateListResult').textContent = formatSuccess('模板列表', `共 ${d.total ?? d.items?.length ?? 0} 条`, d);
   } catch (e) { $('templateListResult').textContent = formatError('模板列表', e); }
 };
 
@@ -441,7 +441,7 @@ function buildAssetQuery() {
 $('btnListAssets').onclick = async () => {
   try {
     const d = await request(`/api/v1/admin/assets?${buildAssetQuery()}`, { headers: headers() });
-    $('assetListResult').textContent = JSON.stringify(d, null, 2);
+    $('assetListResult').textContent = formatSuccess('资产列表', `共 ${d.total ?? d.items?.length ?? 0} 条`, d);
   } catch (e) { $('assetListResult').textContent = formatError('资产列表', e); }
 };
 
@@ -569,7 +569,7 @@ $('btnDiagList').onclick = async () => {
     const s = $('diagSeverityFilter').value.trim();
     const q = s ? `?page=1&size=20&severity=${encodeURIComponent(s)}` : '?page=1&size=20';
     const d = await request(`/api/v1/ai/diagnoses${q}`, { headers: headers() });
-    $('diagListResult').textContent = JSON.stringify(d, null, 2);
+    $('diagListResult').textContent = formatSuccess('AI诊断记录', `共 ${d.total ?? d.items?.length ?? 0} 条`, d);
   } catch (e) { $('diagListResult').textContent = formatError('AI诊断记录', e); }
 };
 
