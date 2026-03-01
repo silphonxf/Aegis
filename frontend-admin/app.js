@@ -3,6 +3,9 @@ let token = localStorage.getItem('aegis_admin_token') || '';
 
 const REQ_HISTORY_KEY = 'aegis_admin_request_history';
 let dashboardTimer = null;
+let autoRefreshEnabled = true;
+const trendSeries = { cpu: [], mem: [], disk: [] };
+let latestMonitoringItems = [];
 
 function base() {
   const protocol = window.location.protocol && window.location.protocol.startsWith('http')
@@ -78,7 +81,72 @@ function setLiveStatus(on) {
   if (!el) return;
   el.classList.toggle('on', on);
   el.classList.toggle('off', !on);
-  el.textContent = on ? '● 实时刷新开启' : '● 实时刷新关闭';
+  el.textContent = on ? '● 自动刷新开启' : '● 手动刷新模式';
+  if ($('btnToggleAutoRefresh')) $('btnToggleAutoRefresh').textContent = on ? '切换手动刷新' : '切换自动刷新';
+}
+
+function pushTrend(key, value) {
+  const arr = trendSeries[key];
+  if (!arr) return;
+  arr.push(Math.max(0, Math.min(100, Number(value) || 0)));
+  if (arr.length > 24) arr.shift();
+}
+
+function drawSparkline(canvasId, values, stroke = '#c48a42') {
+  const canvas = $(canvasId);
+  if (!canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  if (!values.length) return;
+
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  values.forEach((v, i) => {
+    const x = (i / Math.max(values.length - 1, 1)) * (w - 6) + 3;
+    const y = h - 4 - (v / 100) * (h - 8);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+function renderSparklines() {
+  drawSparkline('sparkCpu', trendSeries.cpu, '#c48a42');
+  drawSparkline('sparkMem', trendSeries.mem, '#b97736');
+  drawSparkline('sparkDisk', trendSeries.disk, '#a8642d');
+}
+
+function applyAbnormalFilters() {
+  const colorFilter = $('abnormalColorFilter')?.value || 'all';
+  const keyword = ($('abnormalKeyword')?.value || '').trim().toLowerCase();
+  const allowed = colorFilter === 'all' ? null : colorFilter.split(',');
+
+  const filtered = latestMonitoringItems.filter((i) => {
+    const color = String(i.status_color || '').toLowerCase();
+    if (allowed && !allowed.includes(color)) return false;
+    if (keyword) {
+      const text = `${i.system_code || ''} ${i.system_name || ''}`.toLowerCase();
+      if (!text.includes(keyword)) return false;
+    }
+    return true;
+  });
+
+  const rows = filtered.map(i => `
+    <tr>
+      <td>${i.system_id}</td>
+      <td>${i.system_code} / ${i.system_name}</td>
+      <td>${i.env}</td>
+      <td>${statusChip(i.status_color)}</td>
+      <td>${i.cpu_usage ?? '-'}% (${statusChip(i.cpu_level || 'unknown')})</td>
+      <td>${i.mem_usage ?? '-'}% (${statusChip(i.mem_level || 'unknown')})</td>
+      <td>${i.disk_usage ?? '-'}% (${statusChip(i.disk_level || 'unknown')})</td>
+      <td>${i.captured_at || '-'}</td>
+    </tr>
+  `).join('');
+  $('abnormalTbody').innerHTML = rows || '<tr><td colspan="8">暂无符合筛选条件的数据</td></tr>';
 }
 
 function getHistory() {
@@ -140,23 +208,20 @@ function renderMonitoring(data){
     if (!vals.length) return 0;
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   };
-  setTechMetric('metricCpu', avg('cpu_usage'));
-  setTechMetric('metricMem', avg('mem_usage'));
-  setTechMetric('metricDisk', avg('disk_usage'));
+  const cpuAvg = avg('cpu_usage');
+  const memAvg = avg('mem_usage');
+  const diskAvg = avg('disk_usage');
+  setTechMetric('metricCpu', cpuAvg);
+  setTechMetric('metricMem', memAvg);
+  setTechMetric('metricDisk', diskAvg);
 
-  const rows = items.map(i => `
-    <tr>
-      <td>${i.system_id}</td>
-      <td>${i.system_code} / ${i.system_name}</td>
-      <td>${i.env}</td>
-      <td>${statusChip(i.status_color)}</td>
-      <td>${i.cpu_usage ?? '-'}% (${statusChip(i.cpu_level || 'unknown')})</td>
-      <td>${i.mem_usage ?? '-'}% (${statusChip(i.mem_level || 'unknown')})</td>
-      <td>${i.disk_usage ?? '-'}% (${statusChip(i.disk_level || 'unknown')})</td>
-      <td>${i.captured_at || '-'}</td>
-    </tr>
-  `).join('');
-  $('abnormalTbody').innerHTML = rows || '<tr><td colspan="8">暂无系统数据</td></tr>';
+  pushTrend('cpu', cpuAvg);
+  pushTrend('mem', memAvg);
+  pushTrend('disk', diskAvg);
+  renderSparklines();
+
+  latestMonitoringItems = items;
+  applyAbnormalFilters();
 }
 
 function renderAssetSummary(data) {
@@ -169,10 +234,14 @@ function renderAssetSummary(data) {
 }
 
 function startDashboardAutoRefresh() {
+  if (!autoRefreshEnabled) {
+    stopDashboardAutoRefresh();
+    return;
+  }
   if (dashboardTimer) return;
   setLiveStatus(true);
   dashboardTimer = setInterval(() => {
-    if (!token) return;
+    if (!token || !autoRefreshEnabled) return;
     $('btnRefreshDashboard').click();
   }, 12000);
 }
@@ -182,7 +251,7 @@ function stopDashboardAutoRefresh() {
     clearInterval(dashboardTimer);
     dashboardTimer = null;
   }
-  setLiveStatus(false);
+  setLiveStatus(autoRefreshEnabled ? false : false);
 }
 
 $('btnLogin').onclick = async () => {
@@ -502,6 +571,15 @@ $('btnDiagList').onclick = async () => {
 
 $('btnRefreshHistory').onclick = () => renderHistory();
 $('btnClearHistory').onclick = () => { localStorage.removeItem(REQ_HISTORY_KEY); renderHistory(); };
+$('btnToggleAutoRefresh').onclick = () => {
+  autoRefreshEnabled = !autoRefreshEnabled;
+  if (autoRefreshEnabled) startDashboardAutoRefresh();
+  else stopDashboardAutoRefresh();
+  setLiveStatus(autoRefreshEnabled && Boolean(dashboardTimer));
+};
+
+$('abnormalColorFilter').onchange = applyAbnormalFilters;
+$('abnormalKeyword').oninput = applyAbnormalFilters;
 
 Array.from(document.querySelectorAll('.menu-btn')).forEach((btn) => {
   btn.addEventListener('click', () => switchPanel(btn.dataset.section));

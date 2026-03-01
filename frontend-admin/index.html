@@ -41,7 +41,8 @@
       <header class="workspace-header">
         <h1>管理工作台 <span class="badge">v2.1 Tech</span></h1>
         <div class="header-meta">
-          <span id="liveStatus" class="live-status on">● 实时刷新开启</span>
+          <button id="btnToggleAutoRefresh" class="toggle-btn">切换手动刷新</button>
+          <span id="liveStatus" class="live-status on">● 自动刷新开启</span>
           <span id="lastUpdated" class="last-updated">最近更新：--</span>
         </div>
       </header>
@@ -74,14 +75,17 @@
             <div class="tech-meter">
               <div class="tech-head"><span>CPU 负载</span><b id="metricCpuText">0%</b></div>
               <div class="meter-track"><i id="metricCpuBar"></i></div>
+              <canvas id="sparkCpu" class="sparkline" width="220" height="40"></canvas>
             </div>
             <div class="tech-meter">
               <div class="tech-head"><span>内存占用</span><b id="metricMemText">0%</b></div>
               <div class="meter-track"><i id="metricMemBar"></i></div>
+              <canvas id="sparkMem" class="sparkline" width="220" height="40"></canvas>
             </div>
             <div class="tech-meter">
               <div class="tech-head"><span>磁盘占用</span><b id="metricDiskText">0%</b></div>
               <div class="meter-track"><i id="metricDiskBar"></i></div>
+              <canvas id="sparkDisk" class="sparkline" width="220" height="40"></canvas>
             </div>
           </div>
 
@@ -94,6 +98,16 @@
           </div>
           <pre id="assetSummary"></pre>
           <pre id="monitoring"></pre>
+          <div class="grid2 table-filters">
+            <select id="abnormalColorFilter">
+              <option value="all">全部状态</option>
+              <option value="red">仅红色</option>
+              <option value="yellow">仅黄色</option>
+              <option value="red,yellow">仅红黄</option>
+              <option value="green">仅绿色</option>
+            </select>
+            <input id="abnormalKeyword" placeholder="筛选系统名/编号关键词" />
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
