@@ -1,13 +1,13 @@
 :root {
-  --bg: #120d06;
-  --bg-soft: #1a1207;
-  --panel: #201506;
-  --card: #261b0c;
-  --line: #4a3212;
-  --text: #fff8ea;
-  --muted: #d6b98a;
-  --primary: #c9822b;
-  --primary-2: #b56a22;
+  --bg: #07121f;
+  --bg-soft: #0b1d2e;
+  --panel: #0c1f30;
+  --card: #0f2233;
+  --line: #1f3a53;
+  --text: #e6f2ff;
+  --muted: #8ea9c3;
+  --primary: #2dd4bf;
+  --primary-2: #38bdf8;
   --good: #34d399;
   --warn: #fbbf24;
   --bad: #fb7185;
@@ -19,9 +19,9 @@ body {
   color: var(--text);
   font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
   background:
-    radial-gradient(circle at 10% 10%, rgba(201, 130, 43, .14), transparent 35%),
-    radial-gradient(circle at 80% 0%, rgba(181, 106, 34, .12), transparent 30%),
-    linear-gradient(135deg, #100b06, #1a130c);
+    radial-gradient(circle at 10% 10%, rgba(56, 189, 248, .14), transparent 35%),
+    radial-gradient(circle at 80% 0%, rgba(45, 212, 191, .12), transparent 30%),
+    linear-gradient(135deg, #07121f, #0b1d2e);
 }
 
 .hidden { display: none !important; }
@@ -70,9 +70,9 @@ body {
 .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 .menu-list { display: grid; gap: 8px; margin-top: 10px; }
 .menu-btn {
-  border: 1px solid #5a3a13;
-  background: #2a1c0b;
-  color: #f5d8a0;
+  border: 1px solid #21425f;
+  background: #0c1f30;
+  color: #b8d3ea;
   text-align: left;
   border-radius: 10px;
   padding: 10px 12px;
@@ -92,29 +92,29 @@ body {
 }
 .logout-btn {
   margin-top: auto;
-  background: #3a2509;
-  border: 1px solid #6a4616;
-  color: #ffd8a8;
+  background: #133049;
+  border: 1px solid #2a5a7a;
+  color: #c7e6ff;
 }
 
 .workspace { padding: 16px; }
 .workspace-header { margin-bottom: 14px; display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
 .workspace-header h1 { margin: 0; display: flex; align-items: center; gap: 10px; }
-.header-meta { display: flex; gap: 12px; align-items: center; color: #e6c9a0; font-size: 13px; }
+.header-meta { display: flex; gap: 12px; align-items: center; color: #8ea9c3; font-size: 13px; }
 .toggle-btn {
   width: auto;
   padding: 7px 10px;
   border-radius: 999px;
   font-size: 12px;
-  color: #fbe9d0;
-  background: #3a2a16;
-  border: 1px solid #6d4c23;
+  color: #cfe9ff;
+  background: #113654;
+  border: 1px solid #1e4b6d;
   box-shadow: none;
 }
-.live-status { padding: 4px 10px; border-radius: 999px; border: 1px solid #7a5522; background: #2f1d08; }
+.live-status { padding: 4px 10px; border-radius: 999px; border: 1px solid #2e5a7d; background: #0c1f30; }
 .live-status.on { border-color: #4fbf86; color: #b5ffda; box-shadow: 0 0 12px rgba(79,191,134,.25); }
-.live-status.off { border-color: #8d5d22; color: #ffd8a0; }
-.last-updated { color: #e6c38a; }
+.live-status.off { border-color: #2e5a7d; color: #ffd8a0; }
+.last-updated { color: #9dd6f5; }
 .badge {
   font-size: 11px;
   background: rgba(255,173,31,.22);
@@ -129,13 +129,13 @@ body {
 
 .card {
   background: linear-gradient(145deg, rgba(38,27,12,.96), rgba(26,18,7,.95));
-  border: 1px solid #573a13;
+  border: 1px solid #1f3a53;
   border-radius: 14px;
   padding: 14px;
   box-shadow: 0 12px 30px rgba(0,0,0,.25);
 }
 .card h2 { margin: 0 0 12px; }
-.card h3 { color: #ffcc7a; font-weight: 600; margin: 12px 0 8px; }
+.card h3 { color: #9dd6f5; font-weight: 600; margin: 12px 0 8px; }
 
 input, button, select, textarea {
   width: 100%;
@@ -145,14 +145,14 @@ input, button, select, textarea {
   font-size: 14px;
 }
 input, select, textarea {
-  background: #1d1206;
-  border: 1px solid #64431a;
-  color: #fff5e3;
+  background: #0a1b2b;
+  border: 1px solid #23435f;
+  color: #e6f2ff;
 }
 button {
   border: none;
   font-weight: 700;
-  color: #341b00;
+  color: #052035;
   background: linear-gradient(135deg, var(--primary), var(--primary-2));
   box-shadow: 0 6px 18px rgba(255,126,31,.24);
   cursor: pointer;
@@ -160,9 +160,9 @@ button {
 button:hover { filter: brightness(1.04); }
 
 pre {
-  background: #120a03;
-  color: #ffdca8;
-  border: 1px solid #4d3414;
+  background: #040d16;
+  color: #bfe7ff;
+  border: 1px solid #173754;
   padding: 10px;
   border-radius: 10px;
   overflow: auto;
@@ -189,9 +189,9 @@ pre {
   color: #fff4d2;
 }
 .kpi.green { background: linear-gradient(135deg, #124535, #0d3328); }
-.kpi.yellow { background: linear-gradient(135deg, #5b3a08, #4a2e06); }
+.kpi.yellow { background: linear-gradient(135deg, #1f4d6d, #173f5d); }
 .kpi.red { background: linear-gradient(135deg, #5a1b2d, #431421); }
-.kpi.total { background: linear-gradient(135deg, #4e3009, #3a2407); }
+.kpi.total { background: linear-gradient(135deg, #1e4b6d, #163c58); }
 
 .tech-metrics {
   display: grid;
@@ -200,8 +200,8 @@ pre {
   margin: 8px 0 14px;
 }
 .tech-meter {
-  border: 1px solid #5a3a13;
-  background: #1c1104;
+  border: 1px solid #21425f;
+  background: #071320;
   border-radius: 12px;
   padding: 10px;
   position: relative;
@@ -229,14 +229,14 @@ pre {
   background: #2d1d09;
   border-radius: 999px;
   overflow: hidden;
-  border: 1px solid #61431a;
+  border: 1px solid #1d3a51;
 }
 .meter-track i {
   display: block;
   width: 0;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #d7a45f, #b7722c);
+  background: linear-gradient(90deg, #2dd4bf, #38bdf8);
   box-shadow: 0 0 10px rgba(183,114,44,.35);
   transition: width .25s ease;
 }
@@ -245,8 +245,8 @@ pre {
   height: 40px;
   margin-top: 8px;
   border-radius: 8px;
-  background: #160e05;
-  border: 1px solid #5a3c1a;
+  background: #071320;
+  border: 1px solid #1d3a51;
 }
 .table-filters { margin: 10px 0; }
 
@@ -254,19 +254,19 @@ pre {
 table {
   width: 100%;
   border-collapse: collapse;
-  background: #1a1004;
-  border: 1px solid #5b3c14;
+  background: #0a1b2b;
+  border: 1px solid #23435f;
   border-radius: 10px;
   overflow: hidden;
 }
 th, td {
-  border-bottom: 1px solid #4a3111;
+  border-bottom: 1px solid #1f3a53;
   padding: 8px;
   text-align: left;
   font-size: 13px;
   white-space: nowrap;
 }
-th { background: #271908; color: #ffd89a; }
+th { background: #113654; color: #7dd3fc; }
 .status-chip {
   display: inline-block;
   padding: 3px 8px;
