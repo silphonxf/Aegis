@@ -584,9 +584,7 @@ function activateToolTab(toolId) {
   if ($('toolHint')) $('toolHint').textContent = targetBtn.dataset.desc || '';
 }
 
-function initUiBindings() {
-  $('btnRefreshHistory').onclick = () => renderHistory();
-  $('btnClearHistory').onclick = () => { localStorage.removeItem(REQ_HISTORY_KEY); renderHistory(); };
+function initDashboardBindings() {
   $('btnToggleAutoRefresh').onclick = () => {
     autoRefreshEnabled = !autoRefreshEnabled;
     if (autoRefreshEnabled) startDashboardAutoRefresh();
@@ -596,11 +594,18 @@ function initUiBindings() {
 
   $('abnormalColorFilter').onchange = applyAbnormalFilters;
   $('abnormalKeyword').oninput = applyAbnormalFilters;
+}
+
+function initAdvancedToolsBindings() {
+  $('btnRefreshHistory').onclick = () => renderHistory();
+  $('btnClearHistory').onclick = () => { localStorage.removeItem(REQ_HISTORY_KEY); renderHistory(); };
 
   Array.from(document.querySelectorAll('.tool-tab')).forEach((btn) => {
     btn.addEventListener('click', () => activateToolTab(btn.dataset.tool));
   });
+}
 
+function initGlobalBindings() {
   Array.from(document.querySelectorAll('.menu-btn')).forEach((btn) => {
     btn.addEventListener('click', () => switchPanel(btn.dataset.section));
   });
@@ -612,6 +617,12 @@ function initUiBindings() {
     stopDashboardAutoRefresh();
     setAuthView(false);
   };
+}
+
+function initUiBindings() {
+  initDashboardBindings();
+  initAdvancedToolsBindings();
+  initGlobalBindings();
 }
 
 function initViewState() {
