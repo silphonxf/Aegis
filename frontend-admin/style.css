@@ -199,18 +199,6 @@ pre {
   background: #071320;
   border-radius: 12px;
   padding: 10px;
-  position: relative;
-  overflow: hidden;
-}
-.tech-meter::after {
-  content: "";
-  position: absolute;
-  inset: -120% auto auto -35%;
-  width: 32%;
-  height: 260%;
-  background: linear-gradient(90deg, transparent, rgba(255, 196, 84, .25), transparent);
-  transform: rotate(20deg);
-  animation: techSweep 2.8s linear infinite;
 }
 .tech-head {
   display: flex;
