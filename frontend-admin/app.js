@@ -12,6 +12,26 @@ function base() {
 }
 function headers(){ const h = {'Content-Type':'application/json'}; if(token) h.Authorization = `Bearer ${token}`; return h; }
 
+function setAuthView(isLoggedIn) {
+  $('loginView').classList.toggle('hidden', isLoggedIn);
+  $('appView').classList.toggle('hidden', !isLoggedIn);
+}
+
+function switchPanel(sectionId) {
+  document.querySelectorAll('.panel').forEach((panel) => panel.classList.remove('active'));
+  document.querySelectorAll('.menu-btn').forEach((btn) => btn.classList.remove('active'));
+  document.getElementById(sectionId)?.classList.add('active');
+  document.querySelector(`.menu-btn[data-section="${sectionId}"]`)?.classList.add('active');
+}
+
+function setTechMetric(prefix, value) {
+  const safe = Math.max(0, Math.min(100, Number(value) || 0));
+  const textEl = $(`${prefix}Text`);
+  const barEl = $(`${prefix}Bar`);
+  if (textEl) textEl.textContent = `${safe.toFixed(0)}%`;
+  if (barEl) barEl.style.width = `${safe}%`;
+}
+
 function getHistory() {
   try { return JSON.parse(localStorage.getItem(REQ_HISTORY_KEY) || '[]'); }
   catch { return []; }
@@ -31,6 +51,7 @@ function forceRelogin(message = '登录已失效，请重新登录') {
   token = '';
   localStorage.removeItem('aegis_admin_token');
   $('state').textContent = message;
+  setAuthView(false);
 }
 
 async function request(path, options={}){
@@ -63,7 +84,17 @@ function renderMonitoring(data){
   $('kpiTotal').textContent = data.summary?.total ?? 0;
   $('monitoring').textContent = JSON.stringify(data.summary, null, 2);
 
-  const rows = (data.items || []).map(i => `
+  const items = data.items || [];
+  const avg = (key) => {
+    const vals = items.map((i) => Number(i?.[key])).filter((v) => Number.isFinite(v));
+    if (!vals.length) return 0;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  };
+  setTechMetric('metricCpu', avg('cpu_usage'));
+  setTechMetric('metricMem', avg('mem_usage'));
+  setTechMetric('metricDisk', avg('disk_usage'));
+
+  const rows = items.map(i => `
     <tr>
       <td>${i.system_id}</td>
       <td>${i.system_code} / ${i.system_name}</td>
@@ -96,6 +127,9 @@ $('btnLogin').onclick = async () => {
     token = d.access_token;
     localStorage.setItem('aegis_admin_token', token);
     $('state').textContent = '登录成功';
+    setAuthView(true);
+    switchPanel('panel-dashboard');
+    $('btnRefreshDashboard').click();
   } catch(e){ $('state').textContent = `登录失败: ${e.message}`; }
 };
 
@@ -400,5 +434,23 @@ $('btnDiagList').onclick = async () => {
 $('btnRefreshHistory').onclick = () => renderHistory();
 $('btnClearHistory').onclick = () => { localStorage.removeItem(REQ_HISTORY_KEY); renderHistory(); };
 
-$('state').textContent = token ? '已加载本地Token' : '未登录';
+Array.from(document.querySelectorAll('.menu-btn')).forEach((btn) => {
+  btn.addEventListener('click', () => switchPanel(btn.dataset.section));
+});
+
+$('btnLogout').onclick = () => {
+  token = '';
+  localStorage.removeItem('aegis_admin_token');
+  $('state').textContent = '已退出登录';
+  setAuthView(false);
+};
+
+if (token) {
+  setAuthView(true);
+  switchPanel('panel-dashboard');
+  $('btnRefreshDashboard').click();
+} else {
+  setAuthView(false);
+  $('state').textContent = '未登录';
+}
 renderHistory();
