@@ -157,6 +157,11 @@ function formatError(moduleName, e) {
   return `【${moduleName}】请求失败\n原因：${msg}\n建议：请检查登录状态或稍后重试。`;
 }
 
+function formatSuccess(moduleName, message, data = null) {
+  const base = `【${moduleName}】${message}`;
+  return data ? `${base}\n${JSON.stringify(data, null, 2)}` : base;
+}
+
 function forceRelogin(message = '登录已失效，请重新登录') {
   token = '';
   localStorage.removeItem('aegis_admin_token');
@@ -340,7 +345,7 @@ $('btnCreateUser').onclick = async () => {
       method:'POST', headers:headers(),
       body: JSON.stringify({ username: $('newUserName').value, password: $('newUserPassword').value, role_code: $('newUserRole').value })
     });
-    $('userCreateResult').textContent = JSON.stringify(d, null, 2);
+    $('userCreateResult').textContent = formatSuccess('创建用户', '操作成功', d);
   } catch(e){ $('userCreateResult').textContent = formatError('创建用户', e); }
 };
 
@@ -350,7 +355,7 @@ $('btnCreateSystem').onclick = async () => {
       method:'POST', headers:headers(),
       body: JSON.stringify({ system_code: $('newSystemCode').value, name: $('newSystemName').value, env: $('newSystemEnv').value || 'prod' })
     });
-    $('systemCreateResult').textContent = JSON.stringify(d, null, 2);
+    $('systemCreateResult').textContent = formatSuccess('创建系统', '操作成功', d);
   } catch(e){ $('systemCreateResult').textContent = formatError('创建系统', e); }
 };
 
@@ -374,7 +379,7 @@ $('btnCreateTemplate').onclick = async () => {
       method:'POST', headers:headers(),
       body: JSON.stringify({ system_id: Number($('tplSystemId').value), check_type: $('tplCheckType').value, name: $('tplName').value })
     });
-    $('templateCreateResult').textContent = JSON.stringify(d, null, 2);
+    $('templateCreateResult').textContent = formatSuccess('创建模板', '操作成功', d);
   } catch(e){ $('templateCreateResult').textContent = formatError('创建模板', e); }
 };
 
@@ -400,7 +405,7 @@ $('btnCreateSnapshot').onclick = async () => {
         last_selfcheck_result: $('snapSelfcheck').value || 'unknown'
       })
     });
-    $('snapshotResult').textContent = JSON.stringify(d, null, 2);
+    $('snapshotResult').textContent = formatSuccess('状态快照', '提交成功', d);
   } catch (e) { $('snapshotResult').textContent = formatError('状态快照', e); }
 };
 
@@ -415,7 +420,7 @@ $('btnCreateAsset').onclick = async () => {
       status: $('assetStatus').value.trim() || 'in_use',
     };
     const d = await request('/api/v1/admin/assets', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
-    $('assetResult').textContent = JSON.stringify(d, null, 2);
+    $('assetResult').textContent = formatSuccess('资产操作', '操作成功', d);
   } catch (e) { $('assetResult').textContent = formatError('资产操作', e); }
 };
 
@@ -480,7 +485,7 @@ $('btnBatchAssets').onclick = async () => {
       headers: headers(),
       body: JSON.stringify({ items }),
     });
-    $('assetResult').textContent = JSON.stringify(d, null, 2);
+    $('assetResult').textContent = formatSuccess('资产操作', '操作成功', d);
   } catch (e) { $('assetResult').textContent = formatError('资产批量导入', e); }
 };
 
@@ -502,7 +507,7 @@ $('btnSaveRules').onclick = async () => {
       disk_warn: Number($('diskWarn').value), disk_critical: Number($('diskCritical').value),
     };
     const d = await request('/api/v1/monitoring/rules', { method: 'PUT', headers: headers(), body: JSON.stringify(payload) });
-    $('ruleResult').textContent = JSON.stringify({ ...d, payload }, null, 2);
+    $('ruleResult').textContent = formatSuccess('规则配置', '保存成功', { ...d, payload });
   } catch (e) { $('ruleResult').textContent = formatError('规则配置', e); }
 };
 
@@ -543,7 +548,7 @@ $('btnToolTaskList').onclick = async () => {
     const s = $('toolTaskStatusFilter').value.trim();
     const q = s ? `?page=1&size=50&status=${encodeURIComponent(s)}` : '?page=1&size=50';
     const d = await request(`/api/v1/toolbox/tasks${q}`, { headers: headers() });
-    $('toolTaskResult').textContent = JSON.stringify(d, null, 2);
+    $('toolTaskResult').textContent = formatSuccess('工具任务', '操作成功', d);
   } catch (e) { $('toolTaskResult').textContent = formatError('工具任务', e); }
 };
 
@@ -555,7 +560,7 @@ $('btnToolTaskUpdate').onclick = async () => {
       headers: headers(),
       body: JSON.stringify({ status: $('toolTaskActionStatus').value, note: $('toolTaskNote').value || null }),
     });
-    $('toolTaskResult').textContent = JSON.stringify(d, null, 2);
+    $('toolTaskResult').textContent = formatSuccess('工具任务', '操作成功', d);
   } catch (e) { $('toolTaskResult').textContent = formatError('工具任务', e); }
 };
 
