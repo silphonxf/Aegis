@@ -248,7 +248,7 @@ async function request(path, options={}){
 
 function renderMonitoring(data){
   const items = data.items || [];
-  $('monitoring').textContent = JSON.stringify(data.summary, null, 2);
+  
 
   latestMonitoringItems = items;
   refreshSystemSelectOptions();
@@ -279,13 +279,6 @@ function renderAssetSummary(data) {
   setNumber($('assetRepair'), repair);
   setNumber($('assetRetired'), retired);
 
-  $('assetSummary').textContent = [
-    '资产概览',
-    `- 总资产：${total}`,
-    `- 在用资产：${inUse}`,
-    `- 维修中：${repair}`,
-    `- 停用：${retired}`,
-  ].join('\n');
 }
 
 function startDashboardAutoRefresh() {
@@ -334,22 +327,21 @@ $('btnRefreshDashboard').onclick = async () => {
     renderAssetSummary(assets);
     setLastUpdated(true);
   } catch (e) {
-    $('monitoring').textContent = formatError('看板刷新', e);
+    
     setLastUpdated(false);
   }
 };
 
 $('btnCollectLocal').onclick = async () => {
   try {
-    const code = $('localSystemCode').value.trim() || 'HOST-LOCAL-001';
-    const d = await request(`/api/v1/monitoring/collect/local?system_code=${encodeURIComponent(code)}`, {
+    const code = 'HOST-LOCAL-001';
+    await request(`/api/v1/monitoring/collect/local?system_code=${encodeURIComponent(code)}`, {
       method: 'POST',
       headers: headers(),
     });
-    $('monitoring').textContent = `本机采集成功:\n${JSON.stringify(d, null, 2)}`;
     $('btnRefreshDashboard').click();
   } catch (e) {
-    $('monitoring').textContent = formatError('本机采集', e);
+    // dashboard text panel removed
   }
 };
 
@@ -377,7 +369,7 @@ $('btnExportAbnormal').onclick = async () => {
     URL.revokeObjectURL(url);
     pushHistory({ startedAt, method: 'GET', path: '/api/v1/monitoring/abnormal/export', ok: true, status: resp.status, code: null, message: 'CSV downloaded' });
     renderHistory();
-  } catch (e) { $('monitoring').textContent = formatError('异常导出', e); }
+  } catch (e) {  }
 };
 
 $('btnCreateUser').onclick = async () => {
