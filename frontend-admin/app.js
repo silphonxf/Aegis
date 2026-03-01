@@ -2,17 +2,14 @@ const $ = (id) => document.getElementById(id);
 let token = localStorage.getItem('aegis_admin_token') || '';
 
 const REQ_HISTORY_KEY = 'aegis_admin_request_history';
-const API_BASE_KEY = 'aegis_admin_api_base';
 
-function defaultApiBase() {
+function base() {
   const protocol = window.location.protocol && window.location.protocol.startsWith('http')
     ? window.location.protocol
     : 'http:';
   const host = window.location.hostname || '127.0.0.1';
   return `${protocol}//${host}:8000`;
 }
-
-function base(){ return $('apiBase').value.trim().replace(/\/$/, ''); }
 function headers(){ const h = {'Content-Type':'application/json'}; if(token) h.Authorization = `Bearer ${token}`; return h; }
 
 function getHistory() {
@@ -402,11 +399,6 @@ $('btnDiagList').onclick = async () => {
 
 $('btnRefreshHistory').onclick = () => renderHistory();
 $('btnClearHistory').onclick = () => { localStorage.removeItem(REQ_HISTORY_KEY); renderHistory(); };
-
-const rememberedApiBase = localStorage.getItem(API_BASE_KEY);
-$('apiBase').value = rememberedApiBase || defaultApiBase();
-$('apiBase').addEventListener('change', () => localStorage.setItem(API_BASE_KEY, base()));
-$('apiBase').addEventListener('blur', () => localStorage.setItem(API_BASE_KEY, base()));
 
 $('state').textContent = token ? '已加载本地Token' : '未登录';
 renderHistory();
