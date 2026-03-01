@@ -266,7 +266,7 @@ const btnMonitoring = $('btnMonitoring');
 if (btnMonitoring) {
   btnMonitoring.onclick = async () => {
     try { renderMonitoring(await request('/api/v1/monitoring/overview',{headers:headers()})); }
-    catch(e){ $('monitoring').textContent = e.message; }
+    catch(e){ $('monitoring').textContent = formatError('监控总览', e); }
   };
 }
 
@@ -303,7 +303,7 @@ $('btnCollectLocal').onclick = async () => {
     $('monitoring').textContent = `本机采集成功:\n${JSON.stringify(d, null, 2)}`;
     $('btnRefreshDashboard').click();
   } catch (e) {
-    $('monitoring').textContent = `本机采集失败: ${e.message}`;
+    $('monitoring').textContent = formatError('本机采集', e);
   }
 };
 
@@ -358,14 +358,14 @@ $('btnListUsers').onclick = async () => {
   try {
     const d = await request('/api/v1/admin/users?page=1&size=50', { headers: headers() });
     $('userListResult').textContent = JSON.stringify(d, null, 2);
-  } catch (e) { $('userListResult').textContent = e.message; }
+  } catch (e) { $('userListResult').textContent = formatError('用户列表', e); }
 };
 
 $('btnListSystems').onclick = async () => {
   try {
     const d = await request('/api/v1/admin/systems?page=1&size=50', { headers: headers() });
     $('systemListResult').textContent = JSON.stringify(d, null, 2);
-  } catch (e) { $('systemListResult').textContent = e.message; }
+  } catch (e) { $('systemListResult').textContent = formatError('系统列表', e); }
 };
 
 $('btnCreateTemplate').onclick = async () => {
@@ -375,14 +375,14 @@ $('btnCreateTemplate').onclick = async () => {
       body: JSON.stringify({ system_id: Number($('tplSystemId').value), check_type: $('tplCheckType').value, name: $('tplName').value })
     });
     $('templateCreateResult').textContent = JSON.stringify(d, null, 2);
-  } catch(e){ $('templateCreateResult').textContent = e.message; }
+  } catch(e){ $('templateCreateResult').textContent = formatError('创建模板', e); }
 };
 
 $('btnListTemplates').onclick = async () => {
   try {
     const d = await request('/api/v1/selfchecks/templates?page=1&size=50', { headers: headers() });
     $('templateListResult').textContent = JSON.stringify(d, null, 2);
-  } catch (e) { $('templateListResult').textContent = e.message; }
+  } catch (e) { $('templateListResult').textContent = formatError('模板列表', e); }
 };
 
 $('btnCreateSnapshot').onclick = async () => {
@@ -401,7 +401,7 @@ $('btnCreateSnapshot').onclick = async () => {
       })
     });
     $('snapshotResult').textContent = JSON.stringify(d, null, 2);
-  } catch (e) { $('snapshotResult').textContent = e.message; }
+  } catch (e) { $('snapshotResult').textContent = formatError('状态快照', e); }
 };
 
 $('btnCreateAsset').onclick = async () => {
@@ -437,7 +437,7 @@ $('btnListAssets').onclick = async () => {
   try {
     const d = await request(`/api/v1/admin/assets?${buildAssetQuery()}`, { headers: headers() });
     $('assetListResult').textContent = JSON.stringify(d, null, 2);
-  } catch (e) { $('assetListResult').textContent = e.message; }
+  } catch (e) { $('assetListResult').textContent = formatError('资产列表', e); }
 };
 
 $('btnAssetExport').onclick = async () => {
@@ -463,7 +463,7 @@ $('btnAssetExport').onclick = async () => {
     pushHistory({ startedAt, method: 'GET', path, ok: true, status: resp.status, code: null, message: 'CSV downloaded' });
     renderHistory();
   } catch (e) {
-    $('assetResult').textContent = `导出失败: ${e.message}`;
+    $('assetResult').textContent = formatError('资产导出', e);
   }
 };
 
@@ -481,7 +481,7 @@ $('btnBatchAssets').onclick = async () => {
       body: JSON.stringify({ items }),
     });
     $('assetResult').textContent = JSON.stringify(d, null, 2);
-  } catch (e) { $('assetResult').textContent = `批量导入失败: ${e.message}`; }
+  } catch (e) { $('assetResult').textContent = formatError('资产批量导入', e); }
 };
 
 $('btnLoadRules').onclick = async () => {
@@ -491,7 +491,7 @@ $('btnLoadRules').onclick = async () => {
     $('memWarn').value = r.mem_warn; $('memCritical').value = r.mem_critical;
     $('diskWarn').value = r.disk_warn; $('diskCritical').value = r.disk_critical;
     $('ruleResult').textContent = JSON.stringify(r, null, 2);
-  } catch (e) { $('ruleResult').textContent = e.message; }
+  } catch (e) { $('ruleResult').textContent = formatError('规则配置', e); }
 };
 
 $('btnSaveRules').onclick = async () => {
@@ -503,7 +503,7 @@ $('btnSaveRules').onclick = async () => {
     };
     const d = await request('/api/v1/monitoring/rules', { method: 'PUT', headers: headers(), body: JSON.stringify(payload) });
     $('ruleResult').textContent = JSON.stringify({ ...d, payload }, null, 2);
-  } catch (e) { $('ruleResult').textContent = e.message; }
+  } catch (e) { $('ruleResult').textContent = formatError('规则配置', e); }
 };
 
 function buildAuditQuery() {
@@ -530,7 +530,7 @@ $('btnAudit').onclick = async () => {
     const qs = buildAuditQuery();
     const data = await request(`/api/v1/admin/audit-logs?${qs}`, {headers:headers()});
     $('audit').textContent = JSON.stringify(data, null, 2);
-  } catch(e){ $('audit').textContent = e.message; }
+  } catch(e){ $('audit').textContent = formatError('审计日志', e); }
 };
 
 $('btnAuditClear').onclick = () => {
@@ -544,7 +544,7 @@ $('btnToolTaskList').onclick = async () => {
     const q = s ? `?page=1&size=50&status=${encodeURIComponent(s)}` : '?page=1&size=50';
     const d = await request(`/api/v1/toolbox/tasks${q}`, { headers: headers() });
     $('toolTaskResult').textContent = JSON.stringify(d, null, 2);
-  } catch (e) { $('toolTaskResult').textContent = e.message; }
+  } catch (e) { $('toolTaskResult').textContent = formatError('工具任务', e); }
 };
 
 $('btnToolTaskUpdate').onclick = async () => {
@@ -556,7 +556,7 @@ $('btnToolTaskUpdate').onclick = async () => {
       body: JSON.stringify({ status: $('toolTaskActionStatus').value, note: $('toolTaskNote').value || null }),
     });
     $('toolTaskResult').textContent = JSON.stringify(d, null, 2);
-  } catch (e) { $('toolTaskResult').textContent = e.message; }
+  } catch (e) { $('toolTaskResult').textContent = formatError('工具任务', e); }
 };
 
 $('btnDiagList').onclick = async () => {
@@ -565,7 +565,7 @@ $('btnDiagList').onclick = async () => {
     const q = s ? `?page=1&size=20&severity=${encodeURIComponent(s)}` : '?page=1&size=20';
     const d = await request(`/api/v1/ai/diagnoses${q}`, { headers: headers() });
     $('diagListResult').textContent = JSON.stringify(d, null, 2);
-  } catch (e) { $('diagListResult').textContent = e.message; }
+  } catch (e) { $('diagListResult').textContent = formatError('AI诊断记录', e); }
 };
 
 $('btnRefreshHistory').onclick = () => renderHistory();
