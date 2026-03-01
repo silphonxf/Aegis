@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%230f2c44"/><circle cx="32" cy="24" r="12" fill="%236bd5ff"/><path d="M12 56c4-10 12-16 20-16s16 6 20 16" fill="%2338bdf8"/></svg>';
+const API_BASE_KEY = 'aegis_mobile_api_base';
 
 const state = {
   token: localStorage.getItem('aegis_token') || '',
@@ -9,6 +10,14 @@ const state = {
   extractedErrors: [],
   profile: JSON.parse(localStorage.getItem('aegis_profile') || '{}'),
 };
+
+function defaultApiBase() {
+  const protocol = window.location.protocol && window.location.protocol.startsWith('http')
+    ? window.location.protocol
+    : 'http:';
+  const host = window.location.hostname || '127.0.0.1';
+  return `${protocol}//${host}:8000`;
+}
 
 function getBase() { return $('apiBase').value.trim().replace(/\/$/, ''); }
 function authHeaders() {
@@ -383,6 +392,11 @@ $('btnCaptureStart').onclick = () => show('captureResult', { status: 'capturing'
 $('btnCaptureStop').onclick = () => show('captureResult', { status: 'stopped', stopped_at: new Date().toISOString() });
 $('btnAppRestart').onclick = () => show('appToolResult', { action: 'app_restart', status: 'mocked', message: '应用重启 Mock 完成，后续接审批+执行器。' });
 $('btnAppAiQa').onclick = () => show('appToolResult', { action: 'ai_qa', status: 'mocked', answer: '这是 AI 问答 Mock 回答：后续接真实模型服务。' });
+
+const rememberedApiBase = localStorage.getItem(API_BASE_KEY);
+$('apiBase').value = rememberedApiBase || defaultApiBase();
+$('apiBase').addEventListener('change', () => localStorage.setItem(API_BASE_KEY, getBase()));
+$('apiBase').addEventListener('blur', () => localStorage.setItem(API_BASE_KEY, getBase()));
 
 initSubNavigation();
 applyProfileUI();
