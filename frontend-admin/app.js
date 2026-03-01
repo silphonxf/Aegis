@@ -168,48 +168,35 @@ function renderSelectedSystem(items) {
 }
 
 function refreshSystemOptions() {
-  const list = $('systemOptions');
-  const input = $('systemSearchInput');
-  if (!list || !input) return;
+  const select = $('systemSelect');
+  if (!select) return;
 
-  list.innerHTML = latestMonitoringItems
+  const keyword = ($('systemSearchKeyword')?.value || '').trim().toLowerCase();
+  const candidates = latestMonitoringItems.filter((i) => {
+    if (!keyword) return true;
+    const text = `${i.system_code || ''} ${i.system_name || ''}`.toLowerCase();
+    return text.includes(keyword);
+  });
+
+  select.innerHTML = candidates
     .map((i) => `<option value="${i.system_code}">${i.system_code} / ${i.system_name}</option>`)
     .join('');
 
-  const selected = latestMonitoringItems.find((i) => i.system_code === selectedSystemCode);
-  if (selected) input.value = `${selected.system_code} / ${selected.system_name}`;
+  if (!candidates.length) return;
+  if (!candidates.some((i) => i.system_code === selectedSystemCode)) {
+    selectedSystemCode = candidates[0].system_code;
+  }
+  select.value = selectedSystemCode;
 }
 
 function applySystemSearch() {
-  const input = $('systemSearchInput');
-  if (!input) return;
-  const keyword = (input.value || '').trim().toLowerCase();
-  if (!keyword) {
-    renderSelectedSystem(latestMonitoringItems);
-    return;
-  }
-
-  let found = latestMonitoringItems.find((i) =>
-    `${i.system_code} / ${i.system_name}`.toLowerCase() === keyword ||
-    String(i.system_code || '').toLowerCase() === keyword
-  );
-
-  if (!found) {
-    found = latestMonitoringItems.find((i) => {
-      const text = `${i.system_code || ''} ${i.system_name || ''}`.toLowerCase();
-      return text.includes(keyword);
-    });
-  }
-
-  if (found) {
-    selectedSystemCode = found.system_code;
-    input.value = `${found.system_code} / ${found.system_name}`;
-    renderSelectedSystem(latestMonitoringItems);
-    pushTrend('cpu', Number(found.cpu_usage) || 0);
-    pushTrend('mem', Number(found.mem_usage) || 0);
-    pushTrend('disk', Number(found.disk_usage) || 0);
-    renderSparklines();
-  }
+  refreshSystemOptions();
+  renderSelectedSystem(latestMonitoringItems);
+  const selected = latestMonitoringItems.find((i) => i.system_code === selectedSystemCode);
+  pushTrend('cpu', Number(selected?.cpu_usage) || 0);
+  pushTrend('mem', Number(selected?.mem_usage) || 0);
+  pushTrend('disk', Number(selected?.disk_usage) || 0);
+  renderSparklines();
 }
 
 function getHistory() {
@@ -651,12 +638,21 @@ function initDashboardBindings() {
   $('abnormalKeyword').oninput = applyAbnormalFilters;
 
   $('btnSystemSearch').onclick = applySystemSearch;
-  $('systemSearchInput').addEventListener('keydown', (e) => {
+  $('btnSystemReset').onclick = () => {
+    $('systemSearchKeyword').value = '';
+    refreshSystemOptions();
+    applySystemSearch();
+  };
+  $('systemSearchKeyword').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       applySystemSearch();
     }
   });
+  $('systemSelect').onchange = () => {
+    selectedSystemCode = $('systemSelect').value;
+    applySystemSearch();
+  };
 }
 
 function initAdvancedToolsBindings() {
