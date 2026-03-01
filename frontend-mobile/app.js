@@ -100,6 +100,7 @@ function initSubNavigation() {
       const panelId = btn.closest('.panel').id;
       showSub(panelId, target);
       if (target === 'selfcheck-home') stopStatusLoop();
+      if (panelId === 'panel-inspection' && target === 'inspection-home') stopQrScanner();
     });
   });
 }
@@ -210,6 +211,84 @@ function stopStatusLoop() {
   state.chartTimer = null;
 }
 
+const qrScan = {
+  stream: null,
+  timer: null,
+  detector: null,
+};
+
+function setQrScanState(text) {
+  if ($('qrScanState')) $('qrScanState').textContent = text;
+}
+
+function stopQrScanner() {
+  if (qrScan.timer) {
+    clearInterval(qrScan.timer);
+    qrScan.timer = null;
+  }
+  if (qrScan.stream) {
+    qrScan.stream.getTracks().forEach((t) => t.stop());
+    qrScan.stream = null;
+  }
+  const video = $('qrVideo');
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+    video.style.display = 'none';
+  }
+}
+
+async function startQrScanner() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setQrScanState('当前浏览器不支持相机调用，请手动输入二维码内容。');
+    return;
+  }
+  if (!('BarcodeDetector' in window)) {
+    setQrScanState('当前浏览器不支持 BarcodeDetector，请手动输入二维码内容。');
+    return;
+  }
+
+  try {
+    qrScan.detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+    qrScan.stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false,
+    });
+
+    const video = $('qrVideo');
+    video.srcObject = qrScan.stream;
+    video.style.display = 'block';
+    await video.play();
+    setQrScanState('相机已开启，请将二维码放入画面中央。');
+
+    const canvas = $('qrCanvas');
+    const ctx = canvas.getContext('2d');
+
+    qrScan.timer = setInterval(async () => {
+      if (!video.videoWidth || !video.videoHeight) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      try {
+        const barcodes = await qrScan.detector.detect(canvas);
+        if (barcodes?.length) {
+          const value = barcodes[0].rawValue || '';
+          if (value) {
+            $('qrContent').value = value;
+            setQrScanState('扫码成功，已自动填入二维码内容。');
+            stopQrScanner();
+          }
+        }
+      } catch {
+        // keep scanning
+      }
+    }, 400);
+  } catch (e) {
+    stopQrScanner();
+    setQrScanState(`相机调用失败：${e.message || '未知错误'}`);
+  }
+}
+
 // auth
 $('btnPing').onclick = async () => {
   try { const d = await api('/healthz'); alert(`后端可用：${d.status || 'ok'}`); }
@@ -240,6 +319,7 @@ function doLogout() {
   state.token = '';
   localStorage.removeItem('aegis_token');
   stopStatusLoop();
+  stopQrScanner();
   switchScreen(false);
   setLoginState('已退出登录');
 }
@@ -288,11 +368,18 @@ $('btnChangePassword').onclick = async () => {
 Array.from(document.querySelectorAll('.menu-tabs .tab')).forEach((tab) => {
   tab.addEventListener('click', () => {
     if (tab.dataset.panel !== 'panel-selfcheck') stopStatusLoop();
+    if (tab.dataset.panel !== 'panel-inspection') stopQrScanner();
     switchPanel(tab.dataset.panel);
   });
 });
 
 // inspection
+$('btnStartQrScan').onclick = startQrScanner;
+$('btnStopQrScan').onclick = () => {
+  stopQrScanner();
+  setQrScanState('已停止扫码，可手动输入二维码内容。');
+};
+
 $('btnCreateInspection').onclick = async () => {
   try {
     const qrText = $('qrContent').value.trim();
