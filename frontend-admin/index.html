@@ -57,8 +57,11 @@
 
           <h3>系统状态</h3>
           <div class="grid2 table-filters">
-            <input id="systemSearchKeyword" placeholder="搜索系统（编号/名称）" />
-            <select id="systemSelect"></select>
+            <div class="search-inline">
+              <input id="systemSearchInput" list="systemOptions" placeholder="搜索或选择系统（编号/名称）" />
+              <datalist id="systemOptions"></datalist>
+              <button id="btnSystemSearch" type="button">搜索</button>
+            </div>
           </div>
           <div class="kpis">
             <div class="kpi green"><span>绿色</span><strong id="kpiGreen" class="digit-roll">0</strong></div>

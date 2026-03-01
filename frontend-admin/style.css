@@ -232,6 +232,16 @@ pre {
   border: 1px solid #1d3a51;
 }
 .table-filters { margin: 10px 0; }
+.search-inline {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+.search-inline button {
+  width: auto;
+  min-width: 88px;
+}
 
 .table-wrap { overflow: auto; }
 table {
