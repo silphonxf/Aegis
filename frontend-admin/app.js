@@ -568,18 +568,6 @@ $('btnDiagList').onclick = async () => {
   } catch (e) { $('diagListResult').textContent = formatError('AI诊断记录', e); }
 };
 
-$('btnRefreshHistory').onclick = () => renderHistory();
-$('btnClearHistory').onclick = () => { localStorage.removeItem(REQ_HISTORY_KEY); renderHistory(); };
-$('btnToggleAutoRefresh').onclick = () => {
-  autoRefreshEnabled = !autoRefreshEnabled;
-  if (autoRefreshEnabled) startDashboardAutoRefresh();
-  else stopDashboardAutoRefresh();
-  setLiveStatus(autoRefreshEnabled && Boolean(dashboardTimer));
-};
-
-$('abnormalColorFilter').onchange = applyAbnormalFilters;
-$('abnormalKeyword').oninput = applyAbnormalFilters;
-
 function activateToolTab(toolId) {
   const targetBtn = document.querySelector(`.tool-tab[data-tool="${toolId}"]`) || document.querySelector('.tool-tab');
   if (!targetBtn) return;
@@ -591,31 +579,51 @@ function activateToolTab(toolId) {
   if ($('toolHint')) $('toolHint').textContent = targetBtn.dataset.desc || '';
 }
 
-Array.from(document.querySelectorAll('.tool-tab')).forEach((btn) => {
-  btn.addEventListener('click', () => activateToolTab(btn.dataset.tool));
-});
+function initUiBindings() {
+  $('btnRefreshHistory').onclick = () => renderHistory();
+  $('btnClearHistory').onclick = () => { localStorage.removeItem(REQ_HISTORY_KEY); renderHistory(); };
+  $('btnToggleAutoRefresh').onclick = () => {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    if (autoRefreshEnabled) startDashboardAutoRefresh();
+    else stopDashboardAutoRefresh();
+    setLiveStatus(autoRefreshEnabled && Boolean(dashboardTimer));
+  };
 
-Array.from(document.querySelectorAll('.menu-btn')).forEach((btn) => {
-  btn.addEventListener('click', () => switchPanel(btn.dataset.section));
-});
+  $('abnormalColorFilter').onchange = applyAbnormalFilters;
+  $('abnormalKeyword').oninput = applyAbnormalFilters;
 
-$('btnLogout').onclick = () => {
-  token = '';
-  localStorage.removeItem('aegis_admin_token');
-  $('state').textContent = '已退出登录';
-  stopDashboardAutoRefresh();
-  setAuthView(false);
-};
+  Array.from(document.querySelectorAll('.tool-tab')).forEach((btn) => {
+    btn.addEventListener('click', () => activateToolTab(btn.dataset.tool));
+  });
 
-activateToolTab(localStorage.getItem(TOOL_TAB_KEY) || 'tool-ops');
+  Array.from(document.querySelectorAll('.menu-btn')).forEach((btn) => {
+    btn.addEventListener('click', () => switchPanel(btn.dataset.section));
+  });
 
-if (token) {
-  setAuthView(true);
-  switchPanel('panel-dashboard');
-  $('btnRefreshDashboard').click();
-} else {
-  stopDashboardAutoRefresh();
-  setAuthView(false);
-  $('state').textContent = '未登录';
+  $('btnLogout').onclick = () => {
+    token = '';
+    localStorage.removeItem('aegis_admin_token');
+    $('state').textContent = '已退出登录';
+    stopDashboardAutoRefresh();
+    setAuthView(false);
+  };
 }
-renderHistory();
+
+function initViewState() {
+  activateToolTab(localStorage.getItem(TOOL_TAB_KEY) || 'tool-ops');
+
+  if (token) {
+    setAuthView(true);
+    switchPanel('panel-dashboard');
+    $('btnRefreshDashboard').click();
+  } else {
+    stopDashboardAutoRefresh();
+    setAuthView(false);
+    $('state').textContent = '未登录';
+  }
+
+  renderHistory();
+}
+
+initUiBindings();
+initViewState();
