@@ -127,7 +127,13 @@
           <label>用户名关键词（模糊查询）
             <input id="userSearchKeyword" placeholder="输入用户名关键词，例如 admin" />
           </label>
-          <div id="userListResult" class="result-board"></div>
+          <div id="userListSummary" class="result-line">匹配 0 条</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>序号</th><th>用户名</th><th>角色</th><th>ID</th></tr></thead>
+              <tbody id="userListTbody"><tr><td colspan="4">暂无数据</td></tr></tbody>
+            </table>
+          </div>
         </section>
 
         <section class="card">
@@ -139,7 +145,13 @@
           <label>系统关键词（编号/名称，模糊查询）
             <input id="systemSearchKeyword2" placeholder="输入关键词，例如 DEMO / 业务系统" />
           </label>
-          <div id="systemListResult" class="result-board"></div>
+          <div id="systemListSummary" class="result-line">匹配 0 条</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>环境</th></tr></thead>
+              <tbody id="systemListTbody"><tr><td colspan="4">暂无数据</td></tr></tbody>
+            </table>
+          </div>
         </section>
       </section>
 

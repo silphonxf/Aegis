@@ -233,14 +233,8 @@ function renderUserResultBoard(items, message = '') {
       <td>${u.id ?? '-'}</td>
     </tr>
   `).join('');
-  $('userListResult').innerHTML = `
-    <div class="result-title">用户查询结果</div>
-    <div class="result-line">${message || `共 ${items.length} 条`}</div>
-    <table>
-      <thead><tr><th>序号</th><th>用户名</th><th>角色</th><th>ID</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="4">暂无匹配用户</td></tr>'}</tbody>
-    </table>
-  `;
+  $('userListSummary').textContent = message || `匹配 ${items.length} 条`;
+  $('userListTbody').innerHTML = rows || '<tr><td colspan="4">暂无匹配用户</td></tr>';
 }
 
 function renderSystemResultBoard(items, message = '') {
@@ -252,14 +246,8 @@ function renderSystemResultBoard(items, message = '') {
       <td>${s.env === 'prod' ? '生产' : s.env === 'test' ? '测试' : s.env === 'dev' ? '开发' : (s.env || '-')}</td>
     </tr>
   `).join('');
-  $('systemListResult').innerHTML = `
-    <div class="result-title">系统查询结果</div>
-    <div class="result-line">${message || `共 ${items.length} 条`}</div>
-    <table>
-      <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>环境</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="4">暂无匹配系统</td></tr>'}</tbody>
-    </table>
-  `;
+  $('systemListSummary').textContent = message || `匹配 ${items.length} 条`;
+  $('systemListTbody').innerHTML = rows || '<tr><td colspan="4">暂无匹配系统</td></tr>';
 }
 
 function forceRelogin(message = '登录已失效，请重新登录') {
@@ -441,7 +429,7 @@ $('btnSubmitCreateUser').onclick = async () => {
     closeCreateUserModal();
     $('modalUserName').value = '';
     $('modalUserPassword').value = '';
-  } catch(e){ $('userListResult').textContent = formatError('创建用户', e); }
+  } catch(e){ $('userListSummary').textContent = formatError('创建用户', e); $('userListTbody').innerHTML = '<tr><td colspan="4">操作失败</td></tr>';  }
 };
 
 function openCreateSystemModal() {
@@ -466,7 +454,7 @@ $('btnSubmitCreateSystem').onclick = async () => {
     closeCreateSystemModal();
     $('modalSystemCode').value = '';
     $('modalSystemName').value = '';
-  } catch(e){ $('systemListResult').textContent = formatError('创建系统', e); }
+  } catch(e){ $('systemListSummary').textContent = formatError('创建系统', e); $('systemListTbody').innerHTML = '<tr><td colspan="4">操作失败</td></tr>';  }
 };
 
 $('btnFindUsers').onclick = async () => {
@@ -478,7 +466,7 @@ $('btnFindUsers').onclick = async () => {
       ? items.filter((u) => String(u.username || '').toLowerCase().includes(keyword))
       : items;
     renderUserResultBoard(filtered, `匹配 ${filtered.length} 条`);
-  } catch (e) { $('userListResult').textContent = formatError('用户查询', e); }
+  } catch (e) { $('userListSummary').textContent = formatError('用户查询', e); $('userListTbody').innerHTML = '<tr><td colspan="4">查询失败</td></tr>';  }
 };
 
 $('btnFindSystems').onclick = async () => {
@@ -490,7 +478,7 @@ $('btnFindSystems').onclick = async () => {
       ? items.filter((s) => `${s.system_code || ''} ${s.name || ''}`.toLowerCase().includes(keyword))
       : items;
     renderSystemResultBoard(filtered, `匹配 ${filtered.length} 条`);
-  } catch (e) { $('systemListResult').textContent = formatError('系统查询', e); }
+  } catch (e) { $('systemListSummary').textContent = formatError('系统查询', e); $('systemListTbody').innerHTML = '<tr><td colspan="4">查询失败</td></tr>';  }
 };
 
 $('btnCreateTemplate').onclick = async () => {
