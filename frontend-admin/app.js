@@ -151,6 +151,11 @@ function renderHistory() {
   $('requestHistory').textContent = JSON.stringify(getHistory(), null, 2);
 }
 
+function formatError(moduleName, e) {
+  const msg = e?.message || String(e) || '未知错误';
+  return `【${moduleName}】请求失败\n原因：${msg}\n建议：请检查登录状态或稍后重试。`;
+}
+
 function forceRelogin(message = '登录已失效，请重新登录') {
   token = '';
   localStorage.removeItem('aegis_admin_token');
@@ -268,7 +273,7 @@ const btnAssetSummary = $('btnAssetSummary');
 if (btnAssetSummary) {
   btnAssetSummary.onclick = async () => {
     try { renderAssetSummary(await request('/api/v1/admin/assets/summary', { headers: headers() })); }
-    catch(e){ $('assetSummary').textContent = e.message; }
+    catch(e){ $('assetSummary').textContent = formatError('资产概览', e); }
   };
 }
 
@@ -282,7 +287,7 @@ $('btnRefreshDashboard').onclick = async () => {
     renderAssetSummary(assets);
     setLastUpdated(true);
   } catch (e) {
-    $('monitoring').textContent = `看板刷新失败: ${e.message}`;
+    $('monitoring').textContent = formatError('看板刷新', e);
     setLastUpdated(false);
   }
 };
@@ -325,7 +330,7 @@ $('btnExportAbnormal').onclick = async () => {
     URL.revokeObjectURL(url);
     pushHistory({ startedAt, method: 'GET', path: '/api/v1/monitoring/abnormal/export', ok: true, status: resp.status, code: null, message: 'CSV downloaded' });
     renderHistory();
-  } catch (e) { $('monitoring').textContent = `导出失败: ${e.message}`; }
+  } catch (e) { $('monitoring').textContent = formatError('异常导出', e); }
 };
 
 $('btnCreateUser').onclick = async () => {
@@ -335,7 +340,7 @@ $('btnCreateUser').onclick = async () => {
       body: JSON.stringify({ username: $('newUserName').value, password: $('newUserPassword').value, role_code: $('newUserRole').value })
     });
     $('userCreateResult').textContent = JSON.stringify(d, null, 2);
-  } catch(e){ $('userCreateResult').textContent = e.message; }
+  } catch(e){ $('userCreateResult').textContent = formatError('创建用户', e); }
 };
 
 $('btnCreateSystem').onclick = async () => {
@@ -345,7 +350,7 @@ $('btnCreateSystem').onclick = async () => {
       body: JSON.stringify({ system_code: $('newSystemCode').value, name: $('newSystemName').value, env: $('newSystemEnv').value || 'prod' })
     });
     $('systemCreateResult').textContent = JSON.stringify(d, null, 2);
-  } catch(e){ $('systemCreateResult').textContent = e.message; }
+  } catch(e){ $('systemCreateResult').textContent = formatError('创建系统', e); }
 };
 
 $('btnListUsers').onclick = async () => {
@@ -410,7 +415,7 @@ $('btnCreateAsset').onclick = async () => {
     };
     const d = await request('/api/v1/admin/assets', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
     $('assetResult').textContent = JSON.stringify(d, null, 2);
-  } catch (e) { $('assetResult').textContent = e.message; }
+  } catch (e) { $('assetResult').textContent = formatError('资产操作', e); }
 };
 
 function buildAssetQuery() {
@@ -573,6 +578,15 @@ $('btnToggleAutoRefresh').onclick = () => {
 
 $('abnormalColorFilter').onchange = applyAbnormalFilters;
 $('abnormalKeyword').oninput = applyAbnormalFilters;
+
+Array.from(document.querySelectorAll('.tool-tab')).forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tool-tab').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.tool-pane').forEach((p) => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tool)?.classList.add('active');
+  });
+});
 
 Array.from(document.querySelectorAll('.menu-btn')).forEach((btn) => {
   btn.addEventListener('click', () => switchPanel(btn.dataset.section));

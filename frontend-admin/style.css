@@ -261,6 +261,24 @@ th { background: #113654; color: #7dd3fc; }
 .status-chip.yellow { background: #1e4b6d; color: #9dd6f5; border-color: #2e5a7d; }
 .status-chip.red { background: #173754; color: #b8d3ea; border-color: #2a5a7a; }
 .status-chip.unknown { background: #163c58; color: #8ea9c3; border-color: #2a5a7a; }
+.tool-tabs { display: flex; gap: 8px; margin: 10px 0 12px; flex-wrap: wrap; }
+.tool-tab {
+  width: auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #2a5a7a;
+  background: #113654;
+  color: #bfe7ff;
+  box-shadow: none;
+}
+.tool-tab.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  color: #052035;
+  border-color: transparent;
+}
+.tool-pane { display: none; }
+.tool-pane.active { display: block; }
+
 .code-list { margin: 0; padding-left: 18px; }
 .code-list li { margin: 6px 0; }
 

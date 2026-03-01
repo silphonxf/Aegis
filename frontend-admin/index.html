@@ -249,53 +249,58 @@
 
       <section id="panel-tools-ai" class="panel">
         <section class="card">
-          <h2>工具任务审批（迭代3）</h2>
-          <div class="grid4">
-            <input id="toolTaskStatusFilter" placeholder="筛选status，如 pending_approval" />
-            <input id="toolTaskId" placeholder="task_id" />
-            <select id="toolTaskActionStatus"><option value="approved">approved</option><option value="rejected">rejected</option><option value="done">done</option></select>
-            <input id="toolTaskNote" placeholder="备注（可选）" />
+          <h2>高级工具</h2>
+          <p class="muted">低频功能已收纳到这里，按需使用。</p>
+          <div class="tool-tabs">
+            <button class="tool-tab active" data-tool="tool-ops">运维审批</button>
+            <button class="tool-tab" data-tool="tool-ai">AI诊断</button>
+            <button class="tool-tab" data-tool="tool-debug">调试与错误码</button>
           </div>
-          <div class="grid2">
-            <button id="btnToolTaskList">刷新工具任务</button>
-            <button id="btnToolTaskUpdate">更新任务状态</button>
-          </div>
-          <pre id="toolTaskResult"></pre>
-        </section>
 
-        <section class="card">
-          <h2>AI诊断记录（迭代3）</h2>
-          <div class="grid2">
-            <input id="diagSeverityFilter" placeholder="severity筛选：low/medium/high" />
-            <button id="btnDiagList">刷新诊断记录</button>
+          <div id="tool-ops" class="tool-pane active">
+            <div class="grid4">
+              <input id="toolTaskStatusFilter" placeholder="筛选status，如 pending_approval" />
+              <input id="toolTaskId" placeholder="task_id" />
+              <select id="toolTaskActionStatus"><option value="approved">approved</option><option value="rejected">rejected</option><option value="done">done</option></select>
+              <input id="toolTaskNote" placeholder="备注（可选）" />
+            </div>
+            <div class="grid2">
+              <button id="btnToolTaskList">刷新工具任务</button>
+              <button id="btnToolTaskUpdate">更新任务状态</button>
+            </div>
+            <pre id="toolTaskResult"></pre>
           </div>
-          <pre id="diagListResult"></pre>
+
+          <div id="tool-ai" class="tool-pane">
+            <div class="grid2">
+              <input id="diagSeverityFilter" placeholder="severity筛选：low/medium/high" />
+              <button id="btnDiagList">刷新诊断记录</button>
+            </div>
+            <pre id="diagListResult"></pre>
+          </div>
+
+          <div id="tool-debug" class="tool-pane">
+            <h3>错误码说明</h3>
+            <ul class="code-list">
+              <li><code>TOKEN_EXPIRED</code>：Token 过期，需要重新登录</li>
+              <li><code>TOKEN_INVALID</code>：Token 无效或格式错误</li>
+              <li><code>USER_DISABLED</code>：账号已禁用</li>
+              <li><code>USER_NOT_FOUND</code>：账号不存在</li>
+              <li><code>FORBIDDEN</code>：权限不足</li>
+              <li><code>VALIDATION_ERROR</code>：参数校验失败</li>
+              <li><code>HTTP_ERROR</code>：通用业务错误</li>
+            </ul>
+            <h3>接口调试历史（最近20条）</h3>
+            <div class="grid2">
+              <button id="btnRefreshHistory">刷新历史</button>
+              <button id="btnClearHistory">清空历史</button>
+            </div>
+            <pre id="requestHistory"></pre>
+          </div>
         </section>
       </section>
 
-      <section id="panel-debug" class="panel">
-        <section class="card">
-          <h2>错误码说明</h2>
-          <ul class="code-list">
-            <li><code>TOKEN_EXPIRED</code>：Token 过期，需要重新登录</li>
-            <li><code>TOKEN_INVALID</code>：Token 无效或格式错误</li>
-            <li><code>USER_DISABLED</code>：账号已禁用</li>
-            <li><code>USER_NOT_FOUND</code>：账号不存在</li>
-            <li><code>FORBIDDEN</code>：权限不足</li>
-            <li><code>VALIDATION_ERROR</code>：参数校验失败</li>
-            <li><code>HTTP_ERROR</code>：通用业务错误</li>
-          </ul>
-        </section>
-
-        <section class="card">
-          <h2>接口调试历史（最近20条）</h2>
-          <div class="grid2">
-            <button id="btnRefreshHistory">刷新历史</button>
-            <button id="btnClearHistory">清空历史</button>
-          </div>
-          <pre id="requestHistory"></pre>
-        </section>
-      </section>
+      <!-- panel-debug merged into panel-tools-ai -->
     </main>
   </div>
 
