@@ -24,12 +24,35 @@ function switchPanel(sectionId) {
   document.querySelector(`.menu-btn[data-section="${sectionId}"]`)?.classList.add('active');
 }
 
+function animateNumber(el, target) {
+  if (!el) return;
+  const end = Number(target) || 0;
+  const start = Number(el.dataset.value || el.textContent || 0) || 0;
+  const duration = 360;
+  const t0 = performance.now();
+
+  const tick = (t) => {
+    const p = Math.min(1, (t - t0) / duration);
+    const cur = Math.round(start + (end - start) * p);
+    el.textContent = String(cur);
+    if (p < 1) requestAnimationFrame(tick);
+    else el.dataset.value = String(end);
+  };
+
+  el.classList.add('bump');
+  setTimeout(() => el.classList.remove('bump'), 220);
+  requestAnimationFrame(tick);
+}
+
 function setTechMetric(prefix, value) {
   const safe = Math.max(0, Math.min(100, Number(value) || 0));
   const textEl = $(`${prefix}Text`);
   const barEl = $(`${prefix}Bar`);
   if (textEl) textEl.textContent = `${safe.toFixed(0)}%`;
-  if (barEl) barEl.style.width = `${safe}%`;
+  if (barEl) {
+    barEl.style.width = `${safe}%`;
+    barEl.style.filter = safe >= 85 ? 'hue-rotate(-35deg) saturate(1.2)' : 'none';
+  }
 }
 
 function getHistory() {
@@ -78,10 +101,10 @@ async function request(path, options={}){
 }
 
 function renderMonitoring(data){
-  $('kpiGreen').textContent = data.summary?.green ?? 0;
-  $('kpiYellow').textContent = data.summary?.yellow ?? 0;
-  $('kpiRed').textContent = data.summary?.red ?? 0;
-  $('kpiTotal').textContent = data.summary?.total ?? 0;
+  animateNumber($('kpiGreen'), data.summary?.green ?? 0);
+  animateNumber($('kpiYellow'), data.summary?.yellow ?? 0);
+  animateNumber($('kpiRed'), data.summary?.red ?? 0);
+  animateNumber($('kpiTotal'), data.summary?.total ?? 0);
   $('monitoring').textContent = JSON.stringify(data.summary, null, 2);
 
   const items = data.items || [];
@@ -111,10 +134,10 @@ function renderMonitoring(data){
 
 function renderAssetSummary(data) {
   const byStatus = Object.fromEntries((data.by_status || []).map(i => [i.status, i.count]));
-  $('assetTotal').textContent = data.total ?? 0;
-  $('assetInUse').textContent = byStatus.in_use ?? 0;
-  $('assetRepair').textContent = byStatus.repair ?? 0;
-  $('assetRetired').textContent = byStatus.retired ?? 0;
+  animateNumber($('assetTotal'), data.total ?? 0);
+  animateNumber($('assetInUse'), byStatus.in_use ?? 0);
+  animateNumber($('assetRepair'), byStatus.repair ?? 0);
+  animateNumber($('assetRetired'), byStatus.retired ?? 0);
   $('assetSummary').textContent = JSON.stringify(data, null, 2);
 }
 
