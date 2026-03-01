@@ -100,7 +100,10 @@ function initSubNavigation() {
       const panelId = btn.closest('.panel').id;
       showSub(panelId, target);
       if (target === 'selfcheck-home') stopStatusLoop();
-      if (panelId === 'panel-inspection' && target === 'inspection-home') stopQrScanner();
+      if (panelId === 'panel-inspection' && target === 'inspection-home') {
+        stopQrScanner();
+        stopNfcScanner();
+      }
     });
   });
 }
@@ -217,6 +220,13 @@ const qrScan = {
   detector: null,
 };
 
+const nfcScan = {
+  reader: null,
+  active: false,
+  onReading: null,
+  onError: null,
+};
+
 function setQrScanState(text) {
   if ($('qrScanState')) $('qrScanState').textContent = text;
 }
@@ -289,6 +299,104 @@ async function startQrScanner() {
   }
 }
 
+function setNfcScanState(text) {
+  if ($('nfcScanState')) $('nfcScanState').textContent = text;
+}
+
+function decodeNfcRecord(record) {
+  try {
+    if (record.recordType === 'text') {
+      return new TextDecoder(record.encoding || 'utf-8').decode(record.data);
+    }
+    if (record.recordType === 'url' || record.recordType === 'absolute-url') {
+      return new TextDecoder('utf-8').decode(record.data);
+    }
+    if (record.recordType === 'unknown' || record.recordType === 'mime') {
+      return new TextDecoder('utf-8').decode(record.data);
+    }
+  } catch {
+    return '';
+  }
+  return '';
+}
+
+async function resolveNfcLocation(tagText) {
+  const resolved = await api(`/api/v1/inspections/points/resolve?qr_content=${encodeURIComponent(tagText)}`, { headers: authHeaders() });
+  show('nfcResultView', {
+    message: 'NFC 读取成功，已解析机房位置',
+    nfc_tag: tagText,
+    location: resolved.location || '未配置',
+    system_id: resolved.system_id,
+    point_id: resolved.point_id,
+    point_code: resolved.point_code,
+    resolved_point: resolved,
+  });
+  return resolved;
+}
+
+function stopNfcScanner() {
+  nfcScan.active = false;
+  if (nfcScan.reader && nfcScan.onReading) {
+    nfcScan.reader.onreading = null;
+  }
+  if (nfcScan.reader && nfcScan.onError) {
+    nfcScan.reader.onerror = null;
+  }
+  nfcScan.reader = null;
+  nfcScan.onReading = null;
+  nfcScan.onError = null;
+}
+
+async function startNfcScanner() {
+  if (!('NDEFReader' in window)) {
+    setNfcScanState('当前设备/浏览器不支持 Web NFC，请手动输入 NFC 标签内容。');
+    return;
+  }
+
+  try {
+    stopNfcScanner();
+    const reader = new window.NDEFReader();
+    await reader.scan();
+    nfcScan.reader = reader;
+    nfcScan.active = true;
+    setNfcScanState('NFC 已开启，请将手机靠近标签。');
+
+    nfcScan.onReading = async ({ serialNumber, message }) => {
+      if (!nfcScan.active) return;
+      const fromRecords = (message?.records || []).map((r) => decodeNfcRecord(r)).find(Boolean);
+      const tagText = (fromRecords || serialNumber || '').trim();
+      if (!tagText) {
+        setNfcScanState('读取到 NFC，但未解析出标签内容。');
+        return;
+      }
+
+      $('nfcTag').value = tagText;
+      setNfcScanState('NFC 读取成功，正在解析机房位置...');
+      try {
+        const resolved = await resolveNfcLocation(tagText);
+        setNfcScanState(`NFC 读取成功：${resolved.location || '位置未配置'}`);
+      } catch (e) {
+        setNfcScanState(`NFC 已读取，但点位未匹配：${e.message}`);
+        show('nfcResultView', {
+          message: '已读取 NFC 标签，但后端未找到对应巡检点',
+          nfc_tag: tagText,
+          error: e.message,
+        });
+      }
+    };
+
+    nfcScan.onError = (event) => {
+      setNfcScanState(`NFC 读取异常：${event?.message || '未知错误'}`);
+    };
+
+    reader.onreading = nfcScan.onReading;
+    reader.onerror = nfcScan.onError;
+  } catch (e) {
+    stopNfcScanner();
+    setNfcScanState(`NFC 启动失败：${e.message || '未知错误'}`);
+  }
+}
+
 // auth
 $('btnPing').onclick = async () => {
   try { const d = await api('/healthz'); alert(`后端可用：${d.status || 'ok'}`); }
@@ -320,6 +428,7 @@ function doLogout() {
   localStorage.removeItem('aegis_token');
   stopStatusLoop();
   stopQrScanner();
+  stopNfcScanner();
   switchScreen(false);
   setLoginState('已退出登录');
 }
@@ -368,7 +477,10 @@ $('btnChangePassword').onclick = async () => {
 Array.from(document.querySelectorAll('.menu-tabs .tab')).forEach((tab) => {
   tab.addEventListener('click', () => {
     if (tab.dataset.panel !== 'panel-selfcheck') stopStatusLoop();
-    if (tab.dataset.panel !== 'panel-inspection') stopQrScanner();
+    if (tab.dataset.panel !== 'panel-inspection') {
+      stopQrScanner();
+      stopNfcScanner();
+    }
     switchPanel(tab.dataset.panel);
   });
 });
@@ -398,6 +510,12 @@ $('btnCreateInspection').onclick = async () => {
   } catch (e) { show('inspectionResult', e.message); }
 };
 
+$('btnStartNfcScan').onclick = startNfcScanner;
+$('btnStopNfcScan').onclick = () => {
+  stopNfcScanner();
+  setNfcScanState('已停止 NFC 读取，可手动输入标签内容。');
+};
+
 $('btnSubmitNfc').onclick = async () => {
   try {
     const nfcText = $('nfcTag').value.trim();
@@ -412,7 +530,12 @@ $('btnSubmitNfc').onclick = async () => {
       inspected_at: new Date().toISOString(),
     };
     const created = await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
-    show('nfcResultView', { resolved_point: resolved, created_record: created });
+    show('nfcResultView', {
+      message: 'NFC 巡检提交成功',
+      location: resolved.location || '未配置',
+      resolved_point: resolved,
+      created_record: created,
+    });
   } catch (e) { show('nfcResultView', e.message); }
 };
 
