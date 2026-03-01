@@ -34,24 +34,11 @@ function switchPanel(sectionId) {
   }
 }
 
-function animateNumber(el, target) {
+function setNumber(el, target) {
   if (!el) return;
   const end = Number(target) || 0;
-  const start = Number(el.dataset.value || el.textContent || 0) || 0;
-  const duration = 360;
-  const t0 = performance.now();
-
-  const tick = (t) => {
-    const p = Math.min(1, (t - t0) / duration);
-    const cur = Math.round(start + (end - start) * p);
-    el.textContent = String(cur);
-    if (p < 1) requestAnimationFrame(tick);
-    else el.dataset.value = String(end);
-  };
-
-  el.classList.add('bump');
-  setTimeout(() => el.classList.remove('bump'), 220);
-  requestAnimationFrame(tick);
+  el.textContent = String(end);
+  el.dataset.value = String(end);
 }
 
 function setTechMetric(prefix, value) {
@@ -196,10 +183,10 @@ async function request(path, options={}){
 }
 
 function renderMonitoring(data){
-  animateNumber($('kpiGreen'), data.summary?.green ?? 0);
-  animateNumber($('kpiYellow'), data.summary?.yellow ?? 0);
-  animateNumber($('kpiRed'), data.summary?.red ?? 0);
-  animateNumber($('kpiTotal'), data.summary?.total ?? 0);
+  setNumber($('kpiGreen'), data.summary?.green ?? 0);
+  setNumber($('kpiYellow'), data.summary?.yellow ?? 0);
+  setNumber($('kpiRed'), data.summary?.red ?? 0);
+  setNumber($('kpiTotal'), data.summary?.total ?? 0);
   $('monitoring').textContent = JSON.stringify(data.summary, null, 2);
 
   const items = data.items || [];
@@ -226,10 +213,10 @@ function renderMonitoring(data){
 
 function renderAssetSummary(data) {
   const byStatus = Object.fromEntries((data.by_status || []).map(i => [i.status, i.count]));
-  animateNumber($('assetTotal'), data.total ?? 0);
-  animateNumber($('assetInUse'), byStatus.in_use ?? 0);
-  animateNumber($('assetRepair'), byStatus.repair ?? 0);
-  animateNumber($('assetRetired'), byStatus.retired ?? 0);
+  setNumber($('assetTotal'), data.total ?? 0);
+  setNumber($('assetInUse'), byStatus.in_use ?? 0);
+  setNumber($('assetRepair'), byStatus.repair ?? 0);
+  setNumber($('assetRetired'), byStatus.retired ?? 0);
   $('assetSummary').textContent = JSON.stringify(data, null, 2);
 }
 
