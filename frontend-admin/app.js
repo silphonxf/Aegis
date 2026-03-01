@@ -267,22 +267,6 @@ $('btnLogin').onclick = async () => {
   } catch(e){ $('state').textContent = `登录失败: ${e.message}`; }
 };
 
-const btnMonitoring = $('btnMonitoring');
-if (btnMonitoring) {
-  btnMonitoring.onclick = async () => {
-    try { renderMonitoring(await request('/api/v1/monitoring/overview',{headers:headers()})); }
-    catch(e){ $('monitoring').textContent = formatError('监控总览', e); }
-  };
-}
-
-const btnAssetSummary = $('btnAssetSummary');
-if (btnAssetSummary) {
-  btnAssetSummary.onclick = async () => {
-    try { renderAssetSummary(await request('/api/v1/admin/assets/summary', { headers: headers() })); }
-    catch(e){ $('assetSummary').textContent = formatError('资产概览', e); }
-  };
-}
-
 $('btnRefreshDashboard').onclick = async () => {
   try {
     const [monitoring, assets] = await Promise.all([
