@@ -132,14 +132,13 @@
 
         <section class="card">
           <h2>系统管理</h2>
-          <input id="newSystemCode" placeholder="system_code" />
-          <input id="newSystemName" placeholder="name" />
-          <input id="newSystemEnv" placeholder="env (prod/test/dev)" value="prod" />
           <div class="grid2">
-            <button id="btnCreateSystem">创建系统</button>
-            <button id="btnListSystems">刷新系统列表</button>
+            <button id="btnOpenCreateSystemModal">新增系统</button>
+            <button id="btnFindSystems">查找系统</button>
           </div>
-          <pre id="systemCreateResult"></pre>
+          <label>系统关键词（编号/名称，模糊查询）
+            <input id="systemSearchKeyword2" placeholder="输入关键词，例如 DEMO / 业务系统" />
+          </label>
           <pre id="systemListResult"></pre>
         </section>
       </section>
@@ -319,6 +318,30 @@
       <div class="grid2">
         <button id="btnSubmitCreateUser">确认新增</button>
         <button id="btnCloseCreateUserModal" type="button">取消</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="createSystemModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>新增系统</h3>
+      <label>系统编号
+        <input id="modalSystemCode" placeholder="请输入系统编号" />
+      </label>
+      <label>系统名称
+        <input id="modalSystemName" placeholder="请输入系统名称" />
+      </label>
+      <label>环境
+        <select id="modalSystemEnv">
+          <option value="prod">生产</option>
+          <option value="test">测试</option>
+          <option value="dev">开发</option>
+        </select>
+      </label>
+      <div class="grid2">
+        <button id="btnSubmitCreateSystem">确认新增</button>
+        <button id="btnCloseCreateSystemModal" type="button">取消</button>
       </div>
     </div>
   </div>

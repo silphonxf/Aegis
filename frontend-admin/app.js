@@ -406,14 +406,29 @@ $('btnSubmitCreateUser').onclick = async () => {
   } catch(e){ $('userListResult').textContent = formatError('创建用户', e); }
 };
 
-$('btnCreateSystem').onclick = async () => {
+function openCreateSystemModal() {
+  $('createSystemModal').classList.remove('hidden');
+}
+
+function closeCreateSystemModal() {
+  $('createSystemModal').classList.add('hidden');
+}
+
+$('btnSubmitCreateSystem').onclick = async () => {
   try {
     const d = await request('/api/v1/admin/systems', {
       method:'POST', headers:headers(),
-      body: JSON.stringify({ system_code: $('newSystemCode').value, name: $('newSystemName').value, env: $('newSystemEnv').value || 'prod' })
+      body: JSON.stringify({
+        system_code: $('modalSystemCode').value.trim(),
+        name: $('modalSystemName').value.trim(),
+        env: $('modalSystemEnv').value || 'prod',
+      })
     });
-    $('systemCreateResult').textContent = formatSuccess('创建系统', '操作成功', d);
-  } catch(e){ $('systemCreateResult').textContent = formatError('创建系统', e); }
+    $('systemListResult').textContent = formatSuccess('创建系统', '操作成功', d);
+    closeCreateSystemModal();
+    $('modalSystemCode').value = '';
+    $('modalSystemName').value = '';
+  } catch(e){ $('systemListResult').textContent = formatError('创建系统', e); }
 };
 
 $('btnFindUsers').onclick = async () => {
@@ -428,11 +443,16 @@ $('btnFindUsers').onclick = async () => {
   } catch (e) { $('userListResult').textContent = formatError('用户查询', e); }
 };
 
-$('btnListSystems').onclick = async () => {
+$('btnFindSystems').onclick = async () => {
   try {
-    const d = await request('/api/v1/admin/systems?page=1&size=50', { headers: headers() });
-    $('systemListResult').textContent = formatSuccess('系统列表', `共 ${d.total ?? d.items?.length ?? 0} 条`, d);
-  } catch (e) { $('systemListResult').textContent = formatError('系统列表', e); }
+    const keyword = $('systemSearchKeyword2').value.trim().toLowerCase();
+    const d = await request('/api/v1/admin/systems?page=1&size=200', { headers: headers() });
+    const items = Array.isArray(d.items) ? d.items : [];
+    const filtered = keyword
+      ? items.filter((s) => `${s.system_code || ''} ${s.name || ''}`.toLowerCase().includes(keyword))
+      : items;
+    $('systemListResult').textContent = formatSuccess('系统查询', `匹配 ${filtered.length} 条`, { ...d, items: filtered, total: filtered.length });
+  } catch (e) { $('systemListResult').textContent = formatError('系统查询', e); }
 };
 
 $('btnCreateTemplate').onclick = async () => {
@@ -691,6 +711,8 @@ function initGlobalBindings() {
 
   $('btnOpenCreateUserModal').onclick = openCreateUserModal;
   $('btnCloseCreateUserModal').onclick = closeCreateUserModal;
+  $('btnOpenCreateSystemModal').onclick = openCreateSystemModal;
+  $('btnCloseCreateSystemModal').onclick = closeCreateSystemModal;
 
   $('btnLogout').onclick = () => {
     token = '';
