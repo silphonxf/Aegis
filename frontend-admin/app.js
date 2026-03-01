@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 let token = localStorage.getItem('aegis_admin_token') || '';
 
 const REQ_HISTORY_KEY = 'aegis_admin_request_history';
+let dashboardTimer = null;
 
 function base() {
   const protocol = window.location.protocol && window.location.protocol.startsWith('http')
@@ -22,6 +23,12 @@ function switchPanel(sectionId) {
   document.querySelectorAll('.menu-btn').forEach((btn) => btn.classList.remove('active'));
   document.getElementById(sectionId)?.classList.add('active');
   document.querySelector(`.menu-btn[data-section="${sectionId}"]`)?.classList.add('active');
+
+  if (sectionId === 'panel-dashboard' && token) {
+    startDashboardAutoRefresh();
+  } else {
+    stopDashboardAutoRefresh();
+  }
 }
 
 function animateNumber(el, target) {
@@ -55,6 +62,25 @@ function setTechMetric(prefix, value) {
   }
 }
 
+function statusChip(color) {
+  const v = String(color || 'unknown').toLowerCase();
+  const cls = ['green', 'yellow', 'red'].includes(v) ? v : 'unknown';
+  return `<span class="status-chip ${cls}">${v}</span>`;
+}
+
+function setLastUpdated(ok = true) {
+  const ts = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  if ($('lastUpdated')) $('lastUpdated').textContent = `最近更新：${ts}${ok ? '' : '（失败）'}`;
+}
+
+function setLiveStatus(on) {
+  const el = $('liveStatus');
+  if (!el) return;
+  el.classList.toggle('on', on);
+  el.classList.toggle('off', !on);
+  el.textContent = on ? '● 实时刷新开启' : '● 实时刷新关闭';
+}
+
 function getHistory() {
   try { return JSON.parse(localStorage.getItem(REQ_HISTORY_KEY) || '[]'); }
   catch { return []; }
@@ -74,6 +100,7 @@ function forceRelogin(message = '登录已失效，请重新登录') {
   token = '';
   localStorage.removeItem('aegis_admin_token');
   $('state').textContent = message;
+  stopDashboardAutoRefresh();
   setAuthView(false);
 }
 
@@ -122,10 +149,10 @@ function renderMonitoring(data){
       <td>${i.system_id}</td>
       <td>${i.system_code} / ${i.system_name}</td>
       <td>${i.env}</td>
-      <td>${i.status_color}</td>
-      <td>${i.cpu_usage ?? '-'}% (${i.cpu_level || 'unknown'})</td>
-      <td>${i.mem_usage ?? '-'}% (${i.mem_level || 'unknown'})</td>
-      <td>${i.disk_usage ?? '-'}% (${i.disk_level || 'unknown'})</td>
+      <td>${statusChip(i.status_color)}</td>
+      <td>${i.cpu_usage ?? '-'}% (${statusChip(i.cpu_level || 'unknown')})</td>
+      <td>${i.mem_usage ?? '-'}% (${statusChip(i.mem_level || 'unknown')})</td>
+      <td>${i.disk_usage ?? '-'}% (${statusChip(i.disk_level || 'unknown')})</td>
       <td>${i.captured_at || '-'}</td>
     </tr>
   `).join('');
@@ -139,6 +166,23 @@ function renderAssetSummary(data) {
   animateNumber($('assetRepair'), byStatus.repair ?? 0);
   animateNumber($('assetRetired'), byStatus.retired ?? 0);
   $('assetSummary').textContent = JSON.stringify(data, null, 2);
+}
+
+function startDashboardAutoRefresh() {
+  if (dashboardTimer) return;
+  setLiveStatus(true);
+  dashboardTimer = setInterval(() => {
+    if (!token) return;
+    $('btnRefreshDashboard').click();
+  }, 12000);
+}
+
+function stopDashboardAutoRefresh() {
+  if (dashboardTimer) {
+    clearInterval(dashboardTimer);
+    dashboardTimer = null;
+  }
+  setLiveStatus(false);
 }
 
 $('btnLogin').onclick = async () => {
@@ -174,8 +218,10 @@ $('btnRefreshDashboard').onclick = async () => {
     ]);
     renderMonitoring(monitoring);
     renderAssetSummary(assets);
+    setLastUpdated(true);
   } catch (e) {
     $('monitoring').textContent = `看板刷新失败: ${e.message}`;
+    setLastUpdated(false);
   }
 };
 
@@ -465,6 +511,7 @@ $('btnLogout').onclick = () => {
   token = '';
   localStorage.removeItem('aegis_admin_token');
   $('state').textContent = '已退出登录';
+  stopDashboardAutoRefresh();
   setAuthView(false);
 };
 
@@ -473,6 +520,7 @@ if (token) {
   switchPanel('panel-dashboard');
   $('btnRefreshDashboard').click();
 } else {
+  stopDashboardAutoRefresh();
   setAuthView(false);
   $('state').textContent = '未登录';
 }

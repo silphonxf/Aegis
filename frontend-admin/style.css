@@ -98,8 +98,13 @@ body {
 }
 
 .workspace { padding: 16px; }
-.workspace-header { margin-bottom: 14px; }
+.workspace-header { margin-bottom: 14px; display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
 .workspace-header h1 { margin: 0; display: flex; align-items: center; gap: 10px; }
+.header-meta { display: flex; gap: 12px; align-items: center; color: #ffd8a0; font-size: 13px; }
+.live-status { padding: 4px 10px; border-radius: 999px; border: 1px solid #7a5522; background: #2f1d08; }
+.live-status.on { border-color: #4fbf86; color: #b5ffda; box-shadow: 0 0 12px rgba(79,191,134,.25); }
+.live-status.off { border-color: #8d5d22; color: #ffd8a0; }
+.last-updated { color: #e6c38a; }
 .badge {
   font-size: 11px;
   background: rgba(255,173,31,.22);
@@ -243,6 +248,17 @@ th, td {
   white-space: nowrap;
 }
 th { background: #271908; color: #ffd89a; }
+.status-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+.status-chip.green { background: #123a2e; color: #9df5d4; border-color: #1f6e56; }
+.status-chip.yellow { background: #4a3209; color: #ffd786; border-color: #7d5416; }
+.status-chip.red { background: #4a1c28; color: #ffb7ca; border-color: #7f2f45; }
+.status-chip.unknown { background: #3b2911; color: #e7cda1; border-color: #6e4a1c; }
 .code-list { margin: 0; padding-left: 18px; }
 .code-list li { margin: 6px 0; }
 
