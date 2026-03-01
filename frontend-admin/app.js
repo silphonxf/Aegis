@@ -269,11 +269,23 @@ function renderMonitoring(data){
 
 function renderAssetSummary(data) {
   const byStatus = Object.fromEntries((data.by_status || []).map(i => [i.status, i.count]));
-  setNumber($('assetTotal'), data.total ?? 0);
-  setNumber($('assetInUse'), byStatus.in_use ?? 0);
-  setNumber($('assetRepair'), byStatus.repair ?? 0);
-  setNumber($('assetRetired'), byStatus.retired ?? 0);
-  $('assetSummary').textContent = JSON.stringify(data, null, 2);
+  const total = data.total ?? 0;
+  const inUse = byStatus.in_use ?? 0;
+  const repair = byStatus.repair ?? 0;
+  const retired = byStatus.retired ?? 0;
+
+  setNumber($('assetTotal'), total);
+  setNumber($('assetInUse'), inUse);
+  setNumber($('assetRepair'), repair);
+  setNumber($('assetRetired'), retired);
+
+  $('assetSummary').textContent = [
+    '资产概览',
+    `- 总资产：${total}`,
+    `- 在用资产：${inUse}`,
+    `- 维修中：${repair}`,
+    `- 停用：${retired}`,
+  ].join('\n');
 }
 
 function startDashboardAutoRefresh() {
