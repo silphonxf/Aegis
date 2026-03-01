@@ -7,6 +7,7 @@ let dashboardTimer = null;
 let autoRefreshEnabled = true;
 const trendSeries = { cpu: [], mem: [], disk: [] };
 let latestMonitoringItems = [];
+let selectedSystemCode = 'HOST-LOCAL-001';
 
 function base() {
   const protocol = window.location.protocol && window.location.protocol.startsWith('http')
@@ -137,6 +138,58 @@ function applyAbnormalFilters() {
   $('abnormalTbody').innerHTML = rows || '<tr><td colspan="8">暂无符合筛选条件的数据</td></tr>';
 }
 
+function renderSelectedSystem(items) {
+  if (!items.length) {
+    setNumber($('kpiGreen'), 0);
+    setNumber($('kpiYellow'), 0);
+    setNumber($('kpiRed'), 0);
+    setNumber($('kpiTotal'), 0);
+    setTechMetric('metricCpu', 0);
+    setTechMetric('metricMem', 0);
+    setTechMetric('metricDisk', 0);
+    return;
+  }
+
+  let selected = items.find((i) => i.system_code === selectedSystemCode);
+  if (!selected) {
+    selected = items.find((i) => i.system_code === 'HOST-LOCAL-001') || items[0];
+    selectedSystemCode = selected.system_code;
+  }
+
+  const color = String(selected.status_color || '').toLowerCase();
+  setNumber($('kpiGreen'), color === 'green' ? 1 : 0);
+  setNumber($('kpiYellow'), color === 'yellow' ? 1 : 0);
+  setNumber($('kpiRed'), color === 'red' ? 1 : 0);
+  setNumber($('kpiTotal'), 1);
+
+  setTechMetric('metricCpu', Number(selected.cpu_usage) || 0);
+  setTechMetric('metricMem', Number(selected.mem_usage) || 0);
+  setTechMetric('metricDisk', Number(selected.disk_usage) || 0);
+}
+
+function refreshSystemSelectOptions() {
+  const select = $('systemSelect');
+  const keyword = ($('systemSearchKeyword')?.value || '').trim().toLowerCase();
+  if (!select) return;
+
+  const candidates = latestMonitoringItems.filter((i) => {
+    if (!keyword) return true;
+    const text = `${i.system_code || ''} ${i.system_name || ''}`.toLowerCase();
+    return text.includes(keyword);
+  });
+
+  select.innerHTML = candidates
+    .map((i) => `<option value="${i.system_code}">${i.system_code} / ${i.system_name}</option>`)
+    .join('');
+
+  if (candidates.length) {
+    if (!candidates.some((i) => i.system_code === selectedSystemCode)) {
+      selectedSystemCode = candidates[0].system_code;
+    }
+    select.value = selectedSystemCode;
+  }
+}
+
 function getHistory() {
   try { return JSON.parse(localStorage.getItem(REQ_HISTORY_KEY) || '[]'); }
   catch { return []; }
@@ -194,31 +247,23 @@ async function request(path, options={}){
 }
 
 function renderMonitoring(data){
-  setNumber($('kpiGreen'), data.summary?.green ?? 0);
-  setNumber($('kpiYellow'), data.summary?.yellow ?? 0);
-  setNumber($('kpiRed'), data.summary?.red ?? 0);
-  setNumber($('kpiTotal'), data.summary?.total ?? 0);
+  const items = data.items || [];
   $('monitoring').textContent = JSON.stringify(data.summary, null, 2);
 
-  const items = data.items || [];
-  const avg = (key) => {
-    const vals = items.map((i) => Number(i?.[key])).filter((v) => Number.isFinite(v));
-    if (!vals.length) return 0;
-    return vals.reduce((a, b) => a + b, 0) / vals.length;
-  };
-  const cpuAvg = avg('cpu_usage');
-  const memAvg = avg('mem_usage');
-  const diskAvg = avg('disk_usage');
-  setTechMetric('metricCpu', cpuAvg);
-  setTechMetric('metricMem', memAvg);
-  setTechMetric('metricDisk', diskAvg);
+  latestMonitoringItems = items;
+  refreshSystemSelectOptions();
+  renderSelectedSystem(items);
 
-  pushTrend('cpu', cpuAvg);
-  pushTrend('mem', memAvg);
-  pushTrend('disk', diskAvg);
+  const selected = items.find((i) => i.system_code === selectedSystemCode);
+  const cpu = Number(selected?.cpu_usage) || 0;
+  const mem = Number(selected?.mem_usage) || 0;
+  const disk = Number(selected?.disk_usage) || 0;
+
+  pushTrend('cpu', cpu);
+  pushTrend('mem', mem);
+  pushTrend('disk', disk);
   renderSparklines();
 
-  latestMonitoringItems = items;
   applyAbnormalFilters();
 }
 
@@ -578,6 +623,21 @@ function initDashboardBindings() {
 
   $('abnormalColorFilter').onchange = applyAbnormalFilters;
   $('abnormalKeyword').oninput = applyAbnormalFilters;
+
+  $('systemSearchKeyword').oninput = () => {
+    refreshSystemSelectOptions();
+    renderSelectedSystem(latestMonitoringItems);
+  };
+
+  $('systemSelect').onchange = () => {
+    selectedSystemCode = $('systemSelect').value;
+    renderSelectedSystem(latestMonitoringItems);
+    const selected = latestMonitoringItems.find((i) => i.system_code === selectedSystemCode);
+    pushTrend('cpu', Number(selected?.cpu_usage) || 0);
+    pushTrend('mem', Number(selected?.mem_usage) || 0);
+    pushTrend('disk', Number(selected?.disk_usage) || 0);
+    renderSparklines();
+  };
 }
 
 function initAdvancedToolsBindings() {
