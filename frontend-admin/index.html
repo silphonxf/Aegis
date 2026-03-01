@@ -120,23 +120,13 @@
       <section id="panel-user-system" class="panel">
         <section class="card">
           <h2>用户管理</h2>
-          <label>用户名
-            <input id="newUserName" placeholder="请输入用户名" />
-          </label>
-          <label>密码
-            <input id="newUserPassword" placeholder="请输入密码" type="password" />
-          </label>
-          <label>角色
-            <select id="newUserRole">
-              <option value="inspector">巡检员</option>
-              <option value="admin">管理员</option>
-              <option value="super_admin">超级管理员</option>
-            </select>
-          </label>
           <div class="grid2">
-            <button id="btnCreateUser">创建用户</button>
-            <button id="btnListUsers">刷新用户列表</button>
+            <button id="btnOpenCreateUserModal">新增用户</button>
+            <button id="btnFindUsers">查找用户</button>
           </div>
+          <label>用户名关键词（模糊查询）
+            <input id="userSearchKeyword" placeholder="输入用户名关键词，例如 admin" />
+          </label>
           <pre id="userListResult"></pre>
         </section>
 
@@ -308,6 +298,29 @@
       </section>
 
     </main>
+  </div>
+
+  <div id="createUserModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>新增用户</h3>
+      <label>用户名
+        <input id="modalUserName" placeholder="请输入用户名" />
+      </label>
+      <label>密码
+        <input id="modalUserPassword" type="password" placeholder="请输入密码" />
+      </label>
+      <label>角色
+        <select id="modalUserRole">
+          <option value="inspector">巡检员</option>
+          <option value="admin">管理员</option>
+          <option value="super_admin">超级管理员</option>
+        </select>
+      </label>
+      <div class="grid2">
+        <button id="btnSubmitCreateUser">确认新增</button>
+        <button id="btnCloseCreateUserModal" type="button">取消</button>
+      </div>
+    </div>
   </div>
 
   <script src="./app.js"></script>

@@ -298,6 +298,23 @@ th { background: #113654; color: #7dd3fc; }
   .menu-list { grid-template-columns: repeat(2,1fr); }
   .grid3, .grid4, .kpis, .tech-metrics { grid-template-columns: 1fr 1fr; }
 }
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 10, 18, .7);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+}
+.modal-card {
+  width: min(420px, calc(100vw - 24px));
+  background: linear-gradient(145deg, rgba(15,34,51,.98), rgba(11,29,46,.98));
+  border: 1px solid #1f3a53;
+  border-radius: 14px;
+  padding: 14px;
+}
+.modal-card h3 { margin: 0 0 10px; color: #9dd6f5; }
+
 @media (max-width: 640px) {
   .grid2, .grid3, .grid4, .kpis, .tech-metrics, .menu-list { grid-template-columns: 1fr; }
 }

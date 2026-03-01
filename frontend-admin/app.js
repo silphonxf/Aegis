@@ -381,13 +381,28 @@ $('btnExportAbnormal').onclick = async () => {
   } catch (e) {  }
 };
 
-$('btnCreateUser').onclick = async () => {
+function openCreateUserModal() {
+  $('createUserModal').classList.remove('hidden');
+}
+
+function closeCreateUserModal() {
+  $('createUserModal').classList.add('hidden');
+}
+
+$('btnSubmitCreateUser').onclick = async () => {
   try {
     const d = await request('/api/v1/admin/users', {
       method:'POST', headers:headers(),
-      body: JSON.stringify({ username: $('newUserName').value, password: $('newUserPassword').value, role_code: $('newUserRole').value })
+      body: JSON.stringify({
+        username: $('modalUserName').value.trim(),
+        password: $('modalUserPassword').value,
+        role_code: $('modalUserRole').value,
+      })
     });
     $('userListResult').textContent = formatSuccess('创建用户', '操作成功', d);
+    closeCreateUserModal();
+    $('modalUserName').value = '';
+    $('modalUserPassword').value = '';
   } catch(e){ $('userListResult').textContent = formatError('创建用户', e); }
 };
 
@@ -401,11 +416,16 @@ $('btnCreateSystem').onclick = async () => {
   } catch(e){ $('systemCreateResult').textContent = formatError('创建系统', e); }
 };
 
-$('btnListUsers').onclick = async () => {
+$('btnFindUsers').onclick = async () => {
   try {
-    const d = await request('/api/v1/admin/users?page=1&size=50', { headers: headers() });
-    $('userListResult').textContent = formatSuccess('用户列表', `共 ${d.total ?? d.items?.length ?? 0} 条`, d);
-  } catch (e) { $('userListResult').textContent = formatError('用户列表', e); }
+    const keyword = $('userSearchKeyword').value.trim().toLowerCase();
+    const d = await request('/api/v1/admin/users?page=1&size=200', { headers: headers() });
+    const items = Array.isArray(d.items) ? d.items : [];
+    const filtered = keyword
+      ? items.filter((u) => String(u.username || '').toLowerCase().includes(keyword))
+      : items;
+    $('userListResult').textContent = formatSuccess('用户查询', `匹配 ${filtered.length} 条`, { ...d, items: filtered, total: filtered.length });
+  } catch (e) { $('userListResult').textContent = formatError('用户查询', e); }
 };
 
 $('btnListSystems').onclick = async () => {
@@ -668,6 +688,9 @@ function initGlobalBindings() {
   Array.from(document.querySelectorAll('.menu-btn')).forEach((btn) => {
     btn.addEventListener('click', () => switchPanel(btn.dataset.section));
   });
+
+  $('btnOpenCreateUserModal').onclick = openCreateUserModal;
+  $('btnCloseCreateUserModal').onclick = closeCreateUserModal;
 
   $('btnLogout').onclick = () => {
     token = '';
