@@ -120,14 +120,23 @@
       <section id="panel-user-system" class="panel">
         <section class="card">
           <h2>用户管理</h2>
-          <input id="newUserName" placeholder="username" />
-          <input id="newUserPassword" placeholder="password" type="password" />
-          <select id="newUserRole"><option value="inspector">inspector</option><option value="admin">admin</option><option value="super_admin">super_admin</option></select>
+          <label>用户名
+            <input id="newUserName" placeholder="请输入用户名" />
+          </label>
+          <label>密码
+            <input id="newUserPassword" placeholder="请输入密码" type="password" />
+          </label>
+          <label>角色
+            <select id="newUserRole">
+              <option value="inspector">巡检员</option>
+              <option value="admin">管理员</option>
+              <option value="super_admin">超级管理员</option>
+            </select>
+          </label>
           <div class="grid2">
             <button id="btnCreateUser">创建用户</button>
             <button id="btnListUsers">刷新用户列表</button>
           </div>
-          <pre id="userCreateResult"></pre>
           <pre id="userListResult"></pre>
         </section>
 

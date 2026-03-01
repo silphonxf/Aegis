@@ -387,8 +387,8 @@ $('btnCreateUser').onclick = async () => {
       method:'POST', headers:headers(),
       body: JSON.stringify({ username: $('newUserName').value, password: $('newUserPassword').value, role_code: $('newUserRole').value })
     });
-    $('userCreateResult').textContent = formatSuccess('创建用户', '操作成功', d);
-  } catch(e){ $('userCreateResult').textContent = formatError('创建用户', e); }
+    $('userListResult').textContent = formatSuccess('创建用户', '操作成功', d);
+  } catch(e){ $('userListResult').textContent = formatError('创建用户', e); }
 };
 
 $('btnCreateSystem').onclick = async () => {
