@@ -142,36 +142,6 @@
         </section>
       </section>
 
-      <section id="panel-template-snapshot" class="panel">
-        <section class="card">
-          <h2>自检模板管理</h2>
-          <input id="tplSystemId" placeholder="system_id" />
-          <select id="tplCheckType"><option value="daily">daily</option><option value="weekly">weekly</option><option value="yearly">yearly</option></select>
-          <input id="tplName" placeholder="模板名称" />
-          <div class="grid2">
-            <button id="btnCreateTemplate">创建模板</button>
-            <button id="btnListTemplates">刷新模板列表</button>
-          </div>
-          <pre id="templateCreateResult"></pre>
-          <pre id="templateListResult"></pre>
-        </section>
-
-        <section class="card">
-          <h2>状态快照上报（自动算红黄绿）</h2>
-          <input id="snapSystemId" placeholder="system_id" />
-          <div class="grid2">
-            <input id="snapHostOnline" placeholder="host_online(normal/abnormal/unknown)" value="normal" />
-            <input id="snapPortOk" placeholder="port_ok(normal/abnormal/unknown)" value="normal" />
-            <input id="snapCpu" type="number" placeholder="cpu_usage(%)" value="60" />
-            <input id="snapMem" type="number" placeholder="mem_usage(%)" value="65" />
-            <input id="snapDisk" type="number" placeholder="disk_usage(%)" value="70" />
-            <input id="snapSelfcheck" placeholder="last_selfcheck_result(normal/warning/critical/unknown)" value="normal" />
-          </div>
-          <button id="btnCreateSnapshot">提交状态快照</button>
-          <pre id="snapshotResult"></pre>
-        </section>
-      </section>
-
       <section id="panel-assets" class="panel">
         <section class="card">
           <h2>资产管理（迭代2）</h2>
@@ -209,44 +179,6 @@
         </section>
       </section>
 
-      <section id="panel-rules-audit" class="panel">
-        <section class="card">
-          <h2>状态规则配置（后端版）</h2>
-          <div class="grid2">
-            <label>CPU 黄阈值(%)<input id="cpuWarn" type="number" value="70" /></label>
-            <label>CPU 红阈值(%)<input id="cpuCritical" type="number" value="90" /></label>
-            <label>内存 黄阈值(%)<input id="memWarn" type="number" value="75" /></label>
-            <label>内存 红阈值(%)<input id="memCritical" type="number" value="90" /></label>
-            <label>磁盘 黄阈值(%)<input id="diskWarn" type="number" value="80" /></label>
-            <label>磁盘 红阈值(%)<input id="diskCritical" type="number" value="95" /></label>
-          </div>
-          <div class="grid2">
-            <button id="btnLoadRules">读取后端规则</button>
-            <button id="btnSaveRules">保存到后端</button>
-          </div>
-          <pre id="ruleResult"></pre>
-        </section>
-
-        <section class="card">
-          <h2>审计日志（支持筛选）</h2>
-          <div class="grid3">
-            <input id="auditAction" placeholder="action，例如 create_user" />
-            <input id="auditUsername" placeholder="username，例如 admin" />
-            <input id="auditResource" placeholder="resource，例如 system" />
-          </div>
-          <div class="grid3">
-            <input id="auditStartAt" placeholder="start_at，例如 2026-02-25T00:00:00" />
-            <input id="auditEndAt" placeholder="end_at，例如 2026-02-25T23:59:59" />
-            <input id="auditKeyword" placeholder="keyword（detail模糊匹配）" />
-          </div>
-          <div class="grid2">
-            <button id="btnAudit">按筛选读取审计日志</button>
-            <button id="btnAuditClear">清空筛选</button>
-          </div>
-          <pre id="audit"></pre>
-        </section>
-      </section>
-
       <section id="panel-tools-ai" class="panel">
         <section class="card">
           <h2>高级工具</h2>
@@ -254,6 +186,8 @@
           <div class="tool-tabs">
             <button class="tool-tab active" data-tool="tool-ops">运维审批</button>
             <button class="tool-tab" data-tool="tool-ai">AI诊断</button>
+            <button class="tool-tab" data-tool="tool-template">模板与快照</button>
+            <button class="tool-tab" data-tool="tool-rules">规则与审计</button>
             <button class="tool-tab" data-tool="tool-debug">调试与错误码</button>
           </div>
 
@@ -277,6 +211,66 @@
               <button id="btnDiagList">刷新诊断记录</button>
             </div>
             <pre id="diagListResult"></pre>
+          </div>
+
+          <div id="tool-template" class="tool-pane">
+            <h3>自检模板管理</h3>
+            <input id="tplSystemId" placeholder="system_id" />
+            <select id="tplCheckType"><option value="daily">daily</option><option value="weekly">weekly</option><option value="yearly">yearly</option></select>
+            <input id="tplName" placeholder="模板名称" />
+            <div class="grid2">
+              <button id="btnCreateTemplate">创建模板</button>
+              <button id="btnListTemplates">刷新模板列表</button>
+            </div>
+            <pre id="templateCreateResult"></pre>
+            <pre id="templateListResult"></pre>
+
+            <h3>状态快照上报</h3>
+            <input id="snapSystemId" placeholder="system_id" />
+            <div class="grid2">
+              <input id="snapHostOnline" placeholder="host_online(normal/abnormal/unknown)" value="normal" />
+              <input id="snapPortOk" placeholder="port_ok(normal/abnormal/unknown)" value="normal" />
+              <input id="snapCpu" type="number" placeholder="cpu_usage(%)" value="60" />
+              <input id="snapMem" type="number" placeholder="mem_usage(%)" value="65" />
+              <input id="snapDisk" type="number" placeholder="disk_usage(%)" value="70" />
+              <input id="snapSelfcheck" placeholder="last_selfcheck_result(normal/warning/critical/unknown)" value="normal" />
+            </div>
+            <button id="btnCreateSnapshot">提交状态快照</button>
+            <pre id="snapshotResult"></pre>
+          </div>
+
+          <div id="tool-rules" class="tool-pane">
+            <h3>状态规则配置</h3>
+            <div class="grid2">
+              <label>CPU 黄阈值(%)<input id="cpuWarn" type="number" value="70" /></label>
+              <label>CPU 红阈值(%)<input id="cpuCritical" type="number" value="90" /></label>
+              <label>内存 黄阈值(%)<input id="memWarn" type="number" value="75" /></label>
+              <label>内存 红阈值(%)<input id="memCritical" type="number" value="90" /></label>
+              <label>磁盘 黄阈值(%)<input id="diskWarn" type="number" value="80" /></label>
+              <label>磁盘 红阈值(%)<input id="diskCritical" type="number" value="95" /></label>
+            </div>
+            <div class="grid2">
+              <button id="btnLoadRules">读取后端规则</button>
+              <button id="btnSaveRules">保存到后端</button>
+            </div>
+            <pre id="ruleResult"></pre>
+
+            <h3>审计日志（支持筛选）</h3>
+            <div class="grid3">
+              <input id="auditAction" placeholder="action，例如 create_user" />
+              <input id="auditUsername" placeholder="username，例如 admin" />
+              <input id="auditResource" placeholder="resource，例如 system" />
+            </div>
+            <div class="grid3">
+              <input id="auditStartAt" placeholder="start_at，例如 2026-02-25T00:00:00" />
+              <input id="auditEndAt" placeholder="end_at，例如 2026-02-25T23:59:59" />
+              <input id="auditKeyword" placeholder="keyword（detail模糊匹配）" />
+            </div>
+            <div class="grid2">
+              <button id="btnAudit">按筛选读取审计日志</button>
+              <button id="btnAuditClear">清空筛选</button>
+            </div>
+            <pre id="audit"></pre>
           </div>
 
           <div id="tool-debug" class="tool-pane">
