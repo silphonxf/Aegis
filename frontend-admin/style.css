@@ -282,6 +282,17 @@ th { background: #113654; color: #7dd3fc; }
 .tool-pane { display: none; }
 .tool-pane.active { display: block; }
 
+.result-board {
+  margin-top: 10px;
+  border: 1px solid #23435f;
+  background: #0a1b2b;
+  border-radius: 10px;
+  padding: 10px;
+}
+.result-board .result-title { color: #9dd6f5; font-weight: 700; margin-bottom: 8px; }
+.result-board .result-line { color: #c7e6ff; margin: 4px 0; }
+.result-board table { margin-top: 8px; }
+
 .code-list { margin: 0; padding-left: 18px; }
 .code-list li { margin: 6px 0; }
 

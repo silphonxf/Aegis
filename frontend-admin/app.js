@@ -224,6 +224,44 @@ function formatSuccess(moduleName, message, data = null) {
   return data ? `${base}\n${JSON.stringify(data, null, 2)}` : base;
 }
 
+function renderUserResultBoard(items, message = '') {
+  const rows = (items || []).map((u, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>${u.username || '-'}</td>
+      <td>${u.role_code === 'super_admin' ? '超级管理员' : u.role_code === 'admin' ? '管理员' : '巡检员'}</td>
+      <td>${u.id ?? '-'}</td>
+    </tr>
+  `).join('');
+  $('userListResult').innerHTML = `
+    <div class="result-title">用户查询结果</div>
+    <div class="result-line">${message || `共 ${items.length} 条`}</div>
+    <table>
+      <thead><tr><th>序号</th><th>用户名</th><th>角色</th><th>ID</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4">暂无匹配用户</td></tr>'}</tbody>
+    </table>
+  `;
+}
+
+function renderSystemResultBoard(items, message = '') {
+  const rows = (items || []).map((s, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>${s.system_code || '-'}</td>
+      <td>${s.name || '-'}</td>
+      <td>${s.env === 'prod' ? '生产' : s.env === 'test' ? '测试' : s.env === 'dev' ? '开发' : (s.env || '-')}</td>
+    </tr>
+  `).join('');
+  $('systemListResult').innerHTML = `
+    <div class="result-title">系统查询结果</div>
+    <div class="result-line">${message || `共 ${items.length} 条`}</div>
+    <table>
+      <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>环境</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4">暂无匹配系统</td></tr>'}</tbody>
+    </table>
+  `;
+}
+
 function forceRelogin(message = '登录已失效，请重新登录') {
   token = '';
   localStorage.removeItem('aegis_admin_token');
@@ -399,7 +437,7 @@ $('btnSubmitCreateUser').onclick = async () => {
         role_code: $('modalUserRole').value,
       })
     });
-    $('userListResult').textContent = formatSuccess('创建用户', '操作成功', d);
+    renderUserResultBoard([d], '新增成功，已创建 1 个用户');
     closeCreateUserModal();
     $('modalUserName').value = '';
     $('modalUserPassword').value = '';
@@ -424,7 +462,7 @@ $('btnSubmitCreateSystem').onclick = async () => {
         env: $('modalSystemEnv').value || 'prod',
       })
     });
-    $('systemListResult').textContent = formatSuccess('创建系统', '操作成功', d);
+    renderSystemResultBoard([d], '新增成功，已创建 1 个系统');
     closeCreateSystemModal();
     $('modalSystemCode').value = '';
     $('modalSystemName').value = '';
@@ -439,7 +477,7 @@ $('btnFindUsers').onclick = async () => {
     const filtered = keyword
       ? items.filter((u) => String(u.username || '').toLowerCase().includes(keyword))
       : items;
-    $('userListResult').textContent = formatSuccess('用户查询', `匹配 ${filtered.length} 条`, { ...d, items: filtered, total: filtered.length });
+    renderUserResultBoard(filtered, `匹配 ${filtered.length} 条`);
   } catch (e) { $('userListResult').textContent = formatError('用户查询', e); }
 };
 
@@ -451,7 +489,7 @@ $('btnFindSystems').onclick = async () => {
     const filtered = keyword
       ? items.filter((s) => `${s.system_code || ''} ${s.name || ''}`.toLowerCase().includes(keyword))
       : items;
-    $('systemListResult').textContent = formatSuccess('系统查询', `匹配 ${filtered.length} 条`, { ...d, items: filtered, total: filtered.length });
+    renderSystemResultBoard(filtered, `匹配 ${filtered.length} 条`);
   } catch (e) { $('systemListResult').textContent = formatError('系统查询', e); }
 };
 
