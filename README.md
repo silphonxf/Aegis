@@ -51,6 +51,7 @@
 
 详细变更与验收见：
 - `docs/admin-ui-optimization-summary-2026-03-01.md`
+- `docs/release-checklist-v1.0.0-admin-v2.md`
 
 ## 快速验证
 
