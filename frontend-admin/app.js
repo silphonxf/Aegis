@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 let token = localStorage.getItem('aegis_admin_token') || '';
 
 const REQ_HISTORY_KEY = 'aegis_admin_request_history';
+const TOOL_TAB_KEY = 'aegis_admin_tool_tab';
 let dashboardTimer = null;
 let autoRefreshEnabled = true;
 const trendSeries = { cpu: [], mem: [], disk: [] };
@@ -579,13 +580,19 @@ $('btnToggleAutoRefresh').onclick = () => {
 $('abnormalColorFilter').onchange = applyAbnormalFilters;
 $('abnormalKeyword').oninput = applyAbnormalFilters;
 
+function activateToolTab(toolId) {
+  const targetBtn = document.querySelector(`.tool-tab[data-tool="${toolId}"]`) || document.querySelector('.tool-tab');
+  if (!targetBtn) return;
+  document.querySelectorAll('.tool-tab').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.tool-pane').forEach((p) => p.classList.remove('active'));
+  targetBtn.classList.add('active');
+  document.getElementById(targetBtn.dataset.tool)?.classList.add('active');
+  localStorage.setItem(TOOL_TAB_KEY, targetBtn.dataset.tool);
+  if ($('toolHint')) $('toolHint').textContent = targetBtn.dataset.desc || '';
+}
+
 Array.from(document.querySelectorAll('.tool-tab')).forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tool-tab').forEach((b) => b.classList.remove('active'));
-    document.querySelectorAll('.tool-pane').forEach((p) => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(btn.dataset.tool)?.classList.add('active');
-  });
+  btn.addEventListener('click', () => activateToolTab(btn.dataset.tool));
 });
 
 Array.from(document.querySelectorAll('.menu-btn')).forEach((btn) => {
@@ -599,6 +606,8 @@ $('btnLogout').onclick = () => {
   stopDashboardAutoRefresh();
   setAuthView(false);
 };
+
+activateToolTab(localStorage.getItem(TOOL_TAB_KEY) || 'tool-ops');
 
 if (token) {
   setAuthView(true);

@@ -184,12 +184,13 @@
           <h2>高级工具</h2>
           <p class="muted">低频功能已收纳到这里，按需使用。</p>
           <div class="tool-tabs">
-            <button class="tool-tab active" data-tool="tool-ops">运维审批</button>
-            <button class="tool-tab" data-tool="tool-ai">AI诊断</button>
-            <button class="tool-tab" data-tool="tool-template">模板与快照</button>
-            <button class="tool-tab" data-tool="tool-rules">规则与审计</button>
-            <button class="tool-tab" data-tool="tool-debug">调试与错误码</button>
+            <button class="tool-tab active" data-tool="tool-ops" data-desc="处理工具任务审批与状态流转。">运维审批</button>
+            <button class="tool-tab" data-tool="tool-ai" data-desc="查看 AI 诊断记录，按严重级别筛选。">AI诊断</button>
+            <button class="tool-tab" data-tool="tool-template" data-desc="维护自检模板并上报系统状态快照。">模板与快照</button>
+            <button class="tool-tab" data-tool="tool-rules" data-desc="调整状态规则并查询审计日志。">规则与审计</button>
+            <button class="tool-tab" data-tool="tool-debug" data-desc="查看错误码说明和接口调试历史。">调试与错误码</button>
           </div>
+          <p id="toolHint" class="muted">处理工具任务审批与状态流转。</p>
 
           <div id="tool-ops" class="tool-pane active">
             <div class="grid4">
