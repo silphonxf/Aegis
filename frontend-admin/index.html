@@ -28,11 +28,8 @@
       <nav class="menu-list">
         <button class="menu-btn active" data-section="panel-dashboard"><span class="menu-icon">📊</span><span class="menu-label">总览看板</span></button>
         <button class="menu-btn" data-section="panel-user-system"><span class="menu-icon">👥</span><span class="menu-label">用户与系统</span></button>
-        <button class="menu-btn" data-section="panel-template-snapshot"><span class="menu-icon">🧩</span><span class="menu-label">模板与快照</span></button>
         <button class="menu-btn" data-section="panel-assets"><span class="menu-icon">🗂️</span><span class="menu-label">资产管理</span></button>
-        <button class="menu-btn" data-section="panel-rules-audit"><span class="menu-icon">🛡️</span><span class="menu-label">规则与审计</span></button>
-        <button class="menu-btn" data-section="panel-tools-ai"><span class="menu-icon">🤖</span><span class="menu-label">工具与AI</span></button>
-        <button class="menu-btn" data-section="panel-debug"><span class="menu-icon">🧪</span><span class="menu-label">调试与错误码</span></button>
+        <button class="menu-btn" data-section="panel-tools-ai"><span class="menu-icon">🧰</span><span class="menu-label">高级工具</span></button>
       </nav>
       <button id="btnLogout" class="logout-btn">退出登录</button>
     </aside>
@@ -51,12 +48,8 @@
         <section class="card">
           <h2>全局看板（系统 + 资产）</h2>
           <div class="grid2">
-            <button id="btnMonitoring">刷新监控总览</button>
+            <button id="btnRefreshDashboard">刷新看板</button>
             <button id="btnExportAbnormal">导出异常清单 CSV</button>
-          </div>
-          <div class="grid2">
-            <button id="btnAssetSummary">刷新资产概览</button>
-            <button id="btnRefreshDashboard">一键刷新全看板</button>
           </div>
           <div class="grid2">
             <button id="btnCollectLocal">采集本机监控样本</button>

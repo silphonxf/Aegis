@@ -256,15 +256,21 @@ $('btnLogin').onclick = async () => {
   } catch(e){ $('state').textContent = `登录失败: ${e.message}`; }
 };
 
-$('btnMonitoring').onclick = async () => {
-  try { renderMonitoring(await request('/api/v1/monitoring/overview',{headers:headers()})); }
-  catch(e){ $('monitoring').textContent = e.message; }
-};
+const btnMonitoring = $('btnMonitoring');
+if (btnMonitoring) {
+  btnMonitoring.onclick = async () => {
+    try { renderMonitoring(await request('/api/v1/monitoring/overview',{headers:headers()})); }
+    catch(e){ $('monitoring').textContent = e.message; }
+  };
+}
 
-$('btnAssetSummary').onclick = async () => {
-  try { renderAssetSummary(await request('/api/v1/admin/assets/summary', { headers: headers() })); }
-  catch(e){ $('assetSummary').textContent = e.message; }
-};
+const btnAssetSummary = $('btnAssetSummary');
+if (btnAssetSummary) {
+  btnAssetSummary.onclick = async () => {
+    try { renderAssetSummary(await request('/api/v1/admin/assets/summary', { headers: headers() })); }
+    catch(e){ $('assetSummary').textContent = e.message; }
+  };
+}
 
 $('btnRefreshDashboard').onclick = async () => {
   try {
