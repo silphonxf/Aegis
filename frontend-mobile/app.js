@@ -10,6 +10,7 @@ const state = {
   profile: JSON.parse(localStorage.getItem('aegis_profile') || '{}'),
   statusSystems: [],
   selectedStatusSystemId: null,
+  nfcTagText: 'NFC://DEMO-SYS-001/P-002',
 };
 
 function getBase() {
@@ -452,7 +453,7 @@ async function startNfcScanner() {
         return;
       }
 
-      $('nfcTag').value = tagText;
+      state.nfcTagText = tagText;
       setNfcScanState('NFC 读取成功，正在解析机房位置...');
       try {
         const resolved = await resolveNfcLocation(tagText);
@@ -606,8 +607,8 @@ $('btnStopNfcScan').onclick = () => {
 
 $('btnSubmitNfc').onclick = async () => {
   try {
-    const nfcText = $('nfcTag').value.trim();
-    if (!nfcText) throw new Error('请先填写 NFC 标签内容');
+    const nfcText = (state.nfcTagText || '').trim();
+    if (!nfcText) throw new Error('请先进行 NFC 碰一碰读取标签内容');
 
     const resolved = await api(`/api/v1/inspections/points/resolve?qr_content=${encodeURIComponent(nfcText)}`, { headers: authHeaders() });
     const payload = {
