@@ -61,6 +61,7 @@ cd /home/xf/.openclaw/workspace/code/aegis
 ```
 
 更多见：
+- `docs/AGENT_CONTEXT.md`（会话持久化上下文，先看这个）
 - `docs/release-v1.0.0.md`
 - `docs/release-note-v0.3.md`
 - `docs/iteration3-acceptance.md`
