@@ -12,6 +12,7 @@ const state = {
   selectedStatusSystemId: null,
   nfcTagText: 'NFC://DEMO-SYS-001/P-002',
   qrScanText: '',
+  qrResolvedPoint: null,
 };
 
 function getBase() {
@@ -83,7 +84,13 @@ function showSub(panelId, subName) {
 }
 
 function initSubNavigation() {
-  $('btnGoQr').onclick = () => showSub('panel-inspection', 'inspection-qr');
+  $('btnGoQr').onclick = () => {
+    showSub('panel-inspection', 'inspection-qr');
+    state.qrScanText = '';
+    state.qrResolvedPoint = null;
+    if ($('inspectionPointName')) $('inspectionPointName').value = '';
+    show('inspectionResult', '');
+  };
   $('btnUserCenter').onclick = () => {
     stopStatusLoop();
     switchPanel('panel-user-center');
@@ -390,8 +397,18 @@ async function startQrScanner() {
 
         if (value) {
           state.qrScanText = value;
-          setQrScanState('扫码成功，已识别二维码并自动返回。');
+          setQrScanState('扫码成功，正在匹配巡检点...');
           stopQrScanner();
+          try {
+            await resolveQrPoint(value);
+            setQrScanState('扫码成功，已识别二维码并自动返回。');
+          } catch (e) {
+            const msg = e?.message || '找不到巡检点';
+            if ($('inspectionPointName')) $('inspectionPointName').value = '';
+            state.qrResolvedPoint = null;
+            show('inspectionResult', msg);
+            setQrScanState(`扫码成功，但匹配失败：${msg}`);
+          }
           return;
         }
 
@@ -440,9 +457,28 @@ async function resolveNfcLocation(tagText) {
     nfc_tag: tagText,
     location: resolved.location || '未配置',
     system_id: resolved.system_id,
+    system_name: resolved.system_name || '',
     point_id: resolved.point_id,
     point_code: resolved.point_code,
+    point_name: resolved.point_name || resolved.location || resolved.point_code,
     resolved_point: resolved,
+  });
+  return resolved;
+}
+
+async function resolveQrPoint(tagText) {
+  const resolved = await api(`/api/v1/inspections/points/resolve?qr_content=${encodeURIComponent(tagText)}`, { headers: authHeaders() });
+  state.qrResolvedPoint = resolved;
+  const pointName = resolved.point_name || resolved.location || resolved.point_code || '';
+  if ($('inspectionPointName')) $('inspectionPointName').value = pointName;
+  show('inspectionResult', {
+    message: '扫码成功，已定位巡检点',
+    qr_content: tagText,
+    system_id: resolved.system_id,
+    system_name: resolved.system_name || '',
+    point_id: resolved.point_id,
+    point_code: resolved.point_code,
+    point_name: pointName,
   });
   return resolved;
 }
@@ -618,7 +654,7 @@ $('btnCreateInspection').onclick = async () => {
     const qrText = (state.qrScanText || '').trim();
     if (!qrText) throw new Error('请先调用相机完成二维码扫描');
 
-    const resolved = await api(`/api/v1/inspections/points/resolve?qr_content=${encodeURIComponent(qrText)}`, { headers: authHeaders() });
+    const resolved = state.qrResolvedPoint || await resolveQrPoint(qrText);
     const payload = {
       system_id: Number(resolved.system_id),
       point_id: Number(resolved.point_id),
@@ -627,7 +663,12 @@ $('btnCreateInspection').onclick = async () => {
       inspected_at: new Date().toISOString(),
     };
     const created = await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
-    show('inspectionResult', { resolved_point: resolved, created_record: created });
+    show('inspectionResult', {
+      system_name: resolved.system_name || '',
+      point_name: resolved.point_name || resolved.location || resolved.point_code,
+      resolved_point: resolved,
+      created_record: created,
+    });
   } catch (e) { show('inspectionResult', e.message); }
 };
 

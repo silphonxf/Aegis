@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.inspection import InspectionPoint, InspectionRecord
+from app.models.system import System
 from app.models.user import User
 from app.schemas.inspection import InspectionCreate
 from app.services.audit import log_action
@@ -15,13 +16,47 @@ router = APIRouter(prefix="/inspections", tags=["inspections"])
 
 @router.get("/points/resolve")
 def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    point = db.query(InspectionPoint).filter(InspectionPoint.qr_content == qr_content).first()
+    qr_text = (qr_content or "").strip()
+
+    # 新逻辑：二维码为系统ID（纯数字）时，按 system_id 定位系统与巡检点
+    if qr_text.isdigit():
+        system_id = int(qr_text)
+        system = db.query(System).filter(System.id == system_id).first()
+        if not system:
+            raise HTTPException(status_code=404, detail="找不到巡检点")
+
+        point = (
+            db.query(InspectionPoint)
+            .filter(InspectionPoint.system_id == system_id)
+            .order_by(InspectionPoint.id.asc())
+            .first()
+        )
+        if not point:
+            raise HTTPException(status_code=404, detail="找不到巡检点")
+
+        point_name = point.location or point.point_code
+        return {
+            "point_id": point.id,
+            "system_id": point.system_id,
+            "system_name": system.name,
+            "point_code": point.point_code,
+            "point_name": point_name,
+            "location": point.location,
+        }
+
+    # 兼容旧逻辑：二维码为完整 qr_content
+    point = db.query(InspectionPoint).filter(InspectionPoint.qr_content == qr_text).first()
     if not point:
         raise HTTPException(status_code=404, detail="未找到对应巡检点")
+
+    system = db.query(System).filter(System.id == point.system_id).first()
+    point_name = point.location or point.point_code
     return {
         "point_id": point.id,
         "system_id": point.system_id,
+        "system_name": system.name if system else "",
         "point_code": point.point_code,
+        "point_name": point_name,
         "location": point.location,
     }
 
