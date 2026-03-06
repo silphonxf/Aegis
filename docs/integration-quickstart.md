@@ -25,6 +25,19 @@ python3 -m http.server 5174
 ```
 访问：`http://127.0.0.1:5174`
 
+## 3.1 局域网 HTTPS 启动（推荐用于相机/NFC调试）
+```bash
+cd /home/xf/.openclaw/workspace/code/aegis
+./scripts/start_lan_https.sh
+```
+
+启动后示例：
+- `https://<LAN_IP>:5173`（移动端）
+- `https://<LAN_IP>:5174`（后台）
+- `https://<LAN_IP>:8000`（后端）
+
+> 首次访问需信任自签名证书，否则浏览器可能继续拦截相机/NFC能力。
+
 ## 4. 默认账号
 - admin / admin123
 
