@@ -278,6 +278,11 @@ function setQrScanState(text) {
   if ($('qrScanState')) $('qrScanState').textContent = text;
 }
 
+function secureContextHint(feature) {
+  const host = window.location.host;
+  return `${feature} 需要安全上下文（HTTPS或localhost）。当前是 ${host}，请改用 https:// 或在本机 localhost 打开。`;
+}
+
 function stopQrScanner() {
   if (qrScan.timer) {
     clearInterval(qrScan.timer);
@@ -296,12 +301,16 @@ function stopQrScanner() {
 }
 
 async function startQrScanner() {
+  if (!window.isSecureContext) {
+    setQrScanState(secureContextHint('相机扫码'));
+    return;
+  }
   if (!navigator.mediaDevices?.getUserMedia) {
-    setQrScanState('当前浏览器不支持相机调用，请手动输入二维码内容。');
+    setQrScanState('当前浏览器不支持相机调用，请手动输入二维码内容或使用“上传二维码图片识别”。');
     return;
   }
   if (!('BarcodeDetector' in window)) {
-    setQrScanState('当前浏览器不支持 BarcodeDetector，请手动输入二维码内容。');
+    setQrScanState('当前浏览器不支持 BarcodeDetector，请手动输入二维码内容或使用“上传二维码图片识别”。');
     return;
   }
 
@@ -343,6 +352,28 @@ async function startQrScanner() {
   } catch (e) {
     stopQrScanner();
     setQrScanState(`相机调用失败：${e.message || '未知错误'}`);
+  }
+}
+
+async function recognizeQrFromImageFile(file) {
+  if (!file) return;
+  if (!('BarcodeDetector' in window)) {
+    setQrScanState('当前浏览器不支持图片二维码识别，请手动输入二维码内容。');
+    return;
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+    const result = await detector.detect(bitmap);
+    if (result?.length && result[0].rawValue) {
+      $('qrContent').value = result[0].rawValue;
+      setQrScanState('图片识别成功，已填入二维码内容。');
+    } else {
+      setQrScanState('未识别到二维码，请换一张更清晰的图片。');
+    }
+  } catch (e) {
+    setQrScanState(`图片识别失败：${e.message || '未知错误'}`);
   }
 }
 
@@ -395,8 +426,12 @@ function stopNfcScanner() {
 }
 
 async function startNfcScanner() {
+  if (!window.isSecureContext) {
+    setNfcScanState(secureContextHint('NFC 读取'));
+    return;
+  }
   if (!('NDEFReader' in window)) {
-    setNfcScanState('当前设备/浏览器不支持 Web NFC，请手动输入 NFC 标签内容。');
+    setNfcScanState('当前设备/浏览器不支持 Web NFC，请手动输入 NFC 标签内容。建议使用 Android Chrome 最新版并开启 NFC。');
     return;
   }
 
@@ -537,6 +572,12 @@ $('btnStartQrScan').onclick = startQrScanner;
 $('btnStopQrScan').onclick = () => {
   stopQrScanner();
   setQrScanState('已停止扫码，可手动输入二维码内容。');
+};
+$('btnPickQrImage').onclick = () => $('qrImageInput').click();
+$('qrImageInput').onchange = async (e) => {
+  const file = e.target.files?.[0];
+  await recognizeQrFromImageFile(file);
+  e.target.value = '';
 };
 
 $('btnCreateInspection').onclick = async () => {

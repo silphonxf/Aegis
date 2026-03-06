@@ -73,6 +73,10 @@
               <button id="btnStartQrScan">调用相机扫码</button>
               <button id="btnStopQrScan" class="secondary">停止扫码</button>
             </div>
+            <div class="actions one">
+              <button id="btnPickQrImage" class="ghost">上传二维码图片识别（降级）</button>
+              <input id="qrImageInput" type="file" accept="image/*" capture="environment" style="display:none;" />
+            </div>
             <div id="qrScanState" class="hint">可手填二维码，或点击“调用相机扫码”。</div>
             <video id="qrVideo" playsinline muted style="display:none;width:100%;margin-top:8px;border-radius:10px;border:1px solid #1d3a51;background:#071320;"></video>
             <canvas id="qrCanvas" style="display:none;"></canvas>
