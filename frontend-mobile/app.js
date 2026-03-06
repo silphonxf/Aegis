@@ -297,8 +297,8 @@ function stopQrScanner() {
   if (video) {
     video.pause();
     video.srcObject = null;
-    video.style.display = 'none';
   }
+  $('qrScannerOverlay')?.classList.add('hidden');
 }
 
 async function startQrScanner() {
@@ -324,7 +324,7 @@ async function startQrScanner() {
 
     const video = $('qrVideo');
     video.srcObject = qrScan.stream;
-    video.style.display = 'block';
+    $('qrScannerOverlay')?.classList.remove('hidden');
     await video.play();
     setQrScanState('相机已开启，请将二维码放入画面中央。');
 
@@ -573,6 +573,10 @@ $('btnStartQrScan').onclick = startQrScanner;
 $('btnStopQrScan').onclick = () => {
   stopQrScanner();
   setQrScanState('已停止扫码，可手动输入二维码内容。');
+};
+$('btnCloseScanner').onclick = () => {
+  stopQrScanner();
+  setQrScanState('已关闭扫码。');
 };
 $('btnPickQrImage').onclick = () => $('qrImageInput').click();
 $('qrImageInput').onchange = async (e) => {

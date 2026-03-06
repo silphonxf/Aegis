@@ -114,6 +114,52 @@ canvas { width: 100%; border: 1px solid #1d3a51; border-radius: 10px; background
 }
 .status-dot.ok { background: #0f3d36; border-color: #1d7265; color: #9ff3e6; }
 .status-dot.fail { background: #441728; border-color: #8f3358; color: #ffb4ce; }
+.scanner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+}
+.scanner-video {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  background: #000;
+}
+.scanner-mask {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(72vw, 340px);
+  height: min(72vw, 340px);
+  transform: translate(-50%, -50%);
+  border: 2px solid #2dd4bf;
+  border-radius: 16px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
+}
+.scanner-tip {
+  position: absolute;
+  bottom: 92px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #e6f2ff;
+  font-size: 14px;
+}
+.scanner-close {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(10, 24, 36, 0.75);
+  color: #cfe9ff;
+  border: 1px solid #2e5a7d;
+}
+
 @media (max-width: 380px) {
   .grid.two { grid-template-columns: 1fr; }
   .actions { grid-template-columns: 1fr; }

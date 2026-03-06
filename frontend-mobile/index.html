@@ -78,7 +78,6 @@
               <input id="qrImageInput" type="file" accept="image/*" capture="environment" style="display:none;" />
             </div>
             <div id="qrScanState" class="hint">可手填二维码，或点击“调用相机扫码”。</div>
-            <video id="qrVideo" playsinline muted style="display:none;width:100%;margin-top:8px;border-radius:10px;border:1px solid #1d3a51;background:#071320;"></video>
             <canvas id="qrCanvas" style="display:none;"></canvas>
             <div class="actions one">
               <button id="btnCreateInspection">提交巡检</button>
@@ -234,6 +233,13 @@
         </section>
       </main>
     </section>
+  </div>
+
+  <div id="qrScannerOverlay" class="scanner-overlay hidden">
+    <video id="qrVideo" class="scanner-video" playsinline muted></video>
+    <div class="scanner-mask"></div>
+    <div class="scanner-tip">请将二维码放入框内，识别后自动返回</div>
+    <button id="btnCloseScanner" class="scanner-close">关闭</button>
   </div>
 
   <script src="./app.js"></script>
