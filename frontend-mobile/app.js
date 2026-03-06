@@ -306,6 +306,17 @@ function stopQrScanner() {
   $('qrScannerOverlay')?.classList.add('hidden');
 }
 
+function decodeWithJsQR(ctx, canvas) {
+  if (typeof window.jsQR !== 'function') return '';
+  try {
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = window.jsQR(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' });
+    return code?.data || '';
+  } catch {
+    return '';
+  }
+}
+
 async function startQrScanner() {
   if (!window.isSecureContext) {
     setQrScanState(secureContextHint('相机扫码'));
@@ -315,21 +326,32 @@ async function startQrScanner() {
     setQrScanState('当前浏览器不支持相机调用，请更换浏览器或设备后重试。');
     return;
   }
-  if (!('BarcodeDetector' in window)) {
-    setQrScanState('当前浏览器不支持二维码识别能力，请更换浏览器后重试。');
-    return;
-  }
 
   try {
-    if (window.BarcodeDetector.getSupportedFormats) {
-      const formats = await window.BarcodeDetector.getSupportedFormats();
-      if (!formats.includes('qr_code')) {
-        setQrScanState('当前设备不支持 qr_code 识别，请更换设备浏览器。');
-        return;
+    // BarcodeDetector 若可用则优先使用；否则自动降级到 jsQR
+    qrScan.detector = null;
+    if ('BarcodeDetector' in window) {
+      try {
+        if (window.BarcodeDetector.getSupportedFormats) {
+          const formats = await window.BarcodeDetector.getSupportedFormats();
+          if (!formats.includes('qr_code')) {
+            setQrScanState('当前设备原生二维码识别能力受限，已切换兼容识别模式。');
+          } else {
+            qrScan.detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+          }
+        } else {
+          qrScan.detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        }
+      } catch {
+        qrScan.detector = null;
       }
     }
 
-    qrScan.detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+    if (!qrScan.detector && typeof window.jsQR !== 'function') {
+      setQrScanState('二维码识别引擎不可用，请刷新页面后重试。');
+      return;
+    }
+
     qrScan.stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' } },
       audio: false,
@@ -351,18 +373,25 @@ async function startQrScanner() {
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       try {
-        // 先直接识别 video，再识别 canvas，提升兼容性
-        let barcodes = await qrScan.detector.detect(video);
-        if (!barcodes?.length) {
-          barcodes = await qrScan.detector.detect(canvas);
-        }
-        if (barcodes?.length) {
-          const value = barcodes[0].rawValue || '';
-          if (value) {
-            state.qrScanText = value;
-            setQrScanState('扫码成功，已识别二维码并自动返回。');
-            stopQrScanner();
+        let value = '';
+
+        if (qrScan.detector) {
+          // 先直接识别 video，再识别 canvas，提升兼容性
+          let barcodes = await qrScan.detector.detect(video);
+          if (!barcodes?.length) {
+            barcodes = await qrScan.detector.detect(canvas);
           }
+          value = barcodes?.[0]?.rawValue || '';
+        }
+
+        if (!value) {
+          value = decodeWithJsQR(ctx, canvas);
+        }
+
+        if (value) {
+          state.qrScanText = value;
+          setQrScanState('扫码成功，已识别二维码并自动返回。');
+          stopQrScanner();
           return;
         }
 
