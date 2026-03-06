@@ -53,6 +53,26 @@ cd /home/xf/.openclaw/workspace/code/aegis
 
 ## 下一步建议
 
-1. 将达梦环境加入 CI 可选检查（可通过环境变量开关）
-2. 对关键写库接口补充达梦下的集成测试用例
-3. 增加“常见登录误区”说明（区分应用 admin 与数据库账号）
+1. 对关键写库接口补充达梦下的集成测试用例
+2. 增加“常见登录误区”说明（区分应用 admin 与数据库账号）
+
+## 本次新增进展（2026-03-06）
+
+### 4) CI 已接入 + 达梦可选检查
+
+已新增 GitHub Actions 工作流：
+
+- `.github/workflows/backend-ci.yml`
+
+默认行为：
+- 在 `push/pull_request`（backend 相关路径）时运行 SQLite 冒烟检查：
+  - 安装依赖
+  - Alembic 迁移
+  - 启动 API
+  - `GET /healthz`
+
+可选行为（按需开启达梦检查）：
+- 手动触发 `workflow_dispatch` 时将 `run_dm_check=true`
+- 或设置仓库变量 `RUN_DM_CHECK=true`
+- 达梦连接参数走 `secrets`（`DM_HOST/DM_PORT/DM_NAME/DM_USER/DM_PASSWORD`）
+- 调用 `scripts/check_dm_connection.sh` 执行完整达梦连通检查
