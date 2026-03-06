@@ -267,6 +267,8 @@ const qrScan = {
   stream: null,
   timer: null,
   detector: null,
+  attempts: 0,
+  lastError: '',
 };
 
 const nfcScan = {
@@ -294,6 +296,8 @@ function stopQrScanner() {
     qrScan.stream.getTracks().forEach((t) => t.stop());
     qrScan.stream = null;
   }
+  qrScan.attempts = 0;
+  qrScan.lastError = '';
   const video = $('qrVideo');
   if (video) {
     video.pause();
@@ -317,6 +321,14 @@ async function startQrScanner() {
   }
 
   try {
+    if (window.BarcodeDetector.getSupportedFormats) {
+      const formats = await window.BarcodeDetector.getSupportedFormats();
+      if (!formats.includes('qr_code')) {
+        setQrScanState('当前设备不支持 qr_code 识别，请更换设备浏览器。');
+        return;
+      }
+    }
+
     qrScan.detector = new window.BarcodeDetector({ formats: ['qr_code'] });
     qrScan.stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' } },
@@ -334,11 +346,16 @@ async function startQrScanner() {
 
     qrScan.timer = setInterval(async () => {
       if (!video.videoWidth || !video.videoHeight) return;
+      qrScan.attempts += 1;
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       try {
-        const barcodes = await qrScan.detector.detect(canvas);
+        // 先直接识别 video，再识别 canvas，提升兼容性
+        let barcodes = await qrScan.detector.detect(video);
+        if (!barcodes?.length) {
+          barcodes = await qrScan.detector.detect(canvas);
+        }
         if (barcodes?.length) {
           const value = barcodes[0].rawValue || '';
           if (value) {
@@ -346,11 +363,20 @@ async function startQrScanner() {
             setQrScanState('扫码成功，已识别二维码并自动返回。');
             stopQrScanner();
           }
+          return;
         }
-      } catch {
-        // keep scanning
+
+        if (qrScan.attempts % 12 === 0) {
+          setQrScanState('正在识别二维码…请保持光线充足并将二维码放入框内。');
+        }
+      } catch (e) {
+        const msg = e?.message || '识别异常';
+        if (msg !== qrScan.lastError) {
+          qrScan.lastError = msg;
+          setQrScanState(`识别中断，正在重试：${msg}`);
+        }
       }
-    }, 400);
+    }, 280);
   } catch (e) {
     stopQrScanner();
     setQrScanState(`相机调用失败：${e.message || '未知错误'}`);
