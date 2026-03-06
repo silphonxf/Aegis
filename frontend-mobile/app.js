@@ -8,6 +8,8 @@ const state = {
   chartTimer: null,
   extractedErrors: [],
   profile: JSON.parse(localStorage.getItem('aegis_profile') || '{}'),
+  statusSystems: [],
+  selectedStatusSystemId: null,
 };
 
 function getBase() {
@@ -87,7 +89,11 @@ function initSubNavigation() {
   };
   $('btnBackFromUser').onclick = () => switchPanel('panel-inspection');
   $('btnGoNfc').onclick = () => showSub('panel-inspection', 'inspection-nfc');
-  $('btnGoStatus').onclick = () => { showSub('panel-selfcheck', 'selfcheck-status'); startStatusLoop(); };
+  $('btnGoStatus').onclick = () => {
+    showSub('panel-selfcheck', 'selfcheck-status');
+    state.metricSeries = { cpu: [], mem: [], disk: [] };
+    startStatusLoop();
+  };
   $('btnGoSelfForm').onclick = () => showSub('panel-selfcheck', 'selfcheck-form');
   $('btnGoErrorLogs').onclick = () => showSub('panel-selfcheck', 'selfcheck-errors');
   $('btnGoPing').onclick = () => showSub('panel-toolbox', 'toolbox-ping');
@@ -180,18 +186,59 @@ function renderCharts() {
   drawLine('diskChart', state.metricSeries.disk, '#fb7185');
 }
 
+function renderStatusSystemOptions() {
+  const sel = $('scStatusSystem');
+  if (!sel) return;
+  const current = state.selectedStatusSystemId;
+
+  sel.innerHTML = '';
+  if (!state.statusSystems.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '暂无系统可选';
+    sel.appendChild(opt);
+    state.selectedStatusSystemId = null;
+    if ($('statusSystemHint')) $('statusSystemHint').textContent = '未查询到系统，请先在后台创建系统或采集快照。';
+    return;
+  }
+
+  state.statusSystems.forEach((item) => {
+    const opt = document.createElement('option');
+    opt.value = String(item.system_id);
+    opt.textContent = `${item.system_name}（${item.system_code || 'N/A'}）`;
+    sel.appendChild(opt);
+  });
+
+  const hasCurrent = state.statusSystems.some((s) => Number(s.system_id) === Number(current));
+  state.selectedStatusSystemId = hasCurrent ? Number(current) : Number(state.statusSystems[0].system_id);
+  sel.value = String(state.selectedStatusSystemId);
+}
+
 async function refreshStatusBase() {
   try {
     const data = await api('/api/v1/monitoring/overview', { headers: authHeaders() });
-    const cpu = data?.summary?.cpu_usage_percent ?? data?.cpu_usage_percent ?? (Math.random() * 100);
-    const mem = data?.summary?.mem_usage_percent ?? data?.mem_usage_percent ?? (Math.random() * 100);
-    const disk = data?.summary?.disk_usage_percent ?? data?.disk_usage_percent ?? (Math.random() * 100);
+    state.statusSystems = Array.isArray(data?.items) ? data.items : [];
+    renderStatusSystemOptions();
+
+    const selected = state.statusSystems.find((i) => Number(i.system_id) === Number(state.selectedStatusSystemId));
+    const target = selected || state.statusSystems[0] || {};
+
+    if ($('statusSystemHint')) {
+      $('statusSystemHint').textContent = target.system_id
+        ? `当前系统：${target.system_name || target.system_code || target.system_id}`
+        : '未查询到系统，请先在后台创建系统或采集快照。';
+    }
+
+    const cpu = target?.cpu_usage ?? (Math.random() * 100);
+    const mem = target?.mem_usage ?? (Math.random() * 100);
+    const disk = target?.disk_usage ?? (Math.random() * 100);
     pushMetric('cpu', cpu); pushMetric('mem', mem); pushMetric('disk', disk);
     renderCharts();
   } catch {
     pushMetric('cpu', 40 + Math.random() * 30);
     pushMetric('mem', 35 + Math.random() * 35);
     pushMetric('disk', 45 + Math.random() * 25);
+    if ($('statusSystemHint')) $('statusSystemHint').textContent = '状态接口调用失败，已展示本地模拟曲线。';
     renderCharts();
   }
 }
@@ -540,6 +587,10 @@ $('btnSubmitNfc').onclick = async () => {
 };
 
 // selfcheck
+$('scStatusSystem').onchange = () => {
+  state.selectedStatusSystemId = Number($('scStatusSystem').value || 0) || null;
+  refreshStatusBase();
+};
 $('btnRefreshStatus').onclick = refreshStatusBase;
 
 $('btnCreateSelfcheck').onclick = async () => {

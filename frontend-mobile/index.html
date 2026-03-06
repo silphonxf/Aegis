@@ -113,6 +113,12 @@
 
           <section class="card hidden" data-sub="selfcheck-status">
             <div class="card-head"><h2>系统性能状态（动态）</h2><button class="ghost small" data-back="selfcheck-home">返回</button></div>
+            <div class="grid two">
+              <label class="full">选择系统
+                <select id="scStatusSystem"></select>
+              </label>
+            </div>
+            <div id="statusSystemHint" class="hint">请先选择系统，再查看状态曲线。</div>
             <div class="actions one"><button id="btnRefreshStatus">刷新基线数据</button></div>
             <div class="charts">
               <div><h3>CPU</h3><canvas id="cpuChart" width="360" height="130"></canvas></div>
