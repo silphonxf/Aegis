@@ -55,6 +55,7 @@ cd /home/xf/.openclaw/workspace/code/aegis
 
 1. 对关键写库接口补充达梦下的集成测试用例
 2. 增加“常见登录误区”说明（区分应用 admin 与数据库账号）
+3. 离线规则库从当前 6 条扩充到 20+ 条，并补充误报/漏报回归样例
 
 ## 本次新增进展（2026-03-06）
 
@@ -76,3 +77,22 @@ cd /home/xf/.openclaw/workspace/code/aegis
 - 或设置仓库变量 `RUN_DM_CHECK=true`
 - 达梦连接参数走 `secrets`（`DM_HOST/DM_PORT/DM_NAME/DM_USER/DM_PASSWORD`）
 - 调用 `scripts/check_dm_connection.sh` 执行完整达梦连通检查
+
+### 5) AI离线错误日志分析（Phase 1 MVP）
+
+已新增离线分析数据模型与接口（规则引擎版本）：
+
+- 新增表：
+  - `offline_analysis_tasks`
+  - `offline_analysis_results`
+- Alembic：`backend/alembic/versions/20260306_09_offline_analysis_tables.py`
+- 新增模型：`backend/app/models/offline_analysis.py`
+- 新增接口（`/api/v1/ai/offline/*`）：
+  - `POST /api/v1/ai/offline/analyze`
+  - `GET /api/v1/ai/offline/tasks`
+  - `GET /api/v1/ai/offline/tasks/{task_id}`
+
+规则引擎能力（首版）：
+- 内置 6 条高频规则（数据库连接失败、磁盘满、OOM、端口冲突、鉴权失败、超时）
+- 输出：命中规则、风险等级、摘要、处置建议、日志摘录
+- 已本地联调验证通过（admin 登录后可调用离线分析接口）

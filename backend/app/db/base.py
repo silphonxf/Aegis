@@ -2,6 +2,7 @@ from app.models.ai_diagnosis import AIDiagnosis
 from app.models.asset import Asset
 from app.models.audit import AuditLog
 from app.models.inspection import InspectionPoint, InspectionRecord
+from app.models.offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from app.models.rule import StatusRule
 from app.models.selfcheck import ChecklistTemplate, SelfcheckRecord
 from app.models.system import System, SystemStatusSnapshot
@@ -14,6 +15,8 @@ __all__ = [
     "System",
     "InspectionPoint",
     "InspectionRecord",
+    "OfflineAnalysisTask",
+    "OfflineAnalysisResult",
     "ChecklistTemplate",
     "SelfcheckRecord",
     "SystemStatusSnapshot",

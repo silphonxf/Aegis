@@ -3,6 +3,7 @@ from .asset import Asset
 from .audit import AuditLog
 from .base import Base
 from .inspection import InspectionPoint, InspectionRecord
+from .offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from .rule import StatusRule
 from .selfcheck import ChecklistTemplate, SelfcheckRecord
 from .system import System, SystemStatusSnapshot
@@ -17,6 +18,8 @@ __all__ = [
     "SystemStatusSnapshot",
     "InspectionPoint",
     "InspectionRecord",
+    "OfflineAnalysisTask",
+    "OfflineAnalysisResult",
     "ChecklistTemplate",
     "SelfcheckRecord",
     "AuditLog",
