@@ -63,7 +63,6 @@
           <section class="card hidden" data-sub="inspection-qr">
             <div class="card-head"><h2>二维码巡检</h2><button class="ghost small" data-back="inspection-home">返回</button></div>
             <div class="grid two">
-              <label class="full">扫码内容<input id="qrContent" value="QR://DEMO-SYS-001/P-001" /></label>
               <label>结果
                 <select id="insResult"><option value="normal">正常</option><option value="abnormal">异常</option></select>
               </label>
@@ -73,11 +72,7 @@
               <button id="btnStartQrScan">调用相机扫码</button>
               <button id="btnStopQrScan" class="secondary">停止扫码</button>
             </div>
-            <div class="actions one">
-              <button id="btnPickQrImage" class="ghost">上传二维码图片识别（降级）</button>
-              <input id="qrImageInput" type="file" accept="image/*" capture="environment" style="display:none;" />
-            </div>
-            <div id="qrScanState" class="hint">可手填二维码，或点击“调用相机扫码”。</div>
+            <div id="qrScanState" class="hint">点击“调用相机扫码”，识别后自动返回。</div>
             <canvas id="qrCanvas" style="display:none;"></canvas>
             <div class="actions one">
               <button id="btnCreateInspection">提交巡检</button>

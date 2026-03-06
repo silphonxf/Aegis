@@ -11,6 +11,7 @@ const state = {
   statusSystems: [],
   selectedStatusSystemId: null,
   nfcTagText: 'NFC://DEMO-SYS-001/P-002',
+  qrScanText: '',
 };
 
 function getBase() {
@@ -307,11 +308,11 @@ async function startQrScanner() {
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia) {
-    setQrScanState('当前浏览器不支持相机调用，请手动输入二维码内容或使用“上传二维码图片识别”。');
+    setQrScanState('当前浏览器不支持相机调用，请更换浏览器或设备后重试。');
     return;
   }
   if (!('BarcodeDetector' in window)) {
-    setQrScanState('当前浏览器不支持 BarcodeDetector，请手动输入二维码内容或使用“上传二维码图片识别”。');
+    setQrScanState('当前浏览器不支持二维码识别能力，请更换浏览器后重试。');
     return;
   }
 
@@ -341,8 +342,8 @@ async function startQrScanner() {
         if (barcodes?.length) {
           const value = barcodes[0].rawValue || '';
           if (value) {
-            $('qrContent').value = value;
-            setQrScanState('扫码成功，已自动填入二维码内容。');
+            state.qrScanText = value;
+            setQrScanState('扫码成功，已识别二维码并自动返回。');
             stopQrScanner();
           }
         }
@@ -353,28 +354,6 @@ async function startQrScanner() {
   } catch (e) {
     stopQrScanner();
     setQrScanState(`相机调用失败：${e.message || '未知错误'}`);
-  }
-}
-
-async function recognizeQrFromImageFile(file) {
-  if (!file) return;
-  if (!('BarcodeDetector' in window)) {
-    setQrScanState('当前浏览器不支持图片二维码识别，请手动输入二维码内容。');
-    return;
-  }
-
-  try {
-    const bitmap = await createImageBitmap(file);
-    const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
-    const result = await detector.detect(bitmap);
-    if (result?.length && result[0].rawValue) {
-      $('qrContent').value = result[0].rawValue;
-      setQrScanState('图片识别成功，已填入二维码内容。');
-    } else {
-      setQrScanState('未识别到二维码，请换一张更清晰的图片。');
-    }
-  } catch (e) {
-    setQrScanState(`图片识别失败：${e.message || '未知错误'}`);
   }
 }
 
@@ -432,7 +411,7 @@ async function startNfcScanner() {
     return;
   }
   if (!('NDEFReader' in window)) {
-    setNfcScanState('当前设备/浏览器不支持 Web NFC，请手动输入 NFC 标签内容。建议使用 Android Chrome 最新版并开启 NFC。');
+    setNfcScanState('当前设备/浏览器不支持 Web NFC。建议使用 Android Chrome 最新版并开启 NFC。');
     return;
   }
 
@@ -572,23 +551,17 @@ Array.from(document.querySelectorAll('.menu-tabs .tab')).forEach((tab) => {
 $('btnStartQrScan').onclick = startQrScanner;
 $('btnStopQrScan').onclick = () => {
   stopQrScanner();
-  setQrScanState('已停止扫码，可手动输入二维码内容。');
+  setQrScanState('已停止扫码。');
 };
 $('btnCloseScanner').onclick = () => {
   stopQrScanner();
   setQrScanState('已关闭扫码。');
 };
-$('btnPickQrImage').onclick = () => $('qrImageInput').click();
-$('qrImageInput').onchange = async (e) => {
-  const file = e.target.files?.[0];
-  await recognizeQrFromImageFile(file);
-  e.target.value = '';
-};
 
 $('btnCreateInspection').onclick = async () => {
   try {
-    const qrText = $('qrContent').value.trim();
-    if (!qrText) throw new Error('请先填写扫码内容');
+    const qrText = (state.qrScanText || '').trim();
+    if (!qrText) throw new Error('请先调用相机完成二维码扫描');
 
     const resolved = await api(`/api/v1/inspections/points/resolve?qr_content=${encodeURIComponent(qrText)}`, { headers: authHeaders() });
     const payload = {
@@ -606,7 +579,7 @@ $('btnCreateInspection').onclick = async () => {
 $('btnStartNfcScan').onclick = startNfcScanner;
 $('btnStopNfcScan').onclick = () => {
   stopNfcScanner();
-  setNfcScanState('已停止 NFC 读取，可手动输入标签内容。');
+  setNfcScanState('已停止 NFC 读取。');
 };
 
 $('btnSubmitNfc').onclick = async () => {
