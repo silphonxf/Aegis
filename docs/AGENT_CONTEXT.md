@@ -75,6 +75,8 @@ Aegis 是一个运维助手系统，包含：
 ## 7. 最近更新记录（倒序）
 
 ### 2026-03-06
+- 移动端自检-系统状态页新增系统选择框（支持按系统查看CPU/MEM/DISK）
+- 同步时间：2026-03-06 13:46:23 +0800
 - 接续开发：新增 CI 工作流 `.github/workflows/backend-ci.yml`
 - 默认跑 SQLite 冒烟检查（迁移 + 启动 + healthz）
 - 新增达梦可选检查开关：`workflow_dispatch.run_dm_check` 或仓库变量 `RUN_DM_CHECK=true`
