@@ -1,13 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE="${1:-http://127.0.0.1:8000}"
-USER="${2:-admin}"
-PASS="${3:-admin123}"
+BASE="${1:-${SMOKE_BASE:-http://127.0.0.1:8000}}"
+USER="${2:-${SMOKE_USER:-admin}}"
+PASS="${3:-${SMOKE_PASS:-}}"
+
+if [[ -z "$PASS" ]]; then
+  echo "❌ 缺少登录密码：请通过第3个参数或环境变量 SMOKE_PASS 提供。"
+  echo "   示例: ./scripts/iteration3_smoke.sh http://127.0.0.1:8000 admin 'your-password'"
+  exit 1
+fi
 
 echo "[1/7] login"
-TOKEN=$(curl -sS -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
-  -d "{\"username\":\"$USER\",\"password\":\"$PASS\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+LOGIN_RESP=$(curl -sS -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
+  -d "{\"username\":\"$USER\",\"password\":\"$PASS\"}")
+TOKEN=$(python3 - <<'PY'
+import json,sys
+raw=sys.stdin.read().strip()
+try:
+    data=json.loads(raw)
+except Exception:
+    print("")
+    sys.exit(0)
+print(data.get("access_token", ""))
+PY
+<<< "$LOGIN_RESP")
+
+if [[ -z "$TOKEN" ]]; then
+  echo "❌ 登录失败，未获取到 access_token。响应如下："
+  echo "$LOGIN_RESP"
+  exit 1
+fi
+
 AUTH="Authorization: Bearer $TOKEN"
 
 echo "[2/7] toolbox ping"
