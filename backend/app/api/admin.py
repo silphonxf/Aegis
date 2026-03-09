@@ -277,8 +277,25 @@ def batch_create_assets(
     created = []
     skipped = []
 
+    seen_codes: set[str] = set()
+    items_to_create = []
     for item in payload.items:
-        if db.query(Asset).filter(Asset.asset_code == item.asset_code).first():
+        code = item.asset_code.strip()
+        if code in seen_codes:
+            skipped.append({"asset_code": code, "reason": "BATCH_DUPLICATE"})
+            continue
+        seen_codes.add(code)
+        items_to_create.append(item)
+
+    existing_codes = set()
+    if items_to_create:
+        existing_codes = {
+            row[0]
+            for row in db.query(Asset.asset_code).filter(Asset.asset_code.in_([it.asset_code for it in items_to_create])).all()
+        }
+
+    for item in items_to_create:
+        if item.asset_code in existing_codes:
             skipped.append({"asset_code": item.asset_code, "reason": "ASSET_EXISTS"})
             continue
         asset = Asset(**item.model_dump())
