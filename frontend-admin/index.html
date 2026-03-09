@@ -3,234 +3,361 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>运维助手 - 管理后台联调版</title>
+  <title>运维助手 - 管理后台</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <header><h1>运维助手（管理后台） <span class="badge">v1.0.0</span></h1></header>
-  <main>
-    <section class="card">
-      <h2>登录</h2>
-      <input id="apiBase" value="http://127.0.0.1:8000" />
-      <input id="username" value="admin" />
-      <input id="password" type="password" value="admin123" />
+  <section id="loginView" class="login-view">
+    <div class="login-card">
+      <div class="brand-pill">Aegis Admin</div>
+      <h1>运维助手管理后台</h1>
+      <p class="muted">请先登录后进入主界面</p>
+      <input id="username" value="admin" placeholder="用户名" />
+      <input id="password" type="password" value="admin123" placeholder="密码" />
       <button id="btnLogin">登录</button>
-      <p id="state"></p>
-    </section>
+      <p id="state" class="state-text"></p>
+    </div>
+  </section>
 
-    <section class="card">
-      <h2>全局看板（系统 + 资产）</h2>
-      <div class="grid2">
-        <button id="btnMonitoring">刷新监控总览</button>
-        <button id="btnExportAbnormal">导出异常清单 CSV</button>
+  <div id="appView" class="app-shell hidden">
+    <aside class="sidebar">
+      <div>
+        <h2>运维助手</h2>
+        <p class="subtitle">Admin Console</p>
       </div>
-      <div class="grid2">
-        <button id="btnAssetSummary">刷新资产概览</button>
-        <button id="btnRefreshDashboard">一键刷新全看板</button>
-      </div>
-      <div class="grid2">
-        <button id="btnCollectLocal">采集本机监控样本</button>
-        <input id="localSystemCode" placeholder="system_code(默认 HOST-LOCAL-001)" value="HOST-LOCAL-001" />
-      </div>
-      <h3>系统状态</h3>
-      <div class="kpis">
-        <div class="kpi green"><span>绿色</span><strong id="kpiGreen">0</strong></div>
-        <div class="kpi yellow"><span>黄色</span><strong id="kpiYellow">0</strong></div>
-        <div class="kpi red"><span>红色</span><strong id="kpiRed">0</strong></div>
-        <div class="kpi total"><span>总系统</span><strong id="kpiTotal">0</strong></div>
-      </div>
-      <h3>资产概览</h3>
-      <div class="kpis">
-        <div class="kpi total"><span>总资产</span><strong id="assetTotal">0</strong></div>
-        <div class="kpi green"><span>在用</span><strong id="assetInUse">0</strong></div>
-        <div class="kpi yellow"><span>维修中</span><strong id="assetRepair">0</strong></div>
-        <div class="kpi red"><span>停用</span><strong id="assetRetired">0</strong></div>
-      </div>
-      <pre id="assetSummary"></pre>
-      <pre id="monitoring"></pre>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th><th>系统</th><th>环境</th><th>状态</th><th>CPU</th><th>MEM</th><th>DISK</th><th>采集时间</th>
-            </tr>
-          </thead>
-          <tbody id="abnormalTbody"></tbody>
-        </table>
-      </div>
-    </section>
+      <nav class="menu-list">
+        <button class="menu-btn active" data-section="panel-dashboard"><span class="menu-icon">📊</span><span class="menu-label">总览看板</span></button>
+        <button class="menu-btn" data-section="panel-user-system"><span class="menu-icon">👥</span><span class="menu-label">用户与系统</span></button>
+        <button class="menu-btn" data-section="panel-assets"><span class="menu-icon">🗂️</span><span class="menu-label">资产管理</span></button>
+        <button class="menu-btn" data-section="panel-tools-ai"><span class="menu-icon">🧰</span><span class="menu-label">高级工具</span></button>
+      </nav>
+      <button id="btnLogout" class="logout-btn">退出登录</button>
+    </aside>
 
-    <section class="card">
-      <h2>用户管理</h2>
-      <input id="newUserName" placeholder="username" />
-      <input id="newUserPassword" placeholder="password" type="password" />
-      <select id="newUserRole"><option value="inspector">inspector</option><option value="admin">admin</option><option value="super_admin">super_admin</option></select>
-      <div class="grid2">
-        <button id="btnCreateUser">创建用户</button>
-        <button id="btnListUsers">刷新用户列表</button>
-      </div>
-      <pre id="userCreateResult"></pre>
-      <pre id="userListResult"></pre>
-    </section>
+    <main class="workspace">
+      <header class="workspace-header">
+        <h1>管理工作台 <span class="badge">v2.1 Tech</span></h1>
+        <div class="header-meta">
+          <button id="btnToggleAutoRefresh" class="toggle-btn">切换手动刷新</button>
+          <span id="liveStatus" class="live-status on">● 自动刷新开启</span>
+          <span id="lastUpdated" class="last-updated">最近更新：--</span>
+        </div>
+      </header>
 
-    <section class="card">
-      <h2>系统管理</h2>
-      <input id="newSystemCode" placeholder="system_code" />
-      <input id="newSystemName" placeholder="name" />
-      <input id="newSystemEnv" placeholder="env (prod/test/dev)" value="prod" />
-      <div class="grid2">
-        <button id="btnCreateSystem">创建系统</button>
-        <button id="btnListSystems">刷新系统列表</button>
-      </div>
-      <pre id="systemCreateResult"></pre>
-      <pre id="systemListResult"></pre>
-    </section>
+      <section id="panel-dashboard" class="panel active">
+        <section class="card">
+          <h2>全局看板（系统 + 资产）</h2>
+          <div class="grid2">
+            <button id="btnRefreshDashboard">刷新看板</button>
+            <button id="btnExportAbnormal">导出异常清单 CSV</button>
+          </div>
+          <div class="grid2">
+            <button id="btnCollectLocal">采集本机监控样本</button>
+          </div>
 
-    <section class="card">
-      <h2>自检模板管理</h2>
-      <input id="tplSystemId" placeholder="system_id" />
-      <select id="tplCheckType"><option value="daily">daily</option><option value="weekly">weekly</option><option value="yearly">yearly</option></select>
-      <input id="tplName" placeholder="模板名称" />
-      <div class="grid2">
-        <button id="btnCreateTemplate">创建模板</button>
-        <button id="btnListTemplates">刷新模板列表</button>
-      </div>
-      <pre id="templateCreateResult"></pre>
-      <pre id="templateListResult"></pre>
-    </section>
+          <h3>系统状态</h3>
+          <div class="grid2 table-filters">
+            <select id="systemSelect"></select>
+            <input id="systemSearchKeyword" placeholder="输入关键词筛选系统（编号/名称）" />
+            <button id="btnSystemSearch" type="button">筛选</button>
+            <button id="btnSystemReset" type="button">重置</button>
+          </div>
+          <div class="kpis">
+            <div class="kpi green"><span>绿色</span><strong id="kpiGreen" class="digit-roll">0</strong></div>
+            <div class="kpi yellow"><span>黄色</span><strong id="kpiYellow" class="digit-roll">0</strong></div>
+            <div class="kpi red"><span>红色</span><strong id="kpiRed" class="digit-roll">0</strong></div>
+            <div class="kpi total"><span>总系统</span><strong id="kpiTotal" class="digit-roll">0</strong></div>
+          </div>
 
-    <section class="card">
-      <h2>状态快照上报（自动算红黄绿）</h2>
-      <input id="snapSystemId" placeholder="system_id" />
-      <div class="grid2">
-        <input id="snapHostOnline" placeholder="host_online(normal/abnormal/unknown)" value="normal" />
-        <input id="snapPortOk" placeholder="port_ok(normal/abnormal/unknown)" value="normal" />
-        <input id="snapCpu" type="number" placeholder="cpu_usage(%)" value="60" />
-        <input id="snapMem" type="number" placeholder="mem_usage(%)" value="65" />
-        <input id="snapDisk" type="number" placeholder="disk_usage(%)" value="70" />
-        <input id="snapSelfcheck" placeholder="last_selfcheck_result(normal/warning/critical/unknown)" value="normal" />
-      </div>
-      <button id="btnCreateSnapshot">提交状态快照</button>
-      <pre id="snapshotResult"></pre>
-    </section>
+          <div class="tech-metrics">
+            <div class="tech-meter">
+              <div class="tech-head"><span>CPU 负载</span><b id="metricCpuText">0%</b></div>
+              <div class="meter-track"><i id="metricCpuBar"></i></div>
+              <canvas id="sparkCpu" class="sparkline" width="220" height="40"></canvas>
+            </div>
+            <div class="tech-meter">
+              <div class="tech-head"><span>内存占用</span><b id="metricMemText">0%</b></div>
+              <div class="meter-track"><i id="metricMemBar"></i></div>
+              <canvas id="sparkMem" class="sparkline" width="220" height="40"></canvas>
+            </div>
+            <div class="tech-meter">
+              <div class="tech-head"><span>磁盘占用</span><b id="metricDiskText">0%</b></div>
+              <div class="meter-track"><i id="metricDiskBar"></i></div>
+              <canvas id="sparkDisk" class="sparkline" width="220" height="40"></canvas>
+            </div>
+          </div>
 
-    <section class="card">
-      <h2>资产管理（迭代2）</h2>
-      <div class="grid3">
-        <input id="assetCode" placeholder="asset_code" />
-        <input id="assetName" placeholder="name" />
-        <input id="assetCategory" placeholder="category" value="server" />
-      </div>
-      <div class="grid3">
-        <input id="assetSystemId" placeholder="system_id (可空)" />
-        <input id="assetLocation" placeholder="location" />
-        <input id="assetStatus" placeholder="status" value="in_use" />
-      </div>
-      <div class="grid2">
-        <button id="btnCreateAsset">创建资产</button>
-        <button id="btnListAssets">刷新资产列表</button>
-      </div>
-      <div class="grid4">
-        <input id="assetFilterSystemId" placeholder="筛选: system_id" />
-        <input id="assetFilterCategory" placeholder="筛选: category" />
-        <input id="assetFilterStatus" placeholder="筛选: status" />
-        <input id="assetFilterKeyword" placeholder="筛选: keyword" />
-      </div>
-      <div class="grid2">
-        <button id="btnAssetExport">按筛选导出资产 CSV</button>
-        <button id="btnAssetFilterClear">清空资产筛选</button>
-      </div>
-      <p>批量导入 JSON（数组）：</p>
-      <textarea id="assetBatchJson" rows="6" style="width:100%;padding:10px;">[
+          <h3>资产概览</h3>
+          <div class="kpis">
+            <div class="kpi total"><span>总资产</span><strong id="assetTotal" class="digit-roll">0</strong></div>
+            <div class="kpi green"><span>在用</span><strong id="assetInUse" class="digit-roll">0</strong></div>
+            <div class="kpi yellow"><span>维修中</span><strong id="assetRepair" class="digit-roll">0</strong></div>
+            <div class="kpi red"><span>停用</span><strong id="assetRetired" class="digit-roll">0</strong></div>
+          </div>
+          <div class="grid2 table-filters">
+            <select id="abnormalColorFilter">
+              <option value="all">全部状态</option>
+              <option value="red">仅红色</option>
+              <option value="yellow">仅黄色</option>
+              <option value="red,yellow">仅红黄</option>
+              <option value="green">仅绿色</option>
+            </select>
+            <input id="abnormalKeyword" placeholder="筛选系统名/编号关键词" />
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>系统</th><th>环境</th><th>状态</th><th>CPU</th><th>MEM</th><th>DISK</th><th>采集时间</th>
+                </tr>
+              </thead>
+              <tbody id="abnormalTbody"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="panel-user-system" class="panel">
+        <section class="card">
+          <h2>用户管理</h2>
+          <div class="grid2">
+            <button id="btnOpenCreateUserModal">新增用户</button>
+            <button id="btnFindUsers">查找用户</button>
+          </div>
+          <label>用户名关键词（模糊查询）
+            <input id="userSearchKeyword" placeholder="输入用户名关键词，例如 admin" />
+          </label>
+          <div id="userListSummary" class="result-line">匹配 0 条</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>序号</th><th>用户名</th><th>角色</th><th>ID</th></tr></thead>
+              <tbody id="userListTbody"><tr><td colspan="4">暂无数据</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>系统管理</h2>
+          <div class="grid2">
+            <button id="btnOpenCreateSystemModal">新增系统</button>
+            <button id="btnFindSystems">查找系统</button>
+          </div>
+          <label>系统关键词（编号/名称，模糊查询）
+            <input id="systemSearchKeyword2" placeholder="输入关键词，例如 DEMO / 业务系统" />
+          </label>
+          <div id="systemListSummary" class="result-line">匹配 0 条</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>环境</th></tr></thead>
+              <tbody id="systemListTbody"><tr><td colspan="4">暂无数据</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="panel-assets" class="panel">
+        <section class="card">
+          <h2>资产管理（迭代2）</h2>
+          <div class="grid3">
+            <input id="assetCode" placeholder="asset_code" />
+            <input id="assetName" placeholder="name" />
+            <input id="assetCategory" placeholder="category" value="server" />
+          </div>
+          <div class="grid3">
+            <input id="assetSystemId" placeholder="system_id (可空)" />
+            <input id="assetLocation" placeholder="location" />
+            <input id="assetStatus" placeholder="status" value="in_use" />
+          </div>
+          <div class="grid2">
+            <button id="btnCreateAsset">创建资产</button>
+            <button id="btnListAssets">刷新资产列表</button>
+          </div>
+          <div class="grid4">
+            <input id="assetFilterSystemId" placeholder="筛选: system_id" />
+            <input id="assetFilterCategory" placeholder="筛选: category" />
+            <input id="assetFilterStatus" placeholder="筛选: status" />
+            <input id="assetFilterKeyword" placeholder="筛选: keyword" />
+          </div>
+          <div class="grid2">
+            <button id="btnAssetExport">按筛选导出资产 CSV</button>
+            <button id="btnAssetFilterClear">清空资产筛选</button>
+          </div>
+          <p>批量导入 JSON（数组）：</p>
+          <textarea id="assetBatchJson" rows="6" style="width:100%;padding:10px;">[
   {"asset_code":"AST-001","name":"应用服务器01","category":"server","system_id":1,"location":"机房A","status":"in_use"}
 ]</textarea>
-      <button id="btnBatchAssets">批量导入资产</button>
-      <pre id="assetResult"></pre>
-      <pre id="assetListResult"></pre>
-    </section>
+          <button id="btnBatchAssets">批量导入资产</button>
+          <pre id="assetResult"></pre>
+          <pre id="assetListResult"></pre>
+        </section>
+      </section>
 
-    <section class="card">
-      <h2>状态规则配置（后端版）</h2>
-      <div class="grid2">
-        <label>CPU 黄阈值(%)<input id="cpuWarn" type="number" value="70" /></label>
-        <label>CPU 红阈值(%)<input id="cpuCritical" type="number" value="90" /></label>
-        <label>内存 黄阈值(%)<input id="memWarn" type="number" value="75" /></label>
-        <label>内存 红阈值(%)<input id="memCritical" type="number" value="90" /></label>
-        <label>磁盘 黄阈值(%)<input id="diskWarn" type="number" value="80" /></label>
-        <label>磁盘 红阈值(%)<input id="diskCritical" type="number" value="95" /></label>
-      </div>
-      <div class="grid2">
-        <button id="btnLoadRules">读取后端规则</button>
-        <button id="btnSaveRules">保存到后端</button>
-      </div>
-      <pre id="ruleResult"></pre>
-    </section>
+      <section id="panel-tools-ai" class="panel">
+        <section class="card">
+          <h2>高级工具</h2>
+          <p class="muted">低频功能已收纳到这里，按需使用。</p>
+          <div class="tool-tabs">
+            <button class="tool-tab active" data-tool="tool-ops" data-desc="处理工具任务审批与状态流转。">运维审批</button>
+            <button class="tool-tab" data-tool="tool-ai" data-desc="查看 AI 诊断记录，按严重级别筛选。">AI诊断</button>
+            <button class="tool-tab" data-tool="tool-template" data-desc="维护自检模板并上报系统状态快照。">模板与快照</button>
+            <button class="tool-tab" data-tool="tool-rules" data-desc="调整状态规则并查询审计日志。">规则与审计</button>
+            <button class="tool-tab" data-tool="tool-debug" data-desc="查看错误码说明和接口调试历史。">调试与错误码</button>
+          </div>
+          <p id="toolHint" class="muted">处理工具任务审批与状态流转。</p>
 
-    <section class="card">
-      <h2>审计日志（支持筛选）</h2>
-      <div class="grid3">
-        <input id="auditAction" placeholder="action，例如 create_user" />
-        <input id="auditUsername" placeholder="username，例如 admin" />
-        <input id="auditResource" placeholder="resource，例如 system" />
-      </div>
-      <div class="grid3">
-        <input id="auditStartAt" placeholder="start_at，例如 2026-02-25T00:00:00" />
-        <input id="auditEndAt" placeholder="end_at，例如 2026-02-25T23:59:59" />
-        <input id="auditKeyword" placeholder="keyword（detail模糊匹配）" />
-      </div>
-      <div class="grid2">
-        <button id="btnAudit">按筛选读取审计日志</button>
-        <button id="btnAuditClear">清空筛选</button>
-      </div>
-      <pre id="audit"></pre>
-    </section>
+          <div id="tool-ops" class="tool-pane active">
+            <div class="grid4">
+              <input id="toolTaskStatusFilter" placeholder="筛选status，如 pending_approval" />
+              <input id="toolTaskId" placeholder="task_id" />
+              <select id="toolTaskActionStatus"><option value="approved">approved</option><option value="rejected">rejected</option><option value="done">done</option></select>
+              <input id="toolTaskNote" placeholder="备注（可选）" />
+            </div>
+            <div class="grid2">
+              <button id="btnToolTaskList">刷新工具任务</button>
+              <button id="btnToolTaskUpdate">更新任务状态</button>
+            </div>
+            <pre id="toolTaskResult"></pre>
+          </div>
 
-    <section class="card">
-      <h2>工具任务审批（迭代3）</h2>
-      <div class="grid4">
-        <input id="toolTaskStatusFilter" placeholder="筛选status，如 pending_approval" />
-        <input id="toolTaskId" placeholder="task_id" />
-        <select id="toolTaskActionStatus"><option value="approved">approved</option><option value="rejected">rejected</option><option value="done">done</option></select>
-        <input id="toolTaskNote" placeholder="备注（可选）" />
-      </div>
-      <div class="grid2">
-        <button id="btnToolTaskList">刷新工具任务</button>
-        <button id="btnToolTaskUpdate">更新任务状态</button>
-      </div>
-      <pre id="toolTaskResult"></pre>
-    </section>
+          <div id="tool-ai" class="tool-pane">
+            <div class="grid2">
+              <input id="diagSeverityFilter" placeholder="severity筛选：low/medium/high" />
+              <button id="btnDiagList">刷新诊断记录</button>
+            </div>
+            <pre id="diagListResult"></pre>
+          </div>
 
-    <section class="card">
-      <h2>AI诊断记录（迭代3）</h2>
-      <div class="grid2">
-        <input id="diagSeverityFilter" placeholder="severity筛选：low/medium/high" />
-        <button id="btnDiagList">刷新诊断记录</button>
-      </div>
-      <pre id="diagListResult"></pre>
-    </section>
+          <div id="tool-template" class="tool-pane">
+            <h3>自检模板管理</h3>
+            <input id="tplSystemId" placeholder="system_id" />
+            <select id="tplCheckType"><option value="daily">daily</option><option value="weekly">weekly</option><option value="yearly">yearly</option></select>
+            <input id="tplName" placeholder="模板名称" />
+            <div class="grid2">
+              <button id="btnCreateTemplate">创建模板</button>
+              <button id="btnListTemplates">刷新模板列表</button>
+            </div>
+            <pre id="templateCreateResult"></pre>
+            <pre id="templateListResult"></pre>
 
-    <section class="card">
-      <h2>错误码说明</h2>
-      <ul class="code-list">
-        <li><code>TOKEN_EXPIRED</code>：Token 过期，需要重新登录</li>
-        <li><code>TOKEN_INVALID</code>：Token 无效或格式错误</li>
-        <li><code>USER_DISABLED</code>：账号已禁用</li>
-        <li><code>USER_NOT_FOUND</code>：账号不存在</li>
-        <li><code>FORBIDDEN</code>：权限不足</li>
-        <li><code>VALIDATION_ERROR</code>：参数校验失败</li>
-        <li><code>HTTP_ERROR</code>：通用业务错误</li>
-      </ul>
-    </section>
+            <h3>状态快照上报</h3>
+            <input id="snapSystemId" placeholder="system_id" />
+            <div class="grid2">
+              <input id="snapHostOnline" placeholder="host_online(normal/abnormal/unknown)" value="normal" />
+              <input id="snapPortOk" placeholder="port_ok(normal/abnormal/unknown)" value="normal" />
+              <input id="snapCpu" type="number" placeholder="cpu_usage(%)" value="60" />
+              <input id="snapMem" type="number" placeholder="mem_usage(%)" value="65" />
+              <input id="snapDisk" type="number" placeholder="disk_usage(%)" value="70" />
+              <input id="snapSelfcheck" placeholder="last_selfcheck_result(normal/warning/critical/unknown)" value="normal" />
+            </div>
+            <button id="btnCreateSnapshot">提交状态快照</button>
+            <pre id="snapshotResult"></pre>
+          </div>
 
-    <section class="card">
-      <h2>接口调试历史（最近20条）</h2>
+          <div id="tool-rules" class="tool-pane">
+            <h3>状态规则配置</h3>
+            <div class="grid2">
+              <label>CPU 黄阈值(%)<input id="cpuWarn" type="number" value="70" /></label>
+              <label>CPU 红阈值(%)<input id="cpuCritical" type="number" value="90" /></label>
+              <label>内存 黄阈值(%)<input id="memWarn" type="number" value="75" /></label>
+              <label>内存 红阈值(%)<input id="memCritical" type="number" value="90" /></label>
+              <label>磁盘 黄阈值(%)<input id="diskWarn" type="number" value="80" /></label>
+              <label>磁盘 红阈值(%)<input id="diskCritical" type="number" value="95" /></label>
+            </div>
+            <div class="grid2">
+              <button id="btnLoadRules">读取后端规则</button>
+              <button id="btnSaveRules">保存到后端</button>
+            </div>
+            <pre id="ruleResult"></pre>
+
+            <h3>审计日志（支持筛选）</h3>
+            <div class="grid3">
+              <input id="auditAction" placeholder="action，例如 create_user" />
+              <input id="auditUsername" placeholder="username，例如 admin" />
+              <input id="auditResource" placeholder="resource，例如 system" />
+            </div>
+            <div class="grid3">
+              <input id="auditStartAt" placeholder="start_at，例如 2026-02-25T00:00:00" />
+              <input id="auditEndAt" placeholder="end_at，例如 2026-02-25T23:59:59" />
+              <input id="auditKeyword" placeholder="keyword（detail模糊匹配）" />
+            </div>
+            <div class="grid2">
+              <button id="btnAudit">按筛选读取审计日志</button>
+              <button id="btnAuditClear">清空筛选</button>
+            </div>
+            <pre id="audit"></pre>
+          </div>
+
+          <div id="tool-debug" class="tool-pane">
+            <h3>错误码说明</h3>
+            <ul class="code-list">
+              <li><code>TOKEN_EXPIRED</code>：Token 过期，需要重新登录</li>
+              <li><code>TOKEN_INVALID</code>：Token 无效或格式错误</li>
+              <li><code>USER_DISABLED</code>：账号已禁用</li>
+              <li><code>USER_NOT_FOUND</code>：账号不存在</li>
+              <li><code>FORBIDDEN</code>：权限不足</li>
+              <li><code>VALIDATION_ERROR</code>：参数校验失败</li>
+              <li><code>HTTP_ERROR</code>：通用业务错误</li>
+            </ul>
+            <h3>接口调试历史（最近20条）</h3>
+            <div class="grid2">
+              <button id="btnRefreshHistory">刷新历史</button>
+              <button id="btnClearHistory">清空历史</button>
+            </div>
+            <pre id="requestHistory"></pre>
+          </div>
+        </section>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="createUserModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>新增用户</h3>
+      <label>用户名
+        <input id="modalUserName" placeholder="请输入用户名" />
+      </label>
+      <label>密码
+        <input id="modalUserPassword" type="password" placeholder="请输入密码" />
+      </label>
+      <label>角色
+        <select id="modalUserRole">
+          <option value="inspector">巡检员</option>
+          <option value="admin">管理员</option>
+          <option value="super_admin">超级管理员</option>
+        </select>
+      </label>
       <div class="grid2">
-        <button id="btnRefreshHistory">刷新历史</button>
-        <button id="btnClearHistory">清空历史</button>
+        <button id="btnSubmitCreateUser">确认新增</button>
+        <button id="btnCloseCreateUserModal" type="button">取消</button>
       </div>
-      <pre id="requestHistory"></pre>
-    </section>
-  </main>
+    </div>
+  </div>
+
+
+  <div id="createSystemModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>新增系统</h3>
+      <label>系统编号
+        <input id="modalSystemCode" placeholder="请输入系统编号" />
+      </label>
+      <label>系统名称
+        <input id="modalSystemName" placeholder="请输入系统名称" />
+      </label>
+      <label>环境
+        <select id="modalSystemEnv">
+          <option value="prod">生产</option>
+          <option value="test">测试</option>
+          <option value="dev">开发</option>
+        </select>
+      </label>
+      <div class="grid2">
+        <button id="btnSubmitCreateSystem">确认新增</button>
+        <button id="btnCloseCreateSystemModal" type="button">取消</button>
+      </div>
+    </div>
+  </div>
+
   <script src="./app.js"></script>
 </body>
 </html>

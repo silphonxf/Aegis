@@ -24,3 +24,14 @@ dist/
 
 # OS
 .DS_Store
+
+# Local runtime logs
+.logs/
+
+# Local certs / secrets
+.certs/
+*.key
+
+# Local backups
+*.bak
+*.bak.*

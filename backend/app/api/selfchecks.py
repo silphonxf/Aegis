@@ -6,8 +6,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.selfcheck import ChecklistTemplate, SelfcheckRecord
+from app.models.system import System
 from app.models.user import User
-from app.schemas.selfcheck import SelfcheckRecordCreate, SelfcheckTemplateCreate
+from app.schemas.selfcheck import SelfcheckRecordCreate, SelfcheckRecordSimpleCreate, SelfcheckTemplateCreate
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/selfchecks", tags=["selfchecks"])
@@ -75,6 +76,52 @@ def create_selfcheck_record(
     db.refresh(r)
     log_action(db, "create_selfcheck_record", "selfcheck_record", current_user, {"record_id": r.id})
     return {"id": r.id}
+
+
+@router.post("/records/simple")
+def create_selfcheck_record_simple(
+    payload: SelfcheckRecordSimpleCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    target_system_id = payload.system_id
+    if target_system_id is None:
+        first_system = db.query(System).filter(System.is_active == True).order_by(System.id.asc()).first()
+        if not first_system:
+            raise HTTPException(status_code=400, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统中无可用业务系统"})
+        target_system_id = first_system.id
+
+    tpl = (
+        db.query(ChecklistTemplate)
+        .filter(ChecklistTemplate.system_id == target_system_id, ChecklistTemplate.is_active == True)
+        .order_by(ChecklistTemplate.id.asc())
+        .first()
+    )
+    if not tpl:
+        # 为简化版自检入口自动兜底创建一个 daily 模板
+        tpl = ChecklistTemplate(system_id=target_system_id, check_type="daily", name="默认日检模板")
+        db.add(tpl)
+        db.commit()
+        db.refresh(tpl)
+
+    summary = payload.content.strip()
+    if payload.note:
+        summary = f"{summary}；备注：{payload.note.strip()}"
+
+    r = SelfcheckRecord(
+        system_id=target_system_id,
+        template_id=tpl.id,
+        operator_id=current_user.id,
+        result=payload.result,
+        summary=summary,
+        checked_at=datetime.utcnow(),
+    )
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+
+    log_action(db, "create_selfcheck_record_simple", "selfcheck_record", current_user, {"record_id": r.id, "system_id": target_system_id})
+    return {"id": r.id, "system_id": target_system_id, "template_id": tpl.id}
 
 
 @router.get("/records")

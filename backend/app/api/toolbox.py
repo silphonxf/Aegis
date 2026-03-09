@@ -1,4 +1,5 @@
 import json
+import os
 import socket
 import subprocess
 import time
@@ -14,6 +15,43 @@ from app.schemas.toolbox import PingRequest, PortCheckRequest, RestartTaskReques
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/toolbox", tags=["toolbox"])
+
+
+def _read_error_logs(hours: int, lines: int) -> tuple[str, str]:
+    """读取系统 error 日志，优先 journalctl，其次 syslog/messages。"""
+    commands = [
+        [
+            "journalctl",
+            "--since",
+            f"-{hours} hour",
+            "-p",
+            "err",
+            "--no-pager",
+            "-n",
+            str(lines),
+            "-o",
+            "short-iso",
+        ],
+    ]
+
+    syslog_path = "/var/log/syslog"
+    messages_path = "/var/log/messages"
+    if os.path.exists(syslog_path):
+        commands.append(["bash", "-lc", f"tail -n 20000 {syslog_path} | grep -Ei 'error|exception|fatal|traceback' | tail -n {lines}"])
+    if os.path.exists(messages_path):
+        commands.append(["bash", "-lc", f"tail -n 20000 {messages_path} | grep -Ei 'error|exception|fatal|traceback' | tail -n {lines}"])
+
+    last_err = ""
+    for cmd in commands:
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+            if proc.returncode == 0 and (proc.stdout or "").strip():
+                return proc.stdout[-120000:], " ".join(cmd)
+            last_err = (proc.stderr or proc.stdout or "").strip()
+        except Exception as e:
+            last_err = str(e)
+
+    return "", last_err
 
 
 @router.post("/ping")
@@ -61,6 +99,36 @@ def port_check(
         "ok": ok,
         "latency_ms": elapsed_ms,
         "error": err,
+    }
+
+
+@router.get("/error-logs")
+def read_error_logs(
+    hours: int = 24,
+    lines: int = 5000,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    hours = min(max(hours, 1), 168)
+    lines = min(max(lines, 100), 5000)
+
+    content, source = _read_error_logs(hours=hours, lines=lines)
+    if not content:
+        content = "未读取到 error 日志，请确认系统日志权限（journalctl/syslog）。"
+
+    log_action(
+        db,
+        "toolbox_read_error_logs",
+        "toolbox",
+        current_user,
+        {"hours": hours, "lines": lines, "source": source[:200]},
+    )
+
+    return {
+        "hours": hours,
+        "lines": lines,
+        "source": source,
+        "content": content,
     }
 
 

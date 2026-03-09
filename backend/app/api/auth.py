@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.security import create_access_token, verify_password
+from app.core.security import create_access_token, get_password_hash, verify_password
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import LoginRequest, TokenResponse
+from app.schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse, UserProfileUpdateRequest
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -40,6 +40,45 @@ def me(current_user: User = Depends(get_current_user)):
     return {
         "id": current_user.id,
         "username": current_user.username,
+        "nickname": current_user.nickname,
+        "avatar_url": current_user.avatar_url,
         "role": current_user.role.code,
         "is_active": current_user.is_active,
     }
+
+
+@router.put("/profile")
+def update_profile(
+    payload: UserProfileUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    current_user.nickname = payload.nickname
+    current_user.avatar_url = payload.avatar_url
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    log_action(db, "update_profile", "auth", current_user, {"nickname": payload.nickname, "avatar_url": payload.avatar_url})
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "nickname": current_user.nickname,
+        "avatar_url": current_user.avatar_url,
+    }
+
+
+@router.post("/change-password")
+def change_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(payload.old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail={"code": "PASSWORD_OLD_INVALID", "message": "旧密码不正确"})
+
+    current_user.password_hash = get_password_hash(payload.new_password)
+    db.add(current_user)
+    db.commit()
+
+    log_action(db, "change_password", "auth", current_user, None)
+    return {"ok": True, "message": "密码修改成功"}

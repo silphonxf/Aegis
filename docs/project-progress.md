@@ -53,6 +53,97 @@ cd /home/xf/.openclaw/workspace/code/aegis
 
 ## 下一步建议
 
-1. 将达梦环境加入 CI 可选检查（可通过环境变量开关）
-2. 对关键写库接口补充达梦下的集成测试用例
-3. 增加“常见登录误区”说明（区分应用 admin 与数据库账号）
+1. 离线规则库从当前 6 条扩充到 20+ 条，并补充误报/漏报回归样例
+2. 将 `scripts/check_dm_connection.sh` 纳入 CI 可选阶段并输出结构化报告
+3. 为离线 AI 增加“模型超时/不可达”观测指标（成功率、耗时、回退次数）
+
+## 本次新增进展（2026-03-09，第二阶段）
+
+### 7) 达梦关键写库链路验收增强
+
+已增强 `scripts/check_dm_connection.sh`，在原有迁移/健康/登录检查基础上，新增写库接口校验：
+- `PUT /api/v1/auth/profile`（验证用户资料写入）
+- `POST /api/v1/auth/change-password`（验证密码更新）
+- 自动将密码回滚至默认值，避免影响后续环境
+
+### 8) 登录误区文档补充
+
+已新增文档：`docs/login-common-pitfalls.md`
+- 明确区分“应用账号登录”与“数据库账号连接”
+- 解释常见 401 场景
+- 给出推荐排查顺序
+
+### 9) 观测性增强（离线 AI + 达梦检查）
+
+- `scripts/check_dm_connection.sh` 新增结构化报告输出（默认 `/tmp/aegis_dm_check_report.json`）
+  - 成功输出：`ok/port/checks/checked_at`
+  - 失败输出：`ok=false/failed_step/reason/checked_at`
+- `POST /api/v1/ai/diagnose` 与 `POST /api/v1/ai/offline/analyze` 返回新增：
+  - `elapsed_ms`（本次分析耗时）
+  - `fallback_reason`（若发生回退则给出原因）
+- 审计日志 `ai_diagnose` / `ai_offline_analyze` 同步记录上述字段，便于后续统计回退率与时延分布
+
+## 本次新增进展（2026-03-09）
+
+### 6) 离线 AI（Ollama）接入到诊断主链路
+
+已将离线模型接入以下接口，并保留规则引擎回退：
+- `POST /api/v1/ai/diagnose`
+- `POST /api/v1/ai/offline/analyze`
+
+能力说明：
+- 当 `OFFLINE_AI_ENABLED=true` 且 `OFFLINE_AI_PROVIDER=ollama` 时优先走本地模型
+- 模型调用异常/返回异常时自动回退到规则建议（`mode=rule_fallback`）
+- 返回中新增 `mode`，用于区分 `offline_ollama` 与 `rule_fallback`
+
+新增/更新文件：
+- `backend/app/services/offline_llm.py`
+- `backend/app/api/ai.py`
+- `backend/app/core/config.py`
+- `backend/dameng.env.example`
+- `docs/offline-ai-setup.md`
+- `scripts/setup_offline_ai.sh`
+
+稳健性补强：
+- provider 判断改为大小写无关（`OFFLINE_AI_PROVIDER.lower()`）
+- LLM 若未返回有效 `suggestions`，抛错并走规则回退
+
+## 本次新增进展（2026-03-06）
+
+### 4) CI 已接入 + 达梦可选检查
+
+已新增 GitHub Actions 工作流：
+
+- `.github/workflows/backend-ci.yml`
+
+默认行为：
+- 在 `push/pull_request`（backend 相关路径）时运行 SQLite 冒烟检查：
+  - 安装依赖
+  - Alembic 迁移
+  - 启动 API
+  - `GET /healthz`
+
+可选行为（按需开启达梦检查）：
+- 手动触发 `workflow_dispatch` 时将 `run_dm_check=true`
+- 或设置仓库变量 `RUN_DM_CHECK=true`
+- 达梦连接参数走 `secrets`（`DM_HOST/DM_PORT/DM_NAME/DM_USER/DM_PASSWORD`）
+- 调用 `scripts/check_dm_connection.sh` 执行完整达梦连通检查
+
+### 5) AI离线错误日志分析（Phase 1 MVP）
+
+已新增离线分析数据模型与接口（规则引擎版本）：
+
+- 新增表：
+  - `offline_analysis_tasks`
+  - `offline_analysis_results`
+- Alembic：`backend/alembic/versions/20260306_09_offline_analysis_tables.py`
+- 新增模型：`backend/app/models/offline_analysis.py`
+- 新增接口（`/api/v1/ai/offline/*`）：
+  - `POST /api/v1/ai/offline/analyze`
+  - `GET /api/v1/ai/offline/tasks`
+  - `GET /api/v1/ai/offline/tasks/{task_id}`
+
+规则引擎能力（首版）：
+- 内置 6 条高频规则（数据库连接失败、磁盘满、OOM、端口冲突、鉴权失败、超时）
+- 输出：命中规则、风险等级、摘要、处置建议、日志摘录
+- 已本地联调验证通过（admin 登录后可调用离线分析接口）

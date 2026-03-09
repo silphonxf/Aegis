@@ -23,6 +23,36 @@
 - [x] 迭代3（第一阶段）：工具箱 + AI诊断mock + 审批流
 - [x] 前后端联调与冒烟脚本
 
+## 管理后台（5174）使用说明（v2）
+
+### 访问地址
+- 管理后台：`http://127.0.0.1:5174`
+- 移动端：`http://127.0.0.1:5173`
+- 后端 API：`http://127.0.0.1:8000`
+
+### 界面结构
+- 左侧主菜单：
+  - 总览看板
+  - 用户与系统
+  - 资产管理
+  - 高级工具
+- 高级工具二级页签：
+  - 运维审批
+  - AI诊断
+  - 模板与快照
+  - 规则与审计
+  - 调试与错误码
+
+### 看板能力
+- 登录后进入主界面
+- 自动/手动刷新切换
+- 异常系统筛选（状态 + 关键词）
+- CPU/MEM/DISK 趋势火花图
+
+详细变更与验收见：
+- `docs/admin-ui-optimization-summary-2026-03-01.md`
+- `docs/release-checklist-v1.0.0-admin-v2.md`
+
 ## 快速验证
 
 ```bash
@@ -31,6 +61,7 @@ cd /home/xf/.openclaw/workspace/code/aegis
 ```
 
 更多见：
+- `docs/AGENT_CONTEXT.md`（会话持久化上下文，先看这个）
 - `docs/release-v1.0.0.md`
 - `docs/release-note-v0.3.md`
 - `docs/iteration3-acceptance.md`

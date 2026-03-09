@@ -24,6 +24,34 @@ class Settings(BaseSettings):
     INIT_ADMIN_USERNAME: str = "admin"
     INIT_ADMIN_PASSWORD: str = "admin123"
 
+    # 离线 AI（默认开启，优先走本地 Ollama）
+    OFFLINE_AI_ENABLED: bool = True
+    OFFLINE_AI_PROVIDER: str = "ollama"
+    OFFLINE_AI_MODEL: str = "qwen2.5:7b"
+    OFFLINE_AI_OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
+    OFFLINE_AI_TIMEOUT_SECONDS: int = 120
+
+    # CORS
+    CORS_ALLOW_ORIGINS: str = "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174"
+    CORS_ALLOW_ORIGIN_REGEX: str | None = (
+        r"^https?://(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|192\\.168\\.\\d+\\.\\d+|10\\.\\d+\\.\\d+\\.\\d+|172\\.(1[6-9]|2\\d|3[0-1])\\.\\d+\\.\\d+)(:\\d+)?$"
+    )
+    CORS_ALLOW_CREDENTIALS: bool = False
+    CORS_ALLOW_METHODS: str = "*"
+    CORS_ALLOW_HEADERS: str = "*"
+
+    @property
+    def cors_allow_origins(self) -> list[str]:
+        return [item.strip() for item in self.CORS_ALLOW_ORIGINS.split(",") if item.strip()]
+
+    @property
+    def cors_allow_methods(self) -> list[str]:
+        return [item.strip() for item in self.CORS_ALLOW_METHODS.split(",") if item.strip()] or ["*"]
+
+    @property
+    def cors_allow_headers(self) -> list[str]:
+        return [item.strip() for item in self.CORS_ALLOW_HEADERS.split(",") if item.strip()] or ["*"]
+
     @property
     def effective_database_url(self) -> str:
         """当配置了 DM_* 字段时优先拼接达梦连接；否则使用 DATABASE_URL。"""
