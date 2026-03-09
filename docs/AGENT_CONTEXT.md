@@ -74,6 +74,13 @@ Aegis 是一个运维助手系统，包含：
 
 ## 7. 最近更新记录（倒序）
 
+### 2026-03-09
+- 接续开发：离线 AI（Ollama）正式接入 `diagnose` 与 `offline/analyze` 主链路
+- 新增文件：`backend/app/services/offline_llm.py`、`docs/offline-ai-setup.md`、`scripts/setup_offline_ai.sh`
+- 配置扩展：新增 `OFFLINE_AI_*` 参数（enabled/provider/model/base_url/timeout）
+- 稳健性补强：provider 大小写无关、LLM 空建议判错并自动回退规则引擎
+- 当前分支：`feat/dameng-integration`（已新增 3 个提交，待 push）
+
 ### 2026-03-06
 - 新增AI离线错误日志分析MVP：规则引擎+任务结果表+离线分析API
 - 同步时间：2026-03-06 18:00:22 +0800

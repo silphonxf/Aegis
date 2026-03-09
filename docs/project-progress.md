@@ -57,6 +57,31 @@ cd /home/xf/.openclaw/workspace/code/aegis
 2. 增加“常见登录误区”说明（区分应用 admin 与数据库账号）
 3. 离线规则库从当前 6 条扩充到 20+ 条，并补充误报/漏报回归样例
 
+## 本次新增进展（2026-03-09）
+
+### 6) 离线 AI（Ollama）接入到诊断主链路
+
+已将离线模型接入以下接口，并保留规则引擎回退：
+- `POST /api/v1/ai/diagnose`
+- `POST /api/v1/ai/offline/analyze`
+
+能力说明：
+- 当 `OFFLINE_AI_ENABLED=true` 且 `OFFLINE_AI_PROVIDER=ollama` 时优先走本地模型
+- 模型调用异常/返回异常时自动回退到规则建议（`mode=rule_fallback`）
+- 返回中新增 `mode`，用于区分 `offline_ollama` 与 `rule_fallback`
+
+新增/更新文件：
+- `backend/app/services/offline_llm.py`
+- `backend/app/api/ai.py`
+- `backend/app/core/config.py`
+- `backend/dameng.env.example`
+- `docs/offline-ai-setup.md`
+- `scripts/setup_offline_ai.sh`
+
+稳健性补强：
+- provider 判断改为大小写无关（`OFFLINE_AI_PROVIDER.lower()`）
+- LLM 若未返回有效 `suggestions`，抛错并走规则回退
+
 ## 本次新增进展（2026-03-06）
 
 ### 4) CI 已接入 + 达梦可选检查
