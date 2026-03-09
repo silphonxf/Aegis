@@ -118,7 +118,7 @@ def diagnose(
     severity = payload.severity
     summary = ""
 
-    if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER == "ollama":
+    if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
         try:
             severity, suggestions, summary = diagnose_with_ollama(payload.title, payload.detail, payload.severity)
             mode = "offline_ollama"
@@ -194,7 +194,7 @@ def offline_analyze(
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
     mode = "rule_fallback"
-    if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER == "ollama":
+    if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
         try:
             final_severity, summary, suggestions, matched = offline_analyze_with_ollama(
                 payload.title, payload.detail, payload.severity

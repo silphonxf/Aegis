@@ -131,6 +131,9 @@ def offline_analyze_with_ollama(title: str, detail: str, severity: str) -> tuple
 
     summary = str(data.get("summary") or "离线分析完成").strip()
     suggestions = [str(x).strip() for x in (data.get("suggestions") or []) if str(x).strip()]
+    if not suggestions:
+        raise OfflineLLMError("离线模型未返回有效 suggestions")
+
     matched_rules_raw = data.get("matched_rules") or []
 
     matched_rules: list[dict[str, str]] = []
