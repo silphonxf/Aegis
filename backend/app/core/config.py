@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,7 +9,7 @@ class Settings(BaseSettings):
     APP_ENV: str = "dev"
     API_PREFIX: str = "/api/v1"
 
-    SECRET_KEY: str = "change_me"
+    SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
 
     # 默认数据库连接（开发环境可直接用 SQLite）
@@ -22,7 +23,7 @@ class Settings(BaseSettings):
     DM_PASSWORD: str | None = None
 
     INIT_ADMIN_USERNAME: str = "admin"
-    INIT_ADMIN_PASSWORD: str = "admin123"
+    INIT_ADMIN_PASSWORD: str
 
     # 离线 AI（默认开启，优先走本地 Ollama）
     OFFLINE_AI_ENABLED: bool = True
@@ -51,6 +52,14 @@ class Settings(BaseSettings):
     @property
     def cors_allow_headers(self) -> list[str]:
         return [item.strip() for item in self.CORS_ALLOW_HEADERS.split(",") if item.strip()] or ["*"]
+
+    @field_validator("SECRET_KEY", "INIT_ADMIN_PASSWORD")
+    @classmethod
+    def reject_weak_defaults(cls, value: str) -> str:
+        weak_values = {"", "change_me", "admin123", "change_me_to_a_random_secret"}
+        if value.strip() in weak_values:
+            raise ValueError("安全配置不允许使用弱默认值，请通过环境变量设置强密码/密钥")
+        return value
 
     @property
     def effective_database_url(self) -> str:
