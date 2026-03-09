@@ -54,10 +54,19 @@ function setTechMetric(prefix, value) {
   }
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function statusChip(color) {
   const v = String(color || 'unknown').toLowerCase();
   const cls = ['green', 'yellow', 'red'].includes(v) ? v : 'unknown';
-  return `<span class="status-chip ${cls}">${v}</span>`;
+  return `<span class="status-chip ${cls}">${escapeHtml(v)}</span>`;
 }
 
 function setLastUpdated(ok = true) {
@@ -125,14 +134,14 @@ function applyAbnormalFilters() {
 
   const rows = filtered.map(i => `
     <tr>
-      <td>${i.system_id}</td>
-      <td>${i.system_code} / ${i.system_name}</td>
-      <td>${i.env}</td>
+      <td>${escapeHtml(i.system_id ?? '-')}</td>
+      <td>${escapeHtml(i.system_code || '-')} / ${escapeHtml(i.system_name || '-')}</td>
+      <td>${escapeHtml(i.env || '-')}</td>
       <td>${statusChip(i.status_color)}</td>
-      <td>${i.cpu_usage ?? '-'}% (${statusChip(i.cpu_level || 'unknown')})</td>
-      <td>${i.mem_usage ?? '-'}% (${statusChip(i.mem_level || 'unknown')})</td>
-      <td>${i.disk_usage ?? '-'}% (${statusChip(i.disk_level || 'unknown')})</td>
-      <td>${i.captured_at || '-'}</td>
+      <td>${escapeHtml(i.cpu_usage ?? '-')}% (${statusChip(i.cpu_level || 'unknown')})</td>
+      <td>${escapeHtml(i.mem_usage ?? '-')}% (${statusChip(i.mem_level || 'unknown')})</td>
+      <td>${escapeHtml(i.disk_usage ?? '-')}% (${statusChip(i.disk_level || 'unknown')})</td>
+      <td>${escapeHtml(i.captured_at || '-')}</td>
     </tr>
   `).join('');
   $('abnormalTbody').innerHTML = rows || '<tr><td colspan="8">暂无符合筛选条件的数据</td></tr>';
@@ -179,7 +188,7 @@ function refreshSystemOptions() {
   });
 
   select.innerHTML = candidates
-    .map((i) => `<option value="${i.system_code}">${i.system_code} / ${i.system_name}</option>`)
+    .map((i) => `<option value="${escapeHtml(i.system_code)}">${escapeHtml(i.system_code)} / ${escapeHtml(i.system_name || '-')}</option>`)
     .join('');
 
   if (!candidates.length) return;
@@ -228,9 +237,9 @@ function renderUserResultBoard(items, message = '') {
   const rows = (items || []).map((u, idx) => `
     <tr>
       <td>${idx + 1}</td>
-      <td>${u.username || '-'}</td>
+      <td>${escapeHtml(u.username || '-')}</td>
       <td>${u.role_code === 'super_admin' ? '超级管理员' : u.role_code === 'admin' ? '管理员' : '巡检员'}</td>
-      <td>${u.id ?? '-'}</td>
+      <td>${escapeHtml(u.id ?? '-')}</td>
     </tr>
   `).join('');
   $('userListSummary').textContent = message || `匹配 ${items.length} 条`;
@@ -241,9 +250,9 @@ function renderSystemResultBoard(items, message = '') {
   const rows = (items || []).map((s, idx) => `
     <tr>
       <td>${idx + 1}</td>
-      <td>${s.system_code || '-'}</td>
-      <td>${s.name || '-'}</td>
-      <td>${s.env === 'prod' ? '生产' : s.env === 'test' ? '测试' : s.env === 'dev' ? '开发' : (s.env || '-')}</td>
+      <td>${escapeHtml(s.system_code || '-')}</td>
+      <td>${escapeHtml(s.name || '-')}</td>
+      <td>${escapeHtml(s.env === 'prod' ? '生产' : s.env === 'test' ? '测试' : s.env === 'dev' ? '开发' : (s.env || '-'))}</td>
     </tr>
   `).join('');
   $('systemListSummary').textContent = message || `匹配 ${items.length} 条`;
