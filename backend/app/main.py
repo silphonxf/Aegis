@@ -8,8 +8,7 @@ from sqlalchemy.orm import Session
 from app.api import admin, ai, auth, health, inspections, monitoring, reports, selfchecks, systems, toolbox
 from app.core.config import settings
 from app.core.security import get_password_hash
-from app.db.session import SessionLocal, engine
-from app.models import Base
+from app.db.session import SessionLocal
 from app.models.inspection import InspectionPoint
 from app.models.system import System
 from app.models.user import Role, User
@@ -83,12 +82,8 @@ def init_seed(db: Session):
 
 @app.on_event("startup")
 def on_startup():
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    try:
-        init_seed(db)
-    finally:
-        db.close()
+    # 数据库结构与初始数据统一通过 Alembic + 显式初始化脚本完成。
+    return None
 
 
 @app.exception_handler(RequestValidationError)
