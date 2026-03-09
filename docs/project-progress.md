@@ -73,6 +73,16 @@ cd /home/xf/.openclaw/workspace/code/aegis
 - 解释常见 401 场景
 - 给出推荐排查顺序
 
+### 9) 观测性增强（离线 AI + 达梦检查）
+
+- `scripts/check_dm_connection.sh` 新增结构化报告输出（默认 `/tmp/aegis_dm_check_report.json`）
+  - 成功输出：`ok/port/checks/checked_at`
+  - 失败输出：`ok=false/failed_step/reason/checked_at`
+- `POST /api/v1/ai/diagnose` 与 `POST /api/v1/ai/offline/analyze` 返回新增：
+  - `elapsed_ms`（本次分析耗时）
+  - `fallback_reason`（若发生回退则给出原因）
+- 审计日志 `ai_diagnose` / `ai_offline_analyze` 同步记录上述字段，便于后续统计回退率与时延分布
+
 ## 本次新增进展（2026-03-09）
 
 ### 6) 离线 AI（Ollama）接入到诊断主链路

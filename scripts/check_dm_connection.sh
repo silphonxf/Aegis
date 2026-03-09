@@ -1,19 +1,43 @@
 #!/usr/bin/env bash
 set -euo pipefail
+trap 'report_fail "command_failed"' ERR
 
 ROOT_DIR="/home/xf/.openclaw/workspace/code/aegis"
 BACKEND_DIR="$ROOT_DIR/backend"
 PORT="${1:-8001}"
+REPORT_PATH="${2:-/tmp/aegis_dm_check_report.json}"
+CURRENT_STEP="init"
+
+report_fail() {
+  local reason="$1"
+  python - <<'PY' "$REPORT_PATH" "$CURRENT_STEP" "$reason"
+import json,sys,datetime
+path,step,reason=sys.argv[1],sys.argv[2],sys.argv[3]
+payload={
+  "ok": False,
+  "failed_step": step,
+  "reason": reason,
+  "checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+}
+with open(path,"w",encoding="utf-8") as f:
+  json.dump(payload,f,ensure_ascii=False,indent=2)
+print(f"🧾 已写入失败报告: {path}")
+PY
+}
 
 cd "$BACKEND_DIR"
 
 if [[ ! -f .env ]]; then
   echo "❌ 未找到 $BACKEND_DIR/.env，请先配置数据库连接"
+  CURRENT_STEP="precheck_env"
+  report_fail "env_missing"
   exit 1
 fi
 
 if [[ ! -d .venv ]]; then
   echo "❌ 未找到 Python 虚拟环境 .venv，请先执行依赖安装"
+  CURRENT_STEP="precheck_venv"
+  report_fail "venv_missing"
   exit 1
 fi
 
@@ -21,6 +45,7 @@ source .venv/bin/activate
 
 export LD_LIBRARY_PATH="/data/DMdata/dmdbms/drivers/dpi:/data/DMdata/dmdbms/drivers/dpi/dependencies:${LD_LIBRARY_PATH:-}"
 
+CURRENT_STEP="dm_port"
 echo "== [1/6] 检查达梦端口 127.0.0.1:5236 =="
 python - <<'PY'
 import socket, sys
@@ -36,10 +61,12 @@ finally:
     s.close()
 PY
 
+CURRENT_STEP="alembic_upgrade"
 echo "== [2/6] 执行 Alembic 迁移 =="
 alembic upgrade head
 echo "✅ Alembic 迁移完成"
 
+CURRENT_STEP="start_backend"
 echo "== [3/6] 启动后端服务 (port: ${PORT}) =="
 uvicorn app.main:app --host 127.0.0.1 --port "$PORT" > /tmp/aegis_dm_check.log 2>&1 &
 SERVER_PID=$!
@@ -59,6 +86,7 @@ for _ in $(seq 1 40); do
   sleep 0.5
 done
 
+CURRENT_STEP="healthz"
 echo "== [4/6] 健康检查 =="
 health_resp=$(curl -fsS "http://127.0.0.1:${PORT}/healthz")
 echo "$health_resp"
@@ -68,6 +96,7 @@ if [[ "$health_resp" != *'"status":"ok"'* ]]; then
 fi
 echo "✅ /healthz 正常"
 
+CURRENT_STEP="auth_login"
 echo "== [5/6] 登录检查 =="
 login_resp=$(curl -fsS -X POST "http://127.0.0.1:${PORT}/api/v1/auth/login" \
   -H 'Content-Type: application/json' \
@@ -92,6 +121,7 @@ if [[ -z "$token" ]]; then
   exit 1
 fi
 
+CURRENT_STEP="write_paths"
 echo "== [6/6] 写库接口检查（profile + change-password） =="
 new_nickname="dm-check-$(date +%s)"
 
@@ -149,4 +179,27 @@ if [[ "$rollback_resp" != *'"ok":true'* ]]; then
 fi
 
 echo "✅ 密码已回滚为 admin123"
+
+CURRENT_STEP="done"
+python - <<'PY' "$REPORT_PATH" "$PORT"
+import json,sys,datetime
+path,port=sys.argv[1],sys.argv[2]
+payload={
+  "ok": True,
+  "port": int(port),
+  "checks": [
+    "dm_port",
+    "alembic_upgrade",
+    "start_backend",
+    "healthz",
+    "auth_login",
+    "write_paths",
+  ],
+  "checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+}
+with open(path,"w",encoding="utf-8") as f:
+  json.dump(payload,f,ensure_ascii=False,indent=2)
+print(f"🧾 已写入检查报告: {path}")
+PY
+
 echo "\n🎉 达梦接入检查通过（含关键写库接口）"

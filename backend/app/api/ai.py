@@ -1,5 +1,6 @@
 import json
 import re
+import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -117,17 +118,23 @@ def diagnose(
     mode = "rule_fallback"
     severity = payload.severity
     summary = ""
+    fallback_reason: str | None = None
+    started_at = time.perf_counter()
 
     if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
         try:
             severity, suggestions, summary = diagnose_with_ollama(payload.title, payload.detail, payload.severity)
             mode = "offline_ollama"
-        except OfflineLLMError:
+        except OfflineLLMError as e:
             suggestions = _mock_suggestions(payload)
             summary = "离线模型不可用，已回退规则建议。"
+            fallback_reason = str(e)[:200]
     else:
         suggestions = _mock_suggestions(payload)
         summary = "离线模型未启用，已使用规则建议。"
+        fallback_reason = "offline_ai_disabled_or_provider_mismatch"
+
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
 
     row = AIDiagnosis(
         title=payload.title,
@@ -139,7 +146,19 @@ def diagnose(
     db.commit()
     db.refresh(row)
 
-    log_action(db, "ai_diagnose", "ai", current_user, {"diagnosis_id": row.id, "severity": severity, "mode": mode})
+    log_action(
+        db,
+        "ai_diagnose",
+        "ai",
+        current_user,
+        {
+            "diagnosis_id": row.id,
+            "severity": severity,
+            "mode": mode,
+            "elapsed_ms": elapsed_ms,
+            "fallback_reason": fallback_reason,
+        },
+    )
     return {
         "id": row.id,
         "mode": mode,
@@ -147,6 +166,8 @@ def diagnose(
         "severity": severity,
         "summary": summary,
         "suggestions": suggestions,
+        "elapsed_ms": elapsed_ms,
+        "fallback_reason": fallback_reason,
     }
 
 
@@ -194,6 +215,8 @@ def offline_analyze(
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
     mode = "rule_fallback"
+    fallback_reason: str | None = None
+    started_at = time.perf_counter()
     if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
         try:
             final_severity, summary, suggestions, matched = offline_analyze_with_ollama(
@@ -201,10 +224,14 @@ def offline_analyze(
             )
             excerpt = "\n".join([ln for ln in payload.detail.splitlines() if ln.strip()][:80])
             mode = "offline_ollama"
-        except OfflineLLMError:
+        except OfflineLLMError as e:
             final_severity, matched, suggestions, summary, excerpt = _offline_rule_analyze(payload.detail, payload.severity)
+            fallback_reason = str(e)[:200]
     else:
         final_severity, matched, suggestions, summary, excerpt = _offline_rule_analyze(payload.detail, payload.severity)
+        fallback_reason = "offline_ai_disabled_or_provider_mismatch"
+
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
 
     task = OfflineAnalysisTask(
         source_type=payload.source_type,
@@ -232,7 +259,13 @@ def offline_analyze(
         "ai_offline_analyze",
         "ai_offline",
         current_user,
-        {"task_id": task.id, "severity": final_severity, "mode": mode},
+        {
+            "task_id": task.id,
+            "severity": final_severity,
+            "mode": mode,
+            "elapsed_ms": elapsed_ms,
+            "fallback_reason": fallback_reason,
+        },
     )
     return {
         "task_id": task.id,
@@ -242,6 +275,8 @@ def offline_analyze(
         "summary": summary,
         "matched_rules": matched,
         "suggestions": suggestions,
+        "elapsed_ms": elapsed_ms,
+        "fallback_reason": fallback_reason,
     }
 
 

@@ -15,6 +15,12 @@ cd /home/xf/.openclaw/workspace/code/aegis
 ./scripts/setup_offline_ai.sh qwen2.5:14b
 ```
 
+达梦一键检查脚本支持输出结构化报告：
+```bash
+./scripts/check_dm_connection.sh 8001 /tmp/aegis_dm_check_report.json
+cat /tmp/aegis_dm_check_report.json
+```
+
 该脚本会：
 1. 启动 Ollama
 2. 将模型目录固定到 `/data/cache/ollama/models`（位于 /data 下）

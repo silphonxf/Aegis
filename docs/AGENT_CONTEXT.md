@@ -81,6 +81,8 @@ Aegis 是一个运维助手系统，包含：
 - 稳健性补强：provider 大小写无关、LLM 空建议判错并自动回退规则引擎
 - 达梦验收增强：`scripts/check_dm_connection.sh` 新增写库接口检查（profile/change-password）并带密码回滚
 - 文档补充：新增 `docs/login-common-pitfalls.md`，明确应用账号与数据库账号区别
+- 观测性增强：达梦检查脚本支持输出 JSON 报告（成功/失败均可落盘）
+- API观测性增强：`/ai/diagnose` 与 `/ai/offline/analyze` 返回并记录 `elapsed_ms`、`fallback_reason`
 - 当前分支：`feat/dameng-integration`（持续新增提交，待 push）
 
 ### 2026-03-06
