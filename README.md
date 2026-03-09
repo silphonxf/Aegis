@@ -49,9 +49,9 @@
 - 异常系统筛选（状态 + 关键词）
 - CPU/MEM/DISK 趋势火花图
 
-详细变更与验收见：
-- `docs/admin-ui-optimization-summary-2026-03-01.md`
-- `docs/release-checklist-v1.0.0-admin-v2.md`
+详细说明见：
+- `docs/project-progress.md`
+- `docs/integration-quickstart.md`
 
 ## 快速验证
 
@@ -61,8 +61,7 @@ cd /home/xf/.openclaw/workspace/code/aegis
 ```
 
 更多见：
+- `docs/DOCS_INDEX.md`（文档入口）
 - `docs/AGENT_CONTEXT.md`（会话持久化上下文，先看这个）
-- `docs/release-v1.0.0.md`
-- `docs/release-note-v0.3.md`
-- `docs/iteration3-acceptance.md`
+- `docs/project-progress.md`
 - `docs/dameng-setup.md`
