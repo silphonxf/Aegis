@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-let token = localStorage.getItem('aegis_admin_token') || '';
+let token = '';
 
 const REQ_HISTORY_KEY = 'aegis_admin_request_history';
 const TOOL_TAB_KEY = 'aegis_admin_tool_tab';
@@ -252,7 +252,6 @@ function renderSystemResultBoard(items, message = '') {
 
 function forceRelogin(message = '登录已失效，请重新登录') {
   token = '';
-  localStorage.removeItem('aegis_admin_token');
   $('state').textContent = message;
   stopDashboardAutoRefresh();
   setAuthView(false);
@@ -344,8 +343,7 @@ $('btnLogin').onclick = async () => {
       body: JSON.stringify({username:$('username').value, password:$('password').value})
     });
     token = d.access_token;
-    localStorage.setItem('aegis_admin_token', token);
-    $('state').textContent = '登录成功';
+    $('state').textContent = '登录成功（刷新页面后需重新登录）';
     setAuthView(true);
     switchPanel('panel-dashboard');
     $('btnRefreshDashboard').click();
@@ -742,7 +740,6 @@ function initGlobalBindings() {
 
   $('btnLogout').onclick = () => {
     token = '';
-    localStorage.removeItem('aegis_admin_token');
     $('state').textContent = '已退出登录';
     stopDashboardAutoRefresh();
     setAuthView(false);

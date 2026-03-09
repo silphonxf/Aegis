@@ -2,7 +2,7 @@ const $ = (id) => document.getElementById(id);
 const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%230f2c44"/><circle cx="32" cy="24" r="12" fill="%236bd5ff"/><path d="M12 56c4-10 12-16 20-16s16 6 20 16" fill="%2338bdf8"/></svg>';
 
 const state = {
-  token: localStorage.getItem('aegis_token') || '',
+  token: '',
   requestLogs: JSON.parse(localStorage.getItem('aegis_request_logs') || '[]'),
   metricSeries: { cpu: [], mem: [], disk: [] },
   chartTimer: null,
@@ -563,7 +563,6 @@ $('btnLogin').onclick = async () => {
       body: JSON.stringify({ username: $('username').value.trim(), password: $('password').value }),
     });
     state.token = data.access_token;
-    localStorage.setItem('aegis_token', state.token);
     const me = await api('/api/v1/auth/me', { headers: authHeaders() });
     state.profile.username = me.username || $('username').value.trim() || state.profile.username || 'admin';
     state.profile.nickname = me.nickname || '';
@@ -578,7 +577,6 @@ $('btnLogin').onclick = async () => {
 
 function doLogout() {
   state.token = '';
-  localStorage.removeItem('aegis_token');
   stopStatusLoop();
   stopQrScanner();
   stopNfcScanner();
@@ -768,8 +766,8 @@ $('btnAppAiQa').onclick = () => show('appToolResult', { action: 'ai_qa', status:
 
 initSubNavigation();
 applyProfileUI();
-setLoginState(state.token ? '已加载本地 Token，可直接进入主界面' : '未登录');
-switchScreen(Boolean(state.token));
+setLoginState('未登录');
+switchScreen(false);
 switchPanel('panel-inspection');
 showSub('panel-inspection', 'inspection-home');
 showSub('panel-selfcheck', 'selfcheck-home');
