@@ -79,7 +79,9 @@ Aegis 是一个运维助手系统，包含：
 - 新增文件：`backend/app/services/offline_llm.py`、`docs/offline-ai-setup.md`、`scripts/setup_offline_ai.sh`
 - 配置扩展：新增 `OFFLINE_AI_*` 参数（enabled/provider/model/base_url/timeout）
 - 稳健性补强：provider 大小写无关、LLM 空建议判错并自动回退规则引擎
-- 当前分支：`feat/dameng-integration`（已新增 3 个提交，待 push）
+- 达梦验收增强：`scripts/check_dm_connection.sh` 新增写库接口检查（profile/change-password）并带密码回滚
+- 文档补充：新增 `docs/login-common-pitfalls.md`，明确应用账号与数据库账号区别
+- 当前分支：`feat/dameng-integration`（持续新增提交，待 push）
 
 ### 2026-03-06
 - 新增AI离线错误日志分析MVP：规则引擎+任务结果表+离线分析API
