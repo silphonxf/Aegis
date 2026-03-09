@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.ai_diagnosis import AIDiagnosis
 from app.models.offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
@@ -12,6 +13,7 @@ from app.models.user import User
 from app.schemas.ai import DiagnoseRequest
 from app.schemas.offline_ai import OfflineAnalyzeRequest
 from app.services.audit import log_action
+from app.services.offline_llm import OfflineLLMError, diagnose_with_ollama, offline_analyze_with_ollama
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -112,10 +114,24 @@ def diagnose(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
-    suggestions = _mock_suggestions(payload)
+    mode = "rule_fallback"
+    severity = payload.severity
+    summary = ""
+
+    if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER == "ollama":
+        try:
+            severity, suggestions, summary = diagnose_with_ollama(payload.title, payload.detail, payload.severity)
+            mode = "offline_ollama"
+        except OfflineLLMError:
+            suggestions = _mock_suggestions(payload)
+            summary = "离线模型不可用，已回退规则建议。"
+    else:
+        suggestions = _mock_suggestions(payload)
+        summary = "离线模型未启用，已使用规则建议。"
+
     row = AIDiagnosis(
         title=payload.title,
-        severity=payload.severity,
+        severity=severity,
         detail=payload.detail,
         suggestions=json.dumps(suggestions, ensure_ascii=False),
     )
@@ -123,14 +139,14 @@ def diagnose(
     db.commit()
     db.refresh(row)
 
-    log_action(db, "ai_diagnose", "ai", current_user, {"diagnosis_id": row.id, "severity": payload.severity})
+    log_action(db, "ai_diagnose", "ai", current_user, {"diagnosis_id": row.id, "severity": severity, "mode": mode})
     return {
         "id": row.id,
-        "mode": "mock",
+        "mode": mode,
         "title": payload.title,
-        "severity": payload.severity,
+        "severity": severity,
+        "summary": summary,
         "suggestions": suggestions,
-        "disclaimer": "当前为迭代3 mock 诊断接口，仅提供辅助建议，不自动执行变更。",
     }
 
 
@@ -177,7 +193,18 @@ def offline_analyze(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
-    final_severity, matched, suggestions, summary, excerpt = _offline_rule_analyze(payload.detail, payload.severity)
+    mode = "rule_fallback"
+    if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER == "ollama":
+        try:
+            final_severity, summary, suggestions, matched = offline_analyze_with_ollama(
+                payload.title, payload.detail, payload.severity
+            )
+            excerpt = "\n".join([ln for ln in payload.detail.splitlines() if ln.strip()][:80])
+            mode = "offline_ollama"
+        except OfflineLLMError:
+            final_severity, matched, suggestions, summary, excerpt = _offline_rule_analyze(payload.detail, payload.severity)
+    else:
+        final_severity, matched, suggestions, summary, excerpt = _offline_rule_analyze(payload.detail, payload.severity)
 
     task = OfflineAnalysisTask(
         source_type=payload.source_type,
@@ -200,10 +227,17 @@ def offline_analyze(
     db.add(result)
     db.commit()
 
-    log_action(db, "ai_offline_analyze", "ai_offline", current_user, {"task_id": task.id, "severity": final_severity})
+    log_action(
+        db,
+        "ai_offline_analyze",
+        "ai_offline",
+        current_user,
+        {"task_id": task.id, "severity": final_severity, "mode": mode},
+    )
     return {
         "task_id": task.id,
         "status": task.status,
+        "mode": mode,
         "severity": final_severity,
         "summary": summary,
         "matched_rules": matched,
