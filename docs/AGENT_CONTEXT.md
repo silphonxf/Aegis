@@ -1,6 +1,6 @@
 # Aegis 持久化上下文（给我下次快速接入）
 
-> 最后更新：2026-03-06  
+> 最后更新：2026-03-09  
 > 用途：避免每次都从零了解项目进度，5分钟内恢复工作上下文。
 
 ## 1. 项目定位
@@ -39,8 +39,8 @@ Aegis 是一个运维助手系统，包含：
 
 ### 业务总览
 - `README.md`
+- `docs/DOCS_INDEX.md`
 - `docs/project-progress.md`
-- `docs/release-v1.0.0.md`
 
 ### 达梦接入
 - `docs/dameng-setup.md`
@@ -51,9 +51,9 @@ Aegis 是一个运维助手系统，包含：
 - `scripts/check_dm_connection.sh`
 
 ### 验收与联调
-- `docs/iteration3-acceptance.md`
-- `docs/release-checklist-v1.0.0-admin-v2.md`
 - `docs/integration-quickstart.md`
+- `docs/offline-ai-setup.md`
+- `docs/login-common-pitfalls.md`
 
 ## 5. 下次会话“快速恢复”步骤（固定流程）
 
@@ -75,6 +75,11 @@ Aegis 是一个运维助手系统，包含：
 ## 7. 最近更新记录（倒序）
 
 ### 2026-03-09
+- 文档治理：清理阶段性重复/里程碑快照文档，新增统一入口 `docs/DOCS_INDEX.md`
+- README 与 AGENT_CONTEXT 的文档链接统一收敛到长期维护文档
+- 清理分支：`chore/docs-prune-milestones`
+
+### 2026-03-09（功能接续）
 - 接续开发：离线 AI（Ollama）正式接入 `diagnose` 与 `offline/analyze` 主链路
 - 新增文件：`backend/app/services/offline_llm.py`、`docs/offline-ai-setup.md`、`scripts/setup_offline_ai.sh`
 - 配置扩展：新增 `OFFLINE_AI_*` 参数（enabled/provider/model/base_url/timeout）
