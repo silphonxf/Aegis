@@ -89,6 +89,9 @@ def create_system(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    if db.query(System).filter(System.system_code == payload.system_code).first():
+        raise HTTPException(status_code=409, detail={"code": "SYSTEM_CODE_EXISTS", "message": "系统编号已存在"})
+
     system = System(
         system_code=payload.system_code,
         name=payload.name,
