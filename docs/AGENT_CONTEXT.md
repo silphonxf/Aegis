@@ -96,6 +96,7 @@ Aegis 是一个运维助手系统，包含：
 - 第一阶段 A（测试护栏）已完成并跑通 `18 passed`
 - 第一阶段 B（本地开发体验整理）已完成，新增 `dev-up / stop / reset / status`
 - 第一阶段 C 已开始，当前分支：`feat/toolbox-task-workflow`
+- 第一阶段 D 已开始，当前分支：`feat/admin-light-modularization`
 
 ### 2026-03-09
 - 文档治理：清理阶段性重复/里程碑快照文档，新增统一入口 `docs/DOCS_INDEX.md`
