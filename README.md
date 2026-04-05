@@ -10,58 +10,71 @@
 - 平台兼容：Python 技术栈 + 达梦数据库 + 信创环境适配 + Docker 部署
 
 ## 仓库结构
-- `docs/`：产品文档、开发计划、发布说明
+- `docs/`：产品文档、开发计划、进度与接手说明
 - `backend/`：Python 后端（API、业务逻辑、数据层）
 - `frontend-mobile/`：移动端前端（H5/PWA）
 - `frontend-admin/`：后台管理前端
 - `deploy/`：容器化与部署配置
 - `scripts/`：开发与运维脚本
 
-## 当前状态（v1.0.0 正式版）
-- [x] 迭代1：MVP核心闭环
-- [x] 迭代2：管理与可视化
-- [x] 迭代3（第一阶段）：工具箱 + AI诊断mock + 审批流
-- [x] 前后端联调与冒烟脚本
+## 当前状态
+- `v1.0.0` 主体功能已完成
+- 已补本地默认 seed（角色 / admin / 示例系统 / 巡检点）
+- 已补第一阶段回归测试与 smoke 护栏
+- 当前推荐继续推进：`docs/phase1-development-plan.md`
 
-## 管理后台（5174）使用说明（v2）
+## 本地快速启动（推荐）
 
-### 访问地址
+### 一键启动
+```bash
+cd /home/xf/.openclaw/workspace/projects/Aegis
+./scripts/dev-up.sh
+```
+
+### 一键检查
+```bash
+./scripts/dev-check.sh http://127.0.0.1:8000 admin local_admin_pass_2026
+```
+
+### 一键冒烟
+```bash
+./scripts/iteration3_smoke.sh http://127.0.0.1:8000 admin local_admin_pass_2026
+```
+
+### 停止服务
+```bash
+./scripts/dev-stop.sh
+```
+
+### 重置本地环境
+```bash
+./scripts/dev-reset.sh
+```
+
+### 查看状态
+```bash
+./scripts/dev-status.sh
+```
+
+## 本地默认地址
 - 管理后台：`http://127.0.0.1:5174`
 - 移动端：`http://127.0.0.1:5173`
 - 后端 API：`http://127.0.0.1:8000`
 
-### 界面结构
-- 左侧主菜单：
-  - 总览看板
-  - 用户与系统
-  - 资产管理
-  - 高级工具
-- 高级工具二级页签：
-  - 运维审批
-  - AI诊断
-  - 模板与快照
-  - 规则与审计
-  - 调试与错误码
+## 本地默认账号
+- 用户名：`admin`
+- 密码：`local_admin_pass_2026`
 
-### 看板能力
-- 登录后进入主界面
-- 自动/手动刷新切换
-- 异常系统筛选（状态 + 关键词）
-- CPU/MEM/DISK 趋势火花图
+> 若你已有自定义 `backend/.env`，以你的本地配置为准。
 
-详细说明见：
-- `docs/project-progress.md`
-- `docs/integration-quickstart.md`
+## 推荐阅读顺序
+- `docs/DOCS_INDEX.md`：文档入口
+- `docs/phase1-development-plan.md`：第一阶段开发计划
+- `docs/integration-quickstart.md`：联调与启动说明
+- `docs/project-progress.md`：项目进展
+- `docs/AGENT_CONTEXT.md`：持续上下文与接手要点
 
-## 快速验证
-
-```bash
-cd /home/xf/.openclaw/workspace/code/aegis
-./scripts/iteration3_smoke.sh
-```
-
-更多见：
-- `docs/DOCS_INDEX.md`（文档入口）
-- `docs/AGENT_CONTEXT.md`（会话持久化上下文，先看这个）
-- `docs/project-progress.md`
-- `docs/dameng-setup.md`
+## 说明
+- 本地联调默认走 SQLite，不依赖达梦即可启动。
+- 达梦接入与检查见：`docs/dameng-setup.md`
+- 离线 AI（Ollama）接入见：`docs/offline-ai-setup.md`

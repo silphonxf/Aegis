@@ -1,102 +1,117 @@
-# Aegis 项目进度（更新于 2026-02-28）
+# Aegis 项目进度（更新于 2026-04-05）
 
 ## 当前总体状态
 
-- 已完成：v1.0.0 正式版范围（认证、巡检、自检、报表、管理看板、资产管理、审计、工具箱与审批流基础能力）
-- 当前重点：达梦数据库接入完善与一键验收
+- 已完成：`v1.0.0` 正式版主体范围（认证、巡检、自检、报表、管理看板、资产管理、审计、工具箱与审批流基础能力）
+- 当前重点：从“可演示 / 可局部联调”推进到“稳定、可持续迭代的开发基线”
+- 当前开发路线：`docs/phase1-development-plan.md`
 
-## 本次新增进展（达梦接入）
+## 本次新增进展（2026-04-05）
 
-### 1) 配置能力增强
+### 1) 本地启动与默认登录能力修复
+
+已修复后端启动时未自动 seed 的问题：
+- 恢复最小种子数据初始化
+- 本地启动后会自动补齐默认管理员与示例数据
+
+新增 / 调整：
+- `backend/app/main.py`
+- `backend/.env.example`
+- `.gitignore`
+- `docs/integration-quickstart.md`
+
+结果：
+- 本地可直接启动并使用默认管理员登录
+- 默认管理员：`admin / local_admin_pass_2026`
+
+### 2) 第一阶段 A：测试护栏与 smoke 增强
+
+已新增并跑通后端回归测试：
+- `backend/tests/test_auth_basic.py`
+- `backend/tests/test_auth_profile.py`
+- `backend/tests/test_inspections.py`
+- `backend/tests/test_selfchecks.py`
+- `backend/tests/test_toolbox.py`
+- `backend/tests/test_ai.py`
+- `backend/tests/test_admin_assets.py`
+- `backend/tests/test_admin_systems.py`
+- `backend/tests/test_audit_logs.py`
+
+测试覆盖：
+- auth
+- inspections
+- selfchecks
+- toolbox
+- ai
+- admin / assets / audit
+
+本地验证结果：
+- `pytest -q` → `18 passed`
+
+脚本增强：
+- 新增 `scripts/dev-check.sh`
+- 增强 `scripts/iteration3_smoke.sh`
+
+当前 smoke 已覆盖：
+1. `healthz`
+2. 登录
+3. `/auth/me`
+4. 创建系统
+5. 创建自检模板
+6. 提交简化自检
+7. 创建并审批工具任务
+8. AI 诊断
+9. 创建资产并查询 summary
+10. 查询审计日志
+
+### 3) 第一阶段 B：本地开发体验整理（进行中）
+
+已新增 / 整理脚本：
+- `scripts/dev-up.sh`
+- `scripts/dev-stop.sh`
+- `scripts/dev-reset.sh`
+- `scripts/dev-status.sh`
+- `scripts/dev-check.sh`
+
+目标：
+- 新环境更容易启动
+- 常见排障更容易定位
+- 降低接手成本
+
+## 历史进展（保留）
+
+### 达梦接入与验收增强
 
 已支持两种达梦配置方式：
-
 - 方式A：`DATABASE_URL` 完整连接串
-- 方式B：`DM_HOST/DM_PORT/DM_NAME/DM_USER/DM_PASSWORD` 拆分配置（优先级高于 `DATABASE_URL`）
+- 方式B：`DM_HOST/DM_PORT/DM_NAME/DM_USER/DM_PASSWORD` 拆分配置（优先级更高）
 
 涉及文件：
-
 - `backend/app/core/config.py`
 - `backend/app/db/session.py`
 - `backend/alembic/env.py`
 - `backend/dameng.env.example`
 - `docs/dameng-setup.md`
 
-### 2) 一键检查脚本
+### 达梦检查脚本
 
 新增脚本：`scripts/check_dm_connection.sh`
 
 脚本会自动执行：
-
 1. 达梦端口连通检查（127.0.0.1:5236）
 2. Alembic 迁移（`alembic upgrade head`）
 3. 后端启动
 4. `/healthz` 健康检查
 5. 登录检查（`/api/v1/auth/login`）
+6. profile / change-password 写库回归
 
-使用方式：
-
-```bash
-cd /home/xf/.openclaw/workspace/code/aegis
-./scripts/check_dm_connection.sh        # 默认 8001
-./scripts/check_dm_connection.sh 8002   # 指定端口
-```
-
-### 3) 本地验证结果
-
-在本机环境实测通过：
-
-- 达梦端口可达
-- Alembic 迁移成功
-- `/healthz` 返回 `{"status":"ok"}`
-- admin 登录返回 `access_token`
-
-## 下一步建议
-
-1. 离线规则库从当前 6 条扩充到 20+ 条，并补充误报/漏报回归样例
-2. 将 `scripts/check_dm_connection.sh` 纳入 CI 可选阶段并输出结构化报告
-3. 为离线 AI 增加“模型超时/不可达”观测指标（成功率、耗时、回退次数）
-
-## 本次新增进展（2026-03-09，第二阶段）
-
-### 7) 达梦关键写库链路验收增强
-
-已增强 `scripts/check_dm_connection.sh`，在原有迁移/健康/登录检查基础上，新增写库接口校验：
-- `PUT /api/v1/auth/profile`（验证用户资料写入）
-- `POST /api/v1/auth/change-password`（验证密码更新）
-- 自动将密码回滚至默认值，避免影响后续环境
-
-### 8) 登录误区文档补充
-
-已新增文档：`docs/login-common-pitfalls.md`
-- 明确区分“应用账号登录”与“数据库账号连接”
-- 解释常见 401 场景
-- 给出推荐排查顺序
-
-### 9) 观测性增强（离线 AI + 达梦检查）
-
-- `scripts/check_dm_connection.sh` 新增结构化报告输出（默认 `/tmp/aegis_dm_check_report.json`）
-  - 成功输出：`ok/port/checks/checked_at`
-  - 失败输出：`ok=false/failed_step/reason/checked_at`
-- `POST /api/v1/ai/diagnose` 与 `POST /api/v1/ai/offline/analyze` 返回新增：
-  - `elapsed_ms`（本次分析耗时）
-  - `fallback_reason`（若发生回退则给出原因）
-- 审计日志 `ai_diagnose` / `ai_offline_analyze` 同步记录上述字段，便于后续统计回退率与时延分布
-
-## 本次新增进展（2026-03-09）
-
-### 6) 离线 AI（Ollama）接入到诊断主链路
+### 离线 AI（Ollama）接入
 
 已将离线模型接入以下接口，并保留规则引擎回退：
 - `POST /api/v1/ai/diagnose`
 - `POST /api/v1/ai/offline/analyze`
 
-能力说明：
-- 当 `OFFLINE_AI_ENABLED=true` 且 `OFFLINE_AI_PROVIDER=ollama` 时优先走本地模型
-- 模型调用异常/返回异常时自动回退到规则建议（`mode=rule_fallback`）
-- 返回中新增 `mode`，用于区分 `offline_ollama` 与 `rule_fallback`
-
-新增/更新文件：
+新增 / 更新文件：
 - `backend/app/services/offline_llm.py`
 - `backend/app/api/ai.py`
 - `backend/app/core/config.py`
@@ -104,46 +119,15 @@ cd /home/xf/.openclaw/workspace/code/aegis
 - `docs/offline-ai-setup.md`
 - `scripts/setup_offline_ai.sh`
 
-稳健性补强：
-- provider 判断改为大小写无关（`OFFLINE_AI_PROVIDER.lower()`）
-- LLM 若未返回有效 `suggestions`，抛错并走规则回退
+## 下一步建议
 
-## 本次新增进展（2026-03-06）
+### 第一优先级
+- 继续完成第一阶段 B 的文档与脚本收拢
+- 验证 `dev-up / stop / reset / status` 在干净环境中的可用性
 
-### 4) CI 已接入 + 达梦可选检查
+### 第二优先级
+- 开始第一阶段 C：工具箱 / 审批流闭环第一步
+- 统一任务状态与结果结构
 
-已新增 GitHub Actions 工作流：
-
-- `.github/workflows/backend-ci.yml`
-
-默认行为：
-- 在 `push/pull_request`（backend 相关路径）时运行 SQLite 冒烟检查：
-  - 安装依赖
-  - Alembic 迁移
-  - 启动 API
-  - `GET /healthz`
-
-可选行为（按需开启达梦检查）：
-- 手动触发 `workflow_dispatch` 时将 `run_dm_check=true`
-- 或设置仓库变量 `RUN_DM_CHECK=true`
-- 达梦连接参数走 `secrets`（`DM_HOST/DM_PORT/DM_NAME/DM_USER/DM_PASSWORD`）
-- 调用 `scripts/check_dm_connection.sh` 执行完整达梦连通检查
-
-### 5) AI离线错误日志分析（Phase 1 MVP）
-
-已新增离线分析数据模型与接口（规则引擎版本）：
-
-- 新增表：
-  - `offline_analysis_tasks`
-  - `offline_analysis_results`
-- Alembic：`backend/alembic/versions/20260306_09_offline_analysis_tables.py`
-- 新增模型：`backend/app/models/offline_analysis.py`
-- 新增接口（`/api/v1/ai/offline/*`）：
-  - `POST /api/v1/ai/offline/analyze`
-  - `GET /api/v1/ai/offline/tasks`
-  - `GET /api/v1/ai/offline/tasks/{task_id}`
-
-规则引擎能力（首版）：
-- 内置 6 条高频规则（数据库连接失败、磁盘满、OOM、端口冲突、鉴权失败、超时）
-- 输出：命中规则、风险等级、摘要、处置建议、日志摘录
-- 已本地联调验证通过（admin 登录后可调用离线分析接口）
+### 第三优先级
+- 开始第一阶段 D：管理后台轻量模块化
