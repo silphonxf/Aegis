@@ -10,6 +10,8 @@ env/
 # Env
 .env
 .env.*
+!.env.example
+!backend/.env.example
 
 # Local databases
 *.db

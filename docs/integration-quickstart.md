@@ -7,9 +7,12 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
+# 按需修改 SECRET_KEY / INIT_ADMIN_PASSWORD
 alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+> 说明：后端启动时会自动补齐最小种子数据（角色、默认管理员、示例系统/巡检点），首次本地联调可直接登录。
 
 ## 2. 启动移动端联调页
 ```bash

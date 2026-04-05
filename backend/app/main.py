@@ -82,8 +82,12 @@ def init_seed(db: Session):
 
 @app.on_event("startup")
 def on_startup():
-    # 数据库结构与初始数据统一通过 Alembic + 显式初始化脚本完成。
-    return None
+    # Alembic 负责表结构迁移；启动时补齐最小可用种子数据，保证本地/联调环境可直接登录。
+    db = SessionLocal()
+    try:
+        init_seed(db)
+    finally:
+        db.close()
 
 
 @app.exception_handler(RequestValidationError)
