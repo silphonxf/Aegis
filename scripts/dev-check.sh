@@ -17,11 +17,7 @@ curl -fsS "$BASE/healthz" | python3 -m json.tool >/tmp/aegis_devcheck_health.jso
 echo "[2/3] login"
 LOGIN_RESP=$(curl -fsS -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
   -d "{\"username\":\"$USER\",\"password\":\"$PASS\"}")
-TOKEN=$(python3 - <<'PY'
-import json,sys
-print(json.loads(sys.stdin.read()).get('access_token',''))
-PY
-<<< "$LOGIN_RESP")
+TOKEN=$(printf '%s' "$LOGIN_RESP" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("access_token", ""))')
 
 if [[ -z "$TOKEN" ]]; then
   echo "❌ 登录失败"

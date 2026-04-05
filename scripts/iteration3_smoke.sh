@@ -11,20 +11,13 @@ if [[ -z "$PASS" ]]; then
   exit 1
 fi
 
-echo "[1/7] login"
+echo "[1/10] healthz"
+curl -sS "$BASE/healthz" | python3 -m json.tool > /tmp/aegis_health.json
+
+echo "[2/10] login"
 LOGIN_RESP=$(curl -sS -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
   -d "{\"username\":\"$USER\",\"password\":\"$PASS\"}")
-TOKEN=$(python3 - <<'PY'
-import json,sys
-raw=sys.stdin.read().strip()
-try:
-    data=json.loads(raw)
-except Exception:
-    print("")
-    sys.exit(0)
-print(data.get("access_token", ""))
-PY
-<<< "$LOGIN_RESP")
+TOKEN=$(printf '%s' "$LOGIN_RESP" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("access_token", ""))')
 
 if [[ -z "$TOKEN" ]]; then
   echo "❌ 登录失败，未获取到 access_token。响应如下："
@@ -34,28 +27,41 @@ fi
 
 AUTH="Authorization: Bearer $TOKEN"
 
-echo "[2/7] toolbox ping"
-curl -sS -X POST "$BASE/api/v1/toolbox/ping" -H "$AUTH" -H 'Content-Type: application/json' \
-  -d '{"host":"127.0.0.1","count":1}' | python3 -m json.tool > /tmp/aegis_ping.json
+echo "[3/10] me"
+curl -sS "$BASE/api/v1/auth/me" -H "$AUTH" | python3 -m json.tool > /tmp/aegis_me.json
 
-echo "[3/7] toolbox port-check"
-curl -sS -X POST "$BASE/api/v1/toolbox/port-check" -H "$AUTH" -H 'Content-Type: application/json' \
-  -d '{"host":"127.0.0.1","port":8000,"timeout_ms":1200}' | python3 -m json.tool > /tmp/aegis_port.json
+echo "[4/10] create system"
+SYS_SUFFIX=$(date +%s)
+SYSTEM_CODE="SMOKE-SYS-$SYS_SUFFIX"
+SYSTEM_ID=$(curl -sS -X POST "$BASE/api/v1/admin/systems" -H "$AUTH" -H 'Content-Type: application/json' \
+  -d "{\"system_code\":\"$SYSTEM_CODE\",\"name\":\"Smoke系统\",\"env\":\"test\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
 
-echo "[4/7] create restart task"
+echo "[5/10] create selfcheck template"
+TEMPLATE_ID=$(curl -sS -X POST "$BASE/api/v1/selfchecks/templates" -H "$AUTH" -H 'Content-Type: application/json' \
+  -d "{\"system_id\":$SYSTEM_ID,\"check_type\":\"daily\",\"name\":\"Smoke模板\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+
+echo "[6/10] create simple selfcheck"
+curl -sS -X POST "$BASE/api/v1/selfchecks/records/simple" -H "$AUTH" -H 'Content-Type: application/json' \
+  -d "{\"system_id\":$SYSTEM_ID,\"content\":\"Smoke自检\",\"result\":\"normal\",\"note\":\"from smoke\"}" | python3 -m json.tool > /tmp/aegis_selfcheck.json
+
+echo "[7/10] create restart task + approve"
 TASK_ID=$(curl -sS -X POST "$BASE/api/v1/toolbox/restart-task" -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"target":"local-host","reason":"smoke"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
-
-echo "[5/7] approve task"
 curl -sS -X PUT "$BASE/api/v1/toolbox/tasks/$TASK_ID/status" -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"status":"approved","note":"smoke-pass"}' | python3 -m json.tool > /tmp/aegis_task_approved.json
 
-echo "[6/7] ai diagnose"
+echo "[8/10] ai diagnose"
 curl -sS -X POST "$BASE/api/v1/ai/diagnose" -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"title":"smoke","detail":"cpu load and timeout","severity":"medium"}' | python3 -m json.tool > /tmp/aegis_ai.json
 
-echo "[7/7] ai history"
-curl -sS "$BASE/api/v1/ai/diagnoses?page=1&size=5" -H "$AUTH" | python3 -m json.tool > /tmp/aegis_ai_history.json
+echo "[9/10] create asset + summary"
+ASSET_CODE="SMOKE-ASSET-$SYS_SUFFIX"
+curl -sS -X POST "$BASE/api/v1/admin/assets" -H "$AUTH" -H 'Content-Type: application/json' \
+  -d "{\"asset_code\":\"$ASSET_CODE\",\"name\":\"Smoke资产\",\"category\":\"server\",\"system_id\":$SYSTEM_ID,\"status\":\"in_use\"}" | python3 -m json.tool > /tmp/aegis_asset.json
+curl -sS "$BASE/api/v1/admin/assets/summary" -H "$AUTH" | python3 -m json.tool > /tmp/aegis_asset_summary.json
+
+echo "[10/10] audit logs"
+curl -sS "$BASE/api/v1/admin/audit-logs?page=1&size=5" -H "$AUTH" | python3 -m json.tool > /tmp/aegis_audit.json
 
 echo "OK: iteration3 smoke passed"
-echo "artifacts: /tmp/aegis_ping.json /tmp/aegis_port.json /tmp/aegis_task_approved.json /tmp/aegis_ai.json /tmp/aegis_ai_history.json"
+echo "artifacts: /tmp/aegis_health.json /tmp/aegis_me.json /tmp/aegis_selfcheck.json /tmp/aegis_task_approved.json /tmp/aegis_ai.json /tmp/aegis_asset.json /tmp/aegis_asset_summary.json /tmp/aegis_audit.json"
