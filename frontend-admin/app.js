@@ -658,6 +658,28 @@ $('btnAuditClear').onclick = () => {
   $('audit').textContent = '已清空筛选条件';
 };
 
+function renderToolTaskTable(items) {
+  const rows = (items || []).map((task) => {
+    const result = task.result || {};
+    const successText = result.success === true ? 'success' : result.success === false ? 'failed' : '-';
+    const timeText = task.finished_at || task.started_at || task.created_at || '-';
+    const noteText = result.note || result.reason || result.error || '-';
+    const status = String(task.status || 'unknown').toLowerCase();
+    return `
+      <tr>
+        <td>${escapeHtml(task.id)}</td>
+        <td>${escapeHtml(task.action || '-')}</td>
+        <td>${escapeHtml(task.target || '-')}</td>
+        <td><span class="status-chip ${escapeHtml(status)}">${escapeHtml(task.status || '-')}</span> / ${escapeHtml(successText)}</td>
+        <td>${escapeHtml(task.executor || result.executor || '-')}</td>
+        <td>${escapeHtml(timeText)}</td>
+        <td>${escapeHtml(noteText)}</td>
+      </tr>
+    `;
+  }).join('');
+  $('toolTaskTbody').innerHTML = rows || '<tr><td colspan="7">暂无任务</td></tr>';
+}
+
 function formatTaskRow(task) {
   const result = task.result || {};
   return [
@@ -678,6 +700,7 @@ $('btnToolTaskList').onclick = async () => {
     const s = $('toolTaskStatusFilter').value.trim();
     const q = s ? `?page=1&size=50&status=${encodeURIComponent(s)}` : '?page=1&size=50';
     const d = await request(`/api/v1/toolbox/tasks${q}`, { headers: headers() });
+    renderToolTaskTable(d.items || []);
     const items = (d.items || []).map(formatTaskRow).join('\n\n----------------\n\n');
     $('toolTaskResult').textContent = `共 ${d.total ?? d.items?.length ?? 0} 条\n\n${items || '暂无任务'}`;
   } catch (e) { $('toolTaskResult').textContent = formatError('工具任务', e); }
@@ -692,6 +715,7 @@ $('btnToolTaskUpdate').onclick = async () => {
       body: JSON.stringify({ status: $('toolTaskActionStatus').value, note: $('toolTaskNote').value || null, executor: 'admin-console' }),
     });
     $('toolTaskResult').textContent = formatSuccess('工具任务', '状态更新成功', d);
+    await $('btnToolTaskList').onclick();
   } catch (e) { $('toolTaskResult').textContent = formatError('工具任务', e); }
 };
 

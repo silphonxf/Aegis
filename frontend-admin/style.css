@@ -264,6 +264,12 @@ th { background: #113654; color: #7dd3fc; }
 .status-chip.yellow { background: #1e4b6d; color: #9dd6f5; border-color: #2e5a7d; }
 .status-chip.red { background: #173754; color: #b8d3ea; border-color: #2a5a7a; }
 .status-chip.unknown { background: #163c58; color: #8ea9c3; border-color: #2a5a7a; }
+.status-chip.approved { background: #123a2e; color: #9df5d4; border-color: #1f6e56; }
+.status-chip.running { background: #1e4b6d; color: #9dd6f5; border-color: #2e5a7d; }
+.status-chip.done { background: #123a2e; color: #9df5d4; border-color: #1f6e56; }
+.status-chip.failed { background: #173754; color: #ffd3dd; border-color: #8a3348; }
+.status-chip.rejected { background: #3b1f2a; color: #ffbfd0; border-color: #8a3348; }
+.status-chip.cancelled { background: #163c58; color: #8ea9c3; border-color: #2a5a7a; }
 .tool-tabs { display: flex; gap: 8px; margin: 10px 0 12px; flex-wrap: wrap; }
 .tool-tab {
   width: auto;

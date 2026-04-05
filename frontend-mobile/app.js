@@ -779,18 +779,22 @@ $('btnAppRestart').onclick = async () => {
 $('btnRefreshToolTasks').onclick = async () => {
   try {
     const tasks = await api('/api/v1/toolbox/tasks?page=1&size=10', { headers: authHeaders() });
-    show('appToolResult', {
-      message: '最近工具任务',
-      items: (tasks.items || []).map((t) => ({
+    const lines = (tasks.items || []).map((t) => {
+      const result = t.result || {};
+      return {
         id: t.id,
         action: t.action,
         target: t.target,
         status: t.status,
-        executor: t.executor,
-        started_at: t.started_at,
-        finished_at: t.finished_at,
-        result: t.result,
-      })),
+        executor: t.executor || result.executor || '-',
+        success: result.success,
+        note: result.note || result.reason || '-',
+        time: t.finished_at || t.started_at || t.created_at || '-',
+      };
+    });
+    show('appToolResult', {
+      message: '最近工具任务',
+      items: lines,
     });
   } catch (e) {
     show('appToolResult', e.message || '读取任务失败');
