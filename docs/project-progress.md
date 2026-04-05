@@ -64,7 +64,7 @@
 9. 创建资产并查询 summary
 10. 查询审计日志
 
-### 3) 第一阶段 B：本地开发体验整理（进行中）
+### 3) 第一阶段 B：本地开发体验整理
 
 已新增 / 整理脚本：
 - `scripts/dev-up.sh`
@@ -73,10 +73,51 @@
 - `scripts/dev-status.sh`
 - `scripts/dev-check.sh`
 
-目标：
+结果：
 - 新环境更容易启动
 - 常见排障更容易定位
-- 降低接手成本
+- 接手成本明显降低
+
+### 4) 第一阶段 C：工具箱 / 审批流闭环（进行中）
+
+已完成第一步基础能力：
+- 工具任务状态机扩展为：
+  - `pending_approval`
+  - `approved`
+  - `running`
+  - `done`
+  - `failed`
+  - `rejected`
+  - `cancelled`
+- `tool_tasks` 新增字段：
+  - `executor`
+  - `started_at`
+  - `finished_at`
+- 统一任务 `result` 结构，包含：
+  - `reason`
+  - `note`
+  - `executor`
+  - `started_at`
+  - `finished_at`
+  - `success`
+  - `error`
+- `/toolbox/error-logs` 返回新增结构化字段：
+  - `excerpt`
+  - `line_count`
+  - `truncated`
+  - `matched_keywords`
+- 管理后台已适配新版任务状态显示
+- 移动端已接入“创建重启任务 / 查看最近工具任务”
+
+涉及文件：
+- `backend/alembic/versions/20260405_10_tool_task_workflow.py`
+- `backend/app/models/tool_task.py`
+- `backend/app/schemas/toolbox.py`
+- `backend/app/api/toolbox.py`
+- `frontend-admin/index.html`
+- `frontend-admin/app.js`
+- `frontend-mobile/index.html`
+- `frontend-mobile/app.js`
 
 ## 历史进展（保留）
 

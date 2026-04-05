@@ -73,6 +73,7 @@ cd /home/xf/.openclaw/workspace/projects/Aegis
 - `docs/integration-quickstart.md`：联调与启动说明
 - `docs/project-progress.md`：项目进展
 - `docs/AGENT_CONTEXT.md`：持续上下文与接手要点
+- `CONTRIBUTING.md`：协作与分支开发规则
 
 ## 说明
 - 本地联调默认走 SQLite，不依赖达梦即可启动。

@@ -658,12 +658,28 @@ $('btnAuditClear').onclick = () => {
   $('audit').textContent = '已清空筛选条件';
 };
 
+function formatTaskRow(task) {
+  const result = task.result || {};
+  return [
+    `#${task.id} ${task.action} @ ${task.target}`,
+    `status=${task.status}`,
+    `executor=${task.executor || result.executor || '-'}`,
+    `success=${result.success === true ? 'true' : result.success === false ? 'false' : '-'}`,
+    `started_at=${task.started_at || result.started_at || '-'}`,
+    `finished_at=${task.finished_at || result.finished_at || '-'}`,
+    `reason=${result.reason || '-'}`,
+    `note=${result.note || '-'}`,
+    `error=${result.error || '-'}`,
+  ].join('\n');
+}
+
 $('btnToolTaskList').onclick = async () => {
   try {
     const s = $('toolTaskStatusFilter').value.trim();
     const q = s ? `?page=1&size=50&status=${encodeURIComponent(s)}` : '?page=1&size=50';
     const d = await request(`/api/v1/toolbox/tasks${q}`, { headers: headers() });
-    $('toolTaskResult').textContent = formatSuccess('工具任务', '操作成功', d);
+    const items = (d.items || []).map(formatTaskRow).join('\n\n----------------\n\n');
+    $('toolTaskResult').textContent = `共 ${d.total ?? d.items?.length ?? 0} 条\n\n${items || '暂无任务'}`;
   } catch (e) { $('toolTaskResult').textContent = formatError('工具任务', e); }
 };
 
@@ -673,9 +689,9 @@ $('btnToolTaskUpdate').onclick = async () => {
     const d = await request(`/api/v1/toolbox/tasks/${taskId}/status`, {
       method: 'PUT',
       headers: headers(),
-      body: JSON.stringify({ status: $('toolTaskActionStatus').value, note: $('toolTaskNote').value || null }),
+      body: JSON.stringify({ status: $('toolTaskActionStatus').value, note: $('toolTaskNote').value || null, executor: 'admin-console' }),
     });
-    $('toolTaskResult').textContent = formatSuccess('工具任务', '操作成功', d);
+    $('toolTaskResult').textContent = formatSuccess('工具任务', '状态更新成功', d);
   } catch (e) { $('toolTaskResult').textContent = formatError('工具任务', e); }
 };
 

@@ -36,6 +36,11 @@ Aegis 是一个运维助手系统，包含：
    - `/healthz`
    - `/api/v1/auth/login`
 
+4. Git 协作规则已变更：
+   - 新功能必须在功能分支开发
+   - 不直接提交到 `main`
+   - 由用户手动 merge 回主分支
+
 ## 4. 关键文件地图（下次优先看）
 
 ### 业务总览
@@ -75,8 +80,9 @@ Aegis 是一个运维助手系统，包含：
 - [x] 补充 `backend/.env.example`
 - [ ] 按 `docs/phase1-development-plan.md` 推进第一阶段开发
 - [ ] 关键写库接口补充达梦集成测试
-- [ ] 补关键接口回归测试与 smoke 增强
-- [ ] 整理本地开发脚本（up/stop/reset/status）
+- [x] 补关键接口回归测试与 smoke 增强
+- [x] 整理本地开发脚本（up/stop/reset/status）
+- [ ] 完成第一阶段 C：工具箱 / 审批流闭环剩余交互与展示优化
 
 ## 7. 最近更新记录（倒序）
 
@@ -86,6 +92,10 @@ Aegis 是一个运维助手系统，包含：
 - `docs/AGENT_CONTEXT.md` 同步当前阶段目标与待办
 - 修复后端启动自动 seed，恢复本地默认管理员登录能力
 - 补充 `backend/.env.example`，并修复 `.gitignore` 对示例环境文件的误伤
+- 新增 `CONTRIBUTING.md`，明确后续功能统一走功能分支，由用户手动 merge 到 `main`
+- 第一阶段 A（测试护栏）已完成并跑通 `18 passed`
+- 第一阶段 B（本地开发体验整理）已完成，新增 `dev-up / stop / reset / status`
+- 第一阶段 C 已开始，当前分支：`feat/toolbox-task-workflow`
 
 ### 2026-03-09
 - 文档治理：清理阶段性重复/里程碑快照文档，新增统一入口 `docs/DOCS_INDEX.md`
