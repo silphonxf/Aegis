@@ -247,6 +247,8 @@
 
 #### C-1. 扩展任务状态机
 
+> 进度：进行中（已完成状态机、执行元数据、统一 result 结构与前端第一轮适配）
+
 **涉及文件：**
 - `backend/app/api/toolbox.py`
 - `backend/app/models/tool_task.py`

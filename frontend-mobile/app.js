@@ -761,7 +761,45 @@ $('btnToolPing').onclick = async () => {
 
 $('btnCaptureStart').onclick = () => show('captureResult', { status: 'capturing', started_at: new Date().toISOString(), note: '抓包功能当前为 Mock，后续接入真实抓包执行器。' });
 $('btnCaptureStop').onclick = () => show('captureResult', { status: 'stopped', stopped_at: new Date().toISOString() });
-$('btnAppRestart').onclick = () => show('appToolResult', { action: 'app_restart', status: 'mocked', message: '应用重启 Mock 完成，后续接审批+执行器。' });
+$('btnAppRestart').onclick = async () => {
+  try {
+    const task = await api('/api/v1/toolbox/restart-task', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ target: 'mobile-selected-app', reason: 'mobile toolbox request' }),
+    });
+    show('appToolResult', {
+      message: '已创建重启审批任务，请到管理后台审批或继续查看任务状态。',
+      task,
+    });
+  } catch (e) {
+    show('appToolResult', e.message || '创建任务失败');
+  }
+};
+$('btnRefreshToolTasks').onclick = async () => {
+  try {
+    const tasks = await api('/api/v1/toolbox/tasks?page=1&size=10', { headers: authHeaders() });
+    const lines = (tasks.items || []).map((t) => {
+      const result = t.result || {};
+      return {
+        id: t.id,
+        action: t.action,
+        target: t.target,
+        status: t.status,
+        executor: t.executor || result.executor || '-',
+        success: result.success,
+        note: result.note || result.reason || '-',
+        time: t.finished_at || t.started_at || t.created_at || '-',
+      };
+    });
+    show('appToolResult', {
+      message: '最近工具任务',
+      items: lines,
+    });
+  } catch (e) {
+    show('appToolResult', e.message || '读取任务失败');
+  }
+};
 $('btnAppAiQa').onclick = () => show('appToolResult', { action: 'ai_qa', status: 'mocked', answer: '这是 AI 问答 Mock 回答：后续接真实模型服务。' });
 
 initSubNavigation();

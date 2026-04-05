@@ -3,6 +3,7 @@ import os
 import socket
 import subprocess
 import time
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -52,6 +53,33 @@ def _read_error_logs(hours: int, lines: int) -> tuple[str, str]:
             last_err = str(e)
 
     return "", last_err
+
+
+def _load_task_result(task: ToolTask) -> dict:
+    if not task.result:
+        return {}
+    try:
+        return json.loads(task.result)
+    except Exception:
+        return {"raw": task.result}
+
+
+def _write_task_result(task: ToolTask, *, note: str | None = None, executor: str | None = None, success: bool | None = None, error: str | None = None):
+    data = _load_task_result(task)
+    if note is not None:
+        data["note"] = note
+    if executor is not None:
+        data["executor"] = executor
+    if task.started_at is not None:
+        data["started_at"] = task.started_at.isoformat()
+    if task.finished_at is not None:
+        data["finished_at"] = task.finished_at.isoformat()
+    if success is not None:
+        data["success"] = success
+    if error is not None:
+        data["error"] = error
+    task.result = json.dumps(data, ensure_ascii=False)
+    return data
 
 
 @router.post("/ping")
@@ -124,11 +152,17 @@ def read_error_logs(
         {"hours": hours, "lines": lines, "source": source[:200]},
     )
 
+    excerpt_lines = [ln for ln in content.splitlines() if ln.strip()]
+    keywords = [kw for kw in ["error", "exception", "fatal", "traceback", "timeout"] if kw in content.lower()]
     return {
         "hours": hours,
         "lines": lines,
         "source": source,
         "content": content,
+        "excerpt": "\n".join(excerpt_lines[:50]),
+        "line_count": len(excerpt_lines),
+        "truncated": len(content) >= 120000,
+        "matched_keywords": keywords,
     }
 
 
@@ -142,13 +176,30 @@ def create_restart_task(
         action="restart",
         target=payload.target,
         status="pending_approval",
-        result=json.dumps({"reason": payload.reason, "mock": True}, ensure_ascii=False),
+        result=json.dumps(
+            {
+                "reason": payload.reason,
+                "note": None,
+                "executor": "mock",
+                "started_at": None,
+                "finished_at": None,
+                "success": None,
+                "error": None,
+            },
+            ensure_ascii=False,
+        ),
     )
     db.add(task)
     db.commit()
     db.refresh(task)
     log_action(db, "toolbox_create_restart_task", "tool_task", current_user, {"task_id": task.id, "target": task.target})
-    return {"id": task.id, "status": task.status, "mock": True, "message": "仅创建审批任务，未执行重启"}
+    return {
+        "id": task.id,
+        "status": task.status,
+        "result": _load_task_result(task),
+        "mock": True,
+        "message": "仅创建审批任务，未执行重启",
+    }
 
 
 @router.get("/tasks")
@@ -177,7 +228,10 @@ def list_tasks(
                 "action": t.action,
                 "target": t.target,
                 "status": t.status,
-                "result": t.result,
+                "executor": t.executor,
+                "started_at": t.started_at,
+                "finished_at": t.finished_at,
+                "result": _load_task_result(t),
                 "created_at": t.created_at,
             }
             for t in items
@@ -199,17 +253,37 @@ def update_task_status(
     current = task.status
     target = payload.status
     allowed = {
-        "pending_approval": {"approved", "rejected"},
-        "approved": {"done"},
+        "pending_approval": {"approved", "rejected", "cancelled"},
+        "approved": {"running", "cancelled"},
+        "running": {"done", "failed", "cancelled"},
         "rejected": set(),
         "done": set(),
+        "failed": set(),
+        "cancelled": set(),
     }
     if target not in allowed.get(current, set()):
         raise HTTPException(status_code=400, detail={"code": "TASK_STATUS_INVALID", "message": f"不允许从 {current} 变更到 {target}"})
 
     task.status = target
-    if payload.note:
-        task.result = json.dumps({"note": payload.note, "updated_by": current_user.username}, ensure_ascii=False)
+    executor = payload.executor or task.executor or current_user.username
+    task.executor = executor
+
+    if target == "running" and task.started_at is None:
+        task.started_at = datetime.utcnow()
+    if target in {"done", "failed", "rejected", "cancelled"} and task.finished_at is None:
+        if task.started_at is None and target in {"done", "failed"}:
+            task.started_at = datetime.utcnow()
+        task.finished_at = datetime.utcnow()
+
+    success = None
+    error = None
+    if target == "done":
+        success = True
+    elif target in {"failed", "rejected", "cancelled"}:
+        success = False
+        error = payload.note if target == "failed" else None
+
+    result = _write_task_result(task, note=payload.note, executor=executor, success=success, error=error)
     db.commit()
     db.refresh(task)
 
@@ -218,6 +292,13 @@ def update_task_status(
         "toolbox_update_task_status",
         "tool_task",
         current_user,
-        {"task_id": task.id, "from": current, "to": target},
+        {"task_id": task.id, "from": current, "to": target, "executor": executor},
     )
-    return {"id": task.id, "status": task.status}
+    return {
+        "id": task.id,
+        "status": task.status,
+        "executor": task.executor,
+        "started_at": task.started_at,
+        "finished_at": task.finished_at,
+        "result": result,
+    }
