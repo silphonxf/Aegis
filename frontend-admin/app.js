@@ -11,8 +11,10 @@ ns.state = ns.state || {
   selectedSystemCode: 'HOST-LOCAL-001',
 };
 
-function headers() { return ns.api.headers(); }
-function request(path, options = {}) { return ns.api.request(path, options); }
+function formatError(moduleName, e) {
+  const msg = e?.message || String(e) || '未知错误';
+  return `【${moduleName}】请求失败\n原因：${msg}\n建议：请检查登录状态或稍后重试。`;
+}
 
 function switchPanel(sectionId) {
   document.querySelectorAll('.panel').forEach((panel) => panel.classList.remove('active'));
@@ -22,11 +24,6 @@ function switchPanel(sectionId) {
 
   if (sectionId === 'panel-dashboard' && ns.state.token) ns.dashboard.startDashboardAutoRefresh();
   else ns.dashboard.stopDashboardAutoRefresh();
-}
-
-function formatError(moduleName, e) {
-  const msg = e?.message || String(e) || '未知错误';
-  return `【${moduleName}】请求失败\n原因：${msg}\n建议：请检查登录状态或稍后重试。`;
 }
 
 $('btnLogin').onclick = async () => {
@@ -42,32 +39,23 @@ $('btnLogin').onclick = async () => {
 };
 
 $('btnRefreshDashboard').onclick = () => ns.dashboard.refreshDashboard();
-$('btnToolTaskList').onclick = () => ns.toolbox.listTasks();
-$('btnToolTaskUpdate').onclick = () => ns.toolbox.updateTask();
-$('btnListAssets').onclick = () => ns.assets.listAssets();
-$('btnFindUsers').onclick = async () => {
-  try {
-    await ns.users.findUsers($('userSearchKeyword').value.trim());
-  } catch (e) {
-    $('userListSummary').textContent = formatError('用户查询', e);
-    $('userListTbody').innerHTML = '<tr><td colspan="4">查询失败</td></tr>';
-  }
-};
-$('btnFindSystems').onclick = async () => {
-  try {
-    await ns.systems.findSystems($('systemSearchKeyword2').value.trim());
-  } catch (e) {
-    $('systemListSummary').textContent = formatError('系统查询', e);
-    $('systemListTbody').innerHTML = '<tr><td colspan="4">查询失败</td></tr>';
-  }
-};
+$('btnToolTaskList').onclick = () => ns.toolbox.listTasks().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); });
+$('btnToolTaskUpdate').onclick = () => ns.toolbox.updateTask().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); });
+$('btnListAssets').onclick = () => ns.assets.listAssets().catch((e) => { $('assetListResult').textContent = formatError('资产列表', e); });
+$('btnFindUsers').onclick = () => ns.users.findUsers($('userSearchKeyword').value.trim()).catch((e) => {
+  $('userListSummary').textContent = formatError('用户查询', e);
+  $('userListTbody').innerHTML = '<tr><td colspan="4">查询失败</td></tr>';
+});
+$('btnFindSystems').onclick = () => ns.systems.findSystems($('systemSearchKeyword2').value.trim()).catch((e) => {
+  $('systemListSummary').textContent = formatError('系统查询', e);
+  $('systemListTbody').innerHTML = '<tr><td colspan="4">查询失败</td></tr>';
+});
 $('btnLoadRules').onclick = () => ns.rulesAudit.loadRules().catch((e) => { $('ruleResult').textContent = formatError('规则配置', e); });
 $('btnSaveRules').onclick = () => ns.rulesAudit.saveRules().catch((e) => { $('ruleResult').textContent = formatError('规则配置', e); });
 $('btnAudit').onclick = () => ns.rulesAudit.loadAudit().catch((e) => { $('audit').textContent = formatError('审计日志', e); });
 $('btnCreateTemplate').onclick = () => ns.templates.createTemplate().catch((e) => { $('templateCreateResult').textContent = formatError('创建模板', e); });
 $('btnListTemplates').onclick = () => ns.templates.listTemplates().catch((e) => { $('templateListResult').textContent = formatError('模板列表', e); });
 $('btnCreateSnapshot').onclick = () => ns.templates.createSnapshot().catch((e) => { $('snapshotResult').textContent = formatError('状态快照', e); });
-
 $('btnCreateAsset').onclick = async () => {
   try {
     const payload = {
@@ -84,6 +72,24 @@ $('btnCreateAsset').onclick = async () => {
   }
 };
 
+$('btnOpenCreateUserModal').onclick = () => ns.modals.openModal('createUserModal');
+$('btnCloseCreateUserModal').onclick = () => ns.modals.closeModal('createUserModal');
+$('btnOpenCreateSystemModal').onclick = () => ns.modals.openModal('createSystemModal');
+$('btnCloseCreateSystemModal').onclick = () => ns.modals.closeModal('createSystemModal');
+$('btnSubmitCreateUser').onclick = () => ns.modals.submitCreateUser().catch((e) => {
+  $('userListSummary').textContent = formatError('创建用户', e);
+  $('userListTbody').innerHTML = '<tr><td colspan="4">操作失败</td></tr>';
+});
+$('btnSubmitCreateSystem').onclick = () => ns.modals.submitCreateSystem().catch((e) => {
+  $('systemListSummary').textContent = formatError('创建系统', e);
+  $('systemListTbody').innerHTML = '<tr><td colspan="4">操作失败</td></tr>';
+});
+
+$('btnAssetFilterClear').onclick = () => ns.debug.clearAssetFilters();
+$('btnAuditClear').onclick = () => ns.debug.clearAuditFilters();
+$('btnRefreshHistory').onclick = () => ns.api.renderHistory();
+$('btnClearHistory').onclick = () => ns.debug.clearHistory();
+
 $('btnToggleAutoRefresh').onclick = () => {
   ns.state.autoRefreshEnabled = !ns.state.autoRefreshEnabled;
   if (ns.state.autoRefreshEnabled) ns.dashboard.startDashboardAutoRefresh();
@@ -93,6 +99,17 @@ $('btnToggleAutoRefresh').onclick = () => {
 
 Array.from(document.querySelectorAll('.menu-btn')).forEach((btn) => {
   btn.addEventListener('click', () => switchPanel(btn.dataset.section));
+});
+
+Array.from(document.querySelectorAll('.tool-tab')).forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tool-tab').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.tool-pane').forEach((p) => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tool)?.classList.add('active');
+    const hint = document.getElementById('toolHint');
+    if (hint) hint.textContent = btn.dataset.desc || '';
+  });
 });
 
 $('btnLogout').onclick = () => ns.auth.logout();
