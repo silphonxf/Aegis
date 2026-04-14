@@ -207,14 +207,24 @@
 
           <div id="tool-ops" class="tool-pane active">
             <div class="grid4">
-              <input id="toolTaskStatusFilter" placeholder="筛选status，如 pending_approval" />
+              <input id="toolTaskStatusFilter" placeholder="筛选status，如 pending_approval/running" />
               <input id="toolTaskId" placeholder="task_id" />
-              <select id="toolTaskActionStatus"><option value="approved">approved</option><option value="rejected">rejected</option><option value="done">done</option></select>
+              <select id="toolTaskActionStatus"><option value="approved">approved</option><option value="running">running</option><option value="done">done</option><option value="failed">failed</option><option value="rejected">rejected</option><option value="cancelled">cancelled</option></select>
               <input id="toolTaskNote" placeholder="备注（可选）" />
             </div>
             <div class="grid2">
               <button id="btnToolTaskList">刷新工具任务</button>
               <button id="btnToolTaskUpdate">更新任务状态</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th><th>动作</th><th>目标</th><th>状态</th><th>执行者</th><th>时间</th><th>说明</th>
+                  </tr>
+                </thead>
+                <tbody id="toolTaskTbody"><tr><td colspan="7">暂无任务</td></tr></tbody>
+              </table>
             </div>
             <pre id="toolTaskResult"></pre>
           </div>
@@ -371,6 +381,16 @@
     </div>
   </div>
 
+  <script src="./js/api.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./js/dashboard.js"></script>
+  <script src="./js/toolbox.js"></script>
+  <script src="./js/assets.js"></script>
+  <script src="./js/users.js"></script>
+  <script src="./js/systems.js"></script>
+  <script src="./js/rules-audit.js"></script>
+  <script src="./js/templates.js"></script>
+  <script src="./js/modals.js"></script>
   <script src="./js/debug.js"></script>
   <script src="./app.js"></script>
 </body>
