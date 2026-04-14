@@ -298,6 +298,19 @@
           </div>
 
           <div id="tool-debug" class="tool-pane">
+            <h3>开发者调试区</h3>
+            <div class="debug-grid">
+              <div class="debug-card"><span>API Base</span><strong id="debugApiBase">--</strong></div>
+              <div class="debug-card"><span>Token 状态</span><strong id="debugTokenState">未登录</strong></div>
+              <div class="debug-card"><span>当前用户</span><strong id="debugCurrentUser">--</strong></div>
+              <div class="debug-card"><span>最近请求时间</span><strong id="debugLastRequestAt">--</strong></div>
+            </div>
+            <div class="grid2">
+              <button id="btnDebugHealthz">检测 healthz</button>
+              <button id="btnDebugMe">读取当前用户</button>
+            </div>
+            <pre id="debugPanelResult">尚未执行调试检查</pre>
+
             <h3>错误码说明</h3>
             <ul class="code-list">
               <li><code>TOKEN_EXPIRED</code>：Token 过期，需要重新登录</li>
