@@ -19,6 +19,21 @@ window.AegisAdmin = window.AegisAdmin || {};
     ids.forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
   }
 
+  function resetCreateAssetModal() {
+    const defaults = {
+      modalAssetCode: '',
+      modalAssetName: '',
+      modalAssetCategory: 'server',
+      modalAssetSystemId: '',
+      modalAssetLocation: '',
+      modalAssetStatus: 'in_use',
+    };
+    Object.entries(defaults).forEach(([id, value]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = value;
+    });
+  }
+
   async function submitCreateUser() {
     const d = await ns.api.request('/api/v1/admin/users', {
       method: 'POST',
@@ -51,12 +66,29 @@ window.AegisAdmin = window.AegisAdmin || {};
     return d;
   }
 
+  async function submitCreateAsset() {
+    const payload = {
+      asset_code: document.getElementById('modalAssetCode').value.trim(),
+      name: document.getElementById('modalAssetName').value.trim(),
+      category: document.getElementById('modalAssetCategory').value.trim() || 'server',
+      system_id: document.getElementById('modalAssetSystemId').value.trim() ? Number(document.getElementById('modalAssetSystemId').value) : null,
+      location: document.getElementById('modalAssetLocation').value.trim() || null,
+      status: document.getElementById('modalAssetStatus').value.trim() || 'in_use',
+    };
+    const d = await ns.assets.createAsset(payload);
+    closeModal('createAssetModal');
+    resetCreateAssetModal();
+    return d;
+  }
+
   ns.modals = {
     openModal,
     closeModal,
     submitCreateUser,
     submitCreateSystem,
+    submitCreateAsset,
     resetCreateUserModal,
     resetCreateSystemModal,
+    resetCreateAssetModal,
   };
 })(window.AegisAdmin);

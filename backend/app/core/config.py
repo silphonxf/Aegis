@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     OFFLINE_AI_OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
     OFFLINE_AI_TIMEOUT_SECONDS: int = 120
 
+    # ThreatBook
+    THREATBOOK_API_KEY: str | None = None
+    THREATBOOK_TIMEOUT_SECONDS: int = 30
+
     # CORS
     CORS_ALLOW_ORIGINS: str = "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174"
     CORS_ALLOW_ORIGIN_REGEX: str | None = (

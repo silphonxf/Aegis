@@ -1,9 +1,10 @@
 from datetime import datetime
-from io import StringIO
+from io import BytesIO, StringIO
 import csv
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+from openpyxl import load_workbook
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -14,11 +15,47 @@ from app.models.asset import Asset
 from app.models.audit import AuditLog
 from app.models.system import System
 from app.models.user import Role, User
-from app.schemas.admin import BatchCreateAssetsRequest, CreateAssetRequest, CreateUserRequest
+from app.schemas.admin import (
+    BatchCreateAssetsRequest,
+    CreateAssetRequest,
+    CreateUserRequest,
+    ThreatIntelBlockRequest,
+    ThreatIntelQueryRequest,
+    ThreatIntelQuickInputRequest,
+)
+from app.services.threatbook import ThreatbookError, batch_query_ip_reputation
 from app.schemas.system import SystemCreate
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+IP_HEADER_CANDIDATES = {"ip", "ip地址", "ip_address", "地址", "目标ip", "ipv4", "ipv6"}
+
+
+def _extract_ips_from_excel(content: bytes) -> list[str]:
+    try:
+        workbook = load_workbook(filename=BytesIO(content), data_only=True)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail={"code": "INVALID_EXCEL", "message": f"Excel 解析失败：{exc}"})
+
+    ips: list[str] = []
+    for sheet in workbook.worksheets:
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            continue
+        header = [str(cell).strip().lower() if cell is not None else "" for cell in rows[0]]
+        ip_col = None
+        for idx, name in enumerate(header):
+            if name in IP_HEADER_CANDIDATES:
+                ip_col = idx
+                break
+        if ip_col is None:
+            ip_col = 0
+        for row in rows[1:]:
+            if ip_col < len(row) and row[ip_col] is not None:
+                ips.append(str(row[ip_col]).strip())
+    return ips
 
 
 @router.get("/users")
@@ -315,3 +352,108 @@ def batch_create_assets(
         {"created_count": len(created), "skipped_count": len(skipped)},
     )
     return {"created": created, "skipped": skipped}
+
+
+@router.post("/threat-intel/ip-reputation")
+def query_ip_reputation(
+    payload: ThreatIntelQueryRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    try:
+        result = batch_query_ip_reputation(payload.ips, lang=payload.lang, realtime_verdict=payload.realtime_verdict)
+    except ThreatbookError as exc:
+        raise HTTPException(status_code=400, detail={"code": "THREATBOOK_QUERY_FAILED", "message": str(exc)})
+
+    log_action(
+        db,
+        "query_ip_reputation",
+        "threat_intel",
+        current_user,
+        {
+            "count": result["summary"]["total"],
+            "high_risk": result["summary"]["high_risk"],
+            "block_candidates": result["summary"]["block_candidates"],
+        },
+    )
+    return result
+
+
+@router.post("/threat-intel/ip-reputation/quick")
+def query_ip_reputation_quick(
+    payload: ThreatIntelQuickInputRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    raw_items = [payload.raw_input]
+    try:
+        result = batch_query_ip_reputation(raw_items, lang=payload.lang, realtime_verdict=payload.realtime_verdict)
+    except ThreatbookError as exc:
+        raise HTTPException(status_code=400, detail={"code": "THREATBOOK_QUERY_FAILED", "message": str(exc)})
+
+    log_action(
+        db,
+        "query_ip_reputation_quick",
+        "threat_intel",
+        current_user,
+        {
+            "count": result["summary"]["total"],
+            "high_risk": result["summary"]["high_risk"],
+            "block_candidates": result["summary"]["block_candidates"],
+        },
+    )
+    return result
+
+
+@router.post("/threat-intel/ip-reputation/excel")
+async def query_ip_reputation_excel(
+    file: UploadFile = File(...),
+    lang: str = "zh",
+    realtime_verdict: bool = True,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    filename = file.filename or ""
+    if not filename.lower().endswith((".xlsx", ".xlsm", ".xltx", ".xltm")):
+        raise HTTPException(status_code=400, detail={"code": "INVALID_FILE_TYPE", "message": "仅支持上传 .xlsx 类 Excel 文件"})
+
+    content = await file.read()
+    raw_ips = _extract_ips_from_excel(content)
+    try:
+        result = batch_query_ip_reputation(raw_ips, lang=lang, realtime_verdict=realtime_verdict)
+    except ThreatbookError as exc:
+        raise HTTPException(status_code=400, detail={"code": "THREATBOOK_QUERY_FAILED", "message": str(exc)})
+
+    result["import"] = {"filename": filename, "source": "excel"}
+    log_action(
+        db,
+        "query_ip_reputation_excel",
+        "threat_intel",
+        current_user,
+        {
+            "filename": filename,
+            "count": result["summary"]["total"],
+            "high_risk": result["summary"]["high_risk"],
+            "block_candidates": result["summary"]["block_candidates"],
+        },
+    )
+    return result
+
+
+@router.post("/threat-intel/block-ip")
+def block_high_risk_ip(
+    payload: ThreatIntelBlockRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    result = {
+        "status": "mocked",
+        "dry_run": payload.dry_run,
+        "ip": payload.ip,
+        "risk_level": payload.risk_level,
+        "reason": payload.reason,
+        "source": payload.source,
+        "message": "已预留防火墙封禁接口，当前为 mock 返回，后续可替换为真实执行器。",
+    }
+    log_action(db, "block_ip_request", "threat_intel", current_user, result)
+    return result
