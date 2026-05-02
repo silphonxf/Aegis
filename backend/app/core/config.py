@@ -1,9 +1,13 @@
-from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from __future__ import annotations
+from pydantic import validator
+from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        extra = "ignore"
 
     APP_NAME: str = "运维助手 Aegis API"
     APP_ENV: str = "dev"
@@ -57,7 +61,7 @@ class Settings(BaseSettings):
     def cors_allow_headers(self) -> list[str]:
         return [item.strip() for item in self.CORS_ALLOW_HEADERS.split(",") if item.strip()] or ["*"]
 
-    @field_validator("SECRET_KEY", "INIT_ADMIN_PASSWORD")
+    @validator("SECRET_KEY", "INIT_ADMIN_PASSWORD")
     @classmethod
     def reject_weak_defaults(cls, value: str) -> str:
         weak_values = {"", "change_me", "admin123", "change_me_to_a_random_secret"}
