@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional, Set, Tuple
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, validator
 
 
 class CreateUserRequest(BaseModel):
@@ -18,22 +18,21 @@ class CreateAssetRequest(BaseModel):
 
 
 class BatchCreateAssetsRequest(BaseModel):
-    items: list[CreateAssetRequest] = Field(default_factory=list, min_length=1, max_length=500)
+    items: List[CreateAssetRequest] = Field(default_factory=list, min_items=1, max_items=500)
 
 
 class ThreatIntelQueryRequest(BaseModel):
-    ips: List[str] = Field(default_factory=list, min_length=1, max_length=100)
-    lang: str = Field(default="zh", pattern="^(zh|en)$")
+    ips: List[str] = Field(default_factory=list, min_items=1, max_items=100)
+    lang: str = Field(default="zh", regex="^(zh|en)$")
     realtime_verdict: bool = True
 
 
 class ThreatIntelQuickInputRequest(BaseModel):
     raw_input: str = Field(min_length=1, max_length=20000)
-    lang: str = Field(default="zh", pattern="^(zh|en)$")
+    lang: str = Field(default="zh", regex="^(zh|en)$")
     realtime_verdict: bool = True
 
-    @field_validator("raw_input")
-    @classmethod
+    @validator("raw_input")
     def normalize_raw_input(cls, value: str) -> str:
         cleaned = value.strip()
         if not cleaned:

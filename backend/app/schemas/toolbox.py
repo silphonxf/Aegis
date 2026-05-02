@@ -19,6 +19,6 @@ class RestartTaskRequest(BaseModel):
 
 
 class TaskStatusUpdateRequest(BaseModel):
-    status: str = Field(pattern="^(approved|running|rejected|done|failed|cancelled)$")
+    status: str = Field(regex="^(approved|running|rejected|done|failed|cancelled)$")
     note: Optional[str] = Field(default=None, max_length=255)
     executor: Optional[str] = Field(default=None, max_length=32)
