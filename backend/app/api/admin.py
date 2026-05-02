@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 from io import BytesIO, StringIO
 import csv
@@ -33,13 +34,13 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 IP_HEADER_CANDIDATES = {"ip", "ip地址", "ip_address", "地址", "目标ip", "ipv4", "ipv6"}
 
 
-def _extract_ips_from_excel(content: bytes) -> list[str]:
+def _extract_ips_from_excel(content: bytes) -> List[str]:
     try:
         workbook = load_workbook(filename=BytesIO(content), data_only=True)
     except Exception as exc:
         raise HTTPException(status_code=400, detail={"code": "INVALID_EXCEL", "message": f"Excel 解析失败：{exc}"})
 
-    ips: list[str] = []
+    ips: List[str] = []
     for sheet in workbook.worksheets:
         rows = list(sheet.iter_rows(values_only=True))
         if not rows:
@@ -146,12 +147,12 @@ def create_system(
 def list_audit_logs(
     page: int = 1,
     size: int = 20,
-    action: str | None = None,
-    username: str | None = None,
-    resource: str | None = None,
-    start_at: datetime | None = None,
-    end_at: datetime | None = None,
-    keyword: str | None = None,
+    action: Optional[str] = None,
+    username: Optional[str] = None,
+    resource: Optional[str] = None,
+    start_at: Optional[datetime] = None,
+    end_at: Optional[datetime] = None,
+    keyword: Optional[str] = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("super_admin")),
 ):
@@ -201,7 +202,7 @@ def list_audit_logs(
     }
 
 
-def _asset_query(db: Session, system_id: int | None, category: str | None, status: str | None, keyword: str | None):
+def _asset_query(db: Session, system_id: Optional[int], category: Optional[str], status: Optional[str], keyword: Optional[str]):
     q = db.query(Asset)
     if system_id is not None:
         q = q.filter(Asset.system_id == system_id)
@@ -218,10 +219,10 @@ def _asset_query(db: Session, system_id: int | None, category: str | None, statu
 def list_assets(
     page: int = 1,
     size: int = 20,
-    system_id: int | None = None,
-    category: str | None = None,
-    status: str | None = None,
-    keyword: str | None = None,
+    system_id: Optional[int] = None,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    keyword: Optional[str] = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
@@ -253,10 +254,10 @@ def list_assets(
 
 @router.get("/assets/export")
 def export_assets_csv(
-    system_id: int | None = None,
-    category: str | None = None,
-    status: str | None = None,
-    keyword: str | None = None,
+    system_id: Optional[int] = None,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    keyword: Optional[str] = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
@@ -317,7 +318,7 @@ def batch_create_assets(
     created = []
     skipped = []
 
-    seen_codes: set[str] = set()
+    seen_codes: Set[str] = set()
     items_to_create = []
     for item in payload.items:
         code = item.asset_code.strip()

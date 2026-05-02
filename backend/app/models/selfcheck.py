@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
@@ -24,5 +25,5 @@ class SelfcheckRecord(Base):
     template_id: Mapped[int] = mapped_column(Integer, ForeignKey("checklist_templates.id"), nullable=False)
     operator_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     result: Mapped[str] = mapped_column(String(16), nullable=False)
-    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     checked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)

@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -22,7 +23,7 @@ def _auth_error(message: str, code: str = "AUTH_REQUIRED") -> HTTPException:
 def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)) -> User:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        username: str | None = payload.get("sub")
+        username: Optional[str] = payload.get("sub")
         if username is None:
             raise _auth_error("登录状态无效，请重新登录", "TOKEN_INVALID")
     except ExpiredSignatureError:

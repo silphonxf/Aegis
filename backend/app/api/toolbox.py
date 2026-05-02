@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 import json
 import os
 import socket
@@ -18,7 +19,7 @@ from app.services.audit import log_action
 router = APIRouter(prefix="/toolbox", tags=["toolbox"])
 
 
-def _read_error_logs(hours: int, lines: int) -> tuple[str, str]:
+def _read_error_logs(hours: int, lines: int) -> Tuple[str, str]:
     """读取系统 error 日志，优先 journalctl，其次 syslog/messages。"""
     commands = [
         [
@@ -64,7 +65,7 @@ def _load_task_result(task: ToolTask) -> dict:
         return {"raw": task.result}
 
 
-def _write_task_result(task: ToolTask, *, note: str | None = None, executor: str | None = None, success: bool | None = None, error: str | None = None):
+def _write_task_result(task: ToolTask, *, note: Optional[str] = None, executor: Optional[str] = None, success: Optional[bool] = None, error: Optional[str] = None):
     data = _load_task_result(task)
     if note is not None:
         data["note"] = note
@@ -206,7 +207,7 @@ def create_restart_task(
 def list_tasks(
     page: int = 1,
     size: int = 20,
-    status: str | None = None,
+    status: Optional[str] = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):

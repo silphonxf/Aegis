@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from pydantic import BaseModel, Field
 
 
@@ -12,8 +13,8 @@ class TokenResponse(BaseModel):
 
 
 class UserProfileUpdateRequest(BaseModel):
-    nickname: str | None = Field(default=None, max_length=64)
-    avatar_url: str | None = Field(default=None, max_length=512)
+    nickname: Optional[str] = Field(default=None, max_length=64)
+    avatar_url: Optional[str] = Field(default=None, max_length=512)
 
 
 class ChangePasswordRequest(BaseModel):

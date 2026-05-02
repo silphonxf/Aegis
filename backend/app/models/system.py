@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
@@ -12,7 +13,7 @@ class System(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     system_code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
-    owner_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    owner_user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     env: Mapped[str] = mapped_column(String(32), default="prod", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -24,9 +25,9 @@ class SystemStatusSnapshot(Base):
     system_id: Mapped[int] = mapped_column(Integer, ForeignKey("systems.id"), nullable=False, index=True)
     host_online: Mapped[str] = mapped_column(String(16), default="unknown")
     port_ok: Mapped[str] = mapped_column(String(16), default="unknown")
-    cpu_usage: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    mem_usage: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    disk_usage: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cpu_usage: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    mem_usage: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    disk_usage: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     cpu_level: Mapped[str] = mapped_column(String(16), default="unknown")
     mem_level: Mapped[str] = mapped_column(String(16), default="unknown")
     disk_level: Mapped[str] = mapped_column(String(16), default="unknown")

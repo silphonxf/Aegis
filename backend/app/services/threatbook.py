@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ipaddress import ip_address
-from typing import Any
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import requests
 
@@ -32,9 +32,9 @@ def validate_ip(value: str) -> str:
         raise ThreatbookError(f"非法 IP：{value}") from exc
 
 
-def normalize_ip_list(raw_items: list[str]) -> list[str]:
-    values: list[str] = []
-    seen: set[str] = set()
+def normalize_ip_list(raw_items: List[str]) -> List[str]:
+    values: List[str] = []
+    seen: Set[str] = set()
     for raw in raw_items:
         for part in str(raw).replace("\n", ",").replace("\t", ",").split(","):
             candidate = part.strip()
@@ -47,7 +47,7 @@ def normalize_ip_list(raw_items: list[str]) -> list[str]:
     return values
 
 
-def fetch_ip_reputation(ips: list[str], lang: str = "zh", realtime_verdict: bool = True) -> dict[str, Any]:
+def fetch_ip_reputation(ips: List[str], lang: str = "zh", realtime_verdict: bool = True) -> Dict[str, Any]:
     if not settings.THREATBOOK_API_KEY:
         raise ThreatbookError("未配置微步 API Key")
     if not ips:
@@ -76,7 +76,7 @@ def fetch_ip_reputation(ips: list[str], lang: str = "zh", realtime_verdict: bool
     return data
 
 
-def summarize_ip_record(ip: str, record: dict[str, Any]) -> dict[str, Any]:
+def summarize_ip_record(ip: str, record: Dict[str, Any]) -> Dict[str, Any]:
     basic = record.get("basic") or {}
     location = basic.get("location") or {}
     judgments = [str(item) for item in (record.get("judgments") or [])]
@@ -120,7 +120,7 @@ def summarize_ip_record(ip: str, record: dict[str, Any]) -> dict[str, Any]:
     should_block = is_malicious and city != "济南"
     location_text = " / ".join(filter(None, [location.get("country"), location.get("province"), location.get("city")])) or "-"
 
-    reasons: list[str] = []
+    reasons: List[str] = []
     if is_malicious:
         reasons.append("微步判定为恶意 IP")
     if severity:
@@ -177,7 +177,7 @@ def summarize_ip_record(ip: str, record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def batch_query_ip_reputation(raw_items: list[str], lang: str = "zh", realtime_verdict: bool = True) -> dict[str, Any]:
+def batch_query_ip_reputation(raw_items: List[str], lang: str = "zh", realtime_verdict: bool = True) -> Dict[str, Any]:
     ips = normalize_ip_list(raw_items)
     data = fetch_ip_reputation(ips, lang=lang, realtime_verdict=realtime_verdict)
     ip_map = data.get("data", {}).get("ips") or data.get("ips") or {}

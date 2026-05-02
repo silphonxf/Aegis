@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -11,9 +11,9 @@ def log_action(
     db: Session,
     action: str,
     resource: str,
-    user: User | None = None,
-    detail: dict[str, Any] | None = None,
-    username: str | None = None,
+    user: Optional[User] = None,
+    detail: Optional[Dict[str, Any]] = None,
+    username: Optional[str] = None,
 ):
     row = AuditLog(
         user_id=user.id if user else None,

@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, String, Text
@@ -11,12 +12,12 @@ class OfflineAnalysisTask(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)  # system|manual
-    source_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="done", nullable=False, index=True)
     severity: Mapped[str] = mapped_column(String(16), default="medium", nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
-    created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
 

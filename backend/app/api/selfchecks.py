@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -126,10 +127,10 @@ def create_selfcheck_record_simple(
 
 @router.get("/records")
 def list_selfcheck_records(
-    system_id: int | None = None,
-    result: str | None = None,
-    start_at: datetime | None = None,
-    end_at: datetime | None = None,
+    system_id: Optional[int] = None,
+    result: Optional[str] = None,
+    start_at: Optional[datetime] = None,
+    end_at: Optional[datetime] = None,
     page: int = 1,
     size: int = 20,
     db: Session = Depends(get_db),

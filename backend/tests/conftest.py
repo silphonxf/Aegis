@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 import os
 import sys
 from pathlib import Path
@@ -70,7 +71,7 @@ def admin_token(client: TestClient) -> str:
 
 
 @pytest.fixture()
-def admin_headers(admin_token: str) -> dict[str, str]:
+def admin_headers(admin_token: str) -> Dict[str, str]:
     return {"Authorization": f"Bearer {admin_token}"}
 
 

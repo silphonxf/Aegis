@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
@@ -13,7 +14,7 @@ class InspectionPoint(Base):
     system_id: Mapped[int] = mapped_column(Integer, ForeignKey("systems.id"), nullable=False, index=True)
     point_code: Mapped[str] = mapped_column(String(64), nullable=False)
     qr_content: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
 
 class InspectionRecord(Base):
@@ -24,5 +25,5 @@ class InspectionRecord(Base):
     point_id: Mapped[int] = mapped_column(Integer, ForeignKey("inspection_points.id"), nullable=False)
     inspector_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     result: Mapped[str] = mapped_column(String(16), nullable=False)
-    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     inspected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)

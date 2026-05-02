@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any, Dict, List, Optional, Set, Tuple
 from pydantic import validator
 from pydantic import BaseSettings
 
@@ -20,11 +21,11 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./aegis.db"
 
     # 达梦连接可拆分配置，便于运维按字段注入
-    DM_HOST: str | None = None
+    DM_HOST: Optional[str] = None
     DM_PORT: int = 5236
-    DM_NAME: str | None = None
-    DM_USER: str | None = None
-    DM_PASSWORD: str | None = None
+    DM_NAME: Optional[str] = None
+    DM_USER: Optional[str] = None
+    DM_PASSWORD: Optional[str] = None
 
     INIT_ADMIN_USERNAME: str = "admin"
     INIT_ADMIN_PASSWORD: str
@@ -37,12 +38,12 @@ class Settings(BaseSettings):
     OFFLINE_AI_TIMEOUT_SECONDS: int = 120
 
     # ThreatBook
-    THREATBOOK_API_KEY: str | None = None
+    THREATBOOK_API_KEY: Optional[str] = None
     THREATBOOK_TIMEOUT_SECONDS: int = 30
 
     # CORS
     CORS_ALLOW_ORIGINS: str = "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174"
-    CORS_ALLOW_ORIGIN_REGEX: str | None = (
+    CORS_ALLOW_ORIGIN_REGEX: Optional[str] = (
         r"^https?://(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|192\\.168\\.\\d+\\.\\d+|10\\.\\d+\\.\\d+\\.\\d+|172\\.(1[6-9]|2\\d|3[0-1])\\.\\d+\\.\\d+)(:\\d+)?$"
     )
     CORS_ALLOW_CREDENTIALS: bool = False
@@ -50,15 +51,15 @@ class Settings(BaseSettings):
     CORS_ALLOW_HEADERS: str = "*"
 
     @property
-    def cors_allow_origins(self) -> list[str]:
+    def cors_allow_origins(self) -> List[str]:
         return [item.strip() for item in self.CORS_ALLOW_ORIGINS.split(",") if item.strip()]
 
     @property
-    def cors_allow_methods(self) -> list[str]:
+    def cors_allow_methods(self) -> List[str]:
         return [item.strip() for item in self.CORS_ALLOW_METHODS.split(",") if item.strip()] or ["*"]
 
     @property
-    def cors_allow_headers(self) -> list[str]:
+    def cors_allow_headers(self) -> List[str]:
         return [item.strip() for item in self.CORS_ALLOW_HEADERS.split(",") if item.strip()] or ["*"]
 
     @validator("SECRET_KEY", "INIT_ADMIN_PASSWORD")

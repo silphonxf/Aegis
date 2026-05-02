@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from pydantic import BaseModel, Field
 
 
@@ -14,10 +15,10 @@ class PortCheckRequest(BaseModel):
 
 class RestartTaskRequest(BaseModel):
     target: str = Field(default="local-host", min_length=1, max_length=255)
-    reason: str | None = Field(default=None, max_length=255)
+    reason: Optional[str] = Field(default=None, max_length=255)
 
 
 class TaskStatusUpdateRequest(BaseModel):
     status: str = Field(pattern="^(approved|running|rejected|done|failed|cancelled)$")
-    note: str | None = Field(default=None, max_length=255)
-    executor: str | None = Field(default=None, max_length=32)
+    note: Optional[str] = Field(default=None, max_length=255)
+    executor: Optional[str] = Field(default=None, max_length=32)

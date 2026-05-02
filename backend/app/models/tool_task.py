@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, String, Text
@@ -13,8 +14,8 @@ class ToolTask(Base):
     action: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     target: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="pending_approval", nullable=False, index=True)
-    result: Mapped[str | None] = mapped_column(Text, nullable=True)
-    executor: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    result: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    executor: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)

@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 import csv
 from datetime import datetime
 from io import StringIO
@@ -17,10 +18,10 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 @router.get("/inspections")
 def inspection_report(
-    system_id: int | None = None,
-    result: str | None = None,
-    start_at: datetime | None = None,
-    end_at: datetime | None = None,
+    system_id: Optional[int] = None,
+    result: Optional[str] = None,
+    start_at: Optional[datetime] = None,
+    end_at: Optional[datetime] = None,
     page: int = 1,
     size: int = 20,
     db: Session = Depends(get_db),
@@ -51,11 +52,11 @@ def inspection_report(
 
 @router.get("/selfchecks")
 def selfcheck_report(
-    system_id: int | None = None,
-    check_type: str | None = None,
-    result: str | None = None,
-    start_at: datetime | None = None,
-    end_at: datetime | None = None,
+    system_id: Optional[int] = None,
+    check_type: Optional[str] = None,
+    result: Optional[str] = None,
+    start_at: Optional[datetime] = None,
+    end_at: Optional[datetime] = None,
     page: int = 1,
     size: int = 20,
     db: Session = Depends(get_db),
@@ -90,10 +91,10 @@ def selfcheck_report(
 
 @router.get("/inspections/export")
 def inspection_export(
-    system_id: int | None = None,
-    result: str | None = None,
-    start_at: datetime | None = None,
-    end_at: datetime | None = None,
+    system_id: Optional[int] = None,
+    result: Optional[str] = None,
+    start_at: Optional[datetime] = None,
+    end_at: Optional[datetime] = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -119,11 +120,11 @@ def inspection_export(
 
 @router.get("/selfchecks/export")
 def selfcheck_export(
-    system_id: int | None = None,
-    check_type: str | None = None,
-    result: str | None = None,
-    start_at: datetime | None = None,
-    end_at: datetime | None = None,
+    system_id: Optional[int] = None,
+    check_type: Optional[str] = None,
+    result: Optional[str] = None,
+    start_at: Optional[datetime] = None,
+    end_at: Optional[datetime] = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):

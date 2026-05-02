@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 import json
 import re
 import time
@@ -19,7 +20,7 @@ from app.services.offline_llm import OfflineLLMError, diagnose_with_ollama, offl
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
-def _mock_suggestions(payload: DiagnoseRequest) -> list[str]:
+def _mock_suggestions(payload: DiagnoseRequest) -> List[str]:
     text = payload.detail.lower()
     suggestions = []
 
@@ -82,7 +83,7 @@ def _severity_rank(level: str) -> int:
     return {"low": 1, "medium": 2, "high": 3}.get(level, 1)
 
 
-def _offline_rule_analyze(text: str, fallback_severity: str) -> tuple[str, list[dict], list[str], str]:
+def _offline_rule_analyze(text: str, fallback_severity: str) -> tuple[str, List[dict], List[str], str]:
     matched = []
     suggestions = []
     summary_items = []
@@ -118,7 +119,7 @@ def diagnose(
     mode = "rule_fallback"
     severity = payload.severity
     summary = ""
-    fallback_reason: str | None = None
+    fallback_reason: Optional[str] = None
     started_at = time.perf_counter()
 
     if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
@@ -175,7 +176,7 @@ def diagnose(
 def list_diagnoses(
     page: int = 1,
     size: int = 20,
-    severity: str | None = None,
+    severity: Optional[str] = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
@@ -215,7 +216,7 @@ def offline_analyze(
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
     mode = "rule_fallback"
-    fallback_reason: str | None = None
+    fallback_reason: Optional[str] = None
     started_at = time.perf_counter()
     if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
         try:
@@ -284,7 +285,7 @@ def offline_analyze(
 def list_offline_tasks(
     page: int = 1,
     size: int = 20,
-    severity: str | None = None,
+    severity: Optional[str] = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):

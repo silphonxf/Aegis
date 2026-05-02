@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Dict, List, Literal, Optional, Set, Tuple
 
 from pydantic import BaseModel
 
@@ -14,12 +14,12 @@ class SelfcheckRecordCreate(BaseModel):
     system_id: int
     template_id: int
     result: Literal["normal", "warning", "critical"]
-    summary: str | None = None
+    summary: Optional[str] = None
     checked_at: datetime
 
 
 class SelfcheckRecordSimpleCreate(BaseModel):
     content: str
     result: Literal["normal", "critical"]
-    note: str | None = None
-    system_id: int | None = None
+    note: Optional[str] = None
+    system_id: Optional[int] = None

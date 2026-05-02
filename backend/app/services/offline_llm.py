@@ -2,7 +2,7 @@ import json
 import re
 import urllib.error
 import urllib.request
-from typing import Any
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from app.core.config import settings
 
@@ -11,7 +11,7 @@ class OfflineLLMError(RuntimeError):
     pass
 
 
-def _post_json(url: str, payload: dict[str, Any], timeout: int) -> dict[str, Any]:
+def _post_json(url: str, payload: Dict[str, Any], timeout: int) -> Dict[str, Any]:
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -32,7 +32,7 @@ def _post_json(url: str, payload: dict[str, Any], timeout: int) -> dict[str, Any
         raise OfflineLLMError(f"离线模型返回非 JSON: {e}") from e
 
 
-def _extract_json(text: str) -> dict[str, Any]:
+def _extract_json(text: str) -> Dict[str, Any]:
     # 支持模型返回 markdown code block 或纯 JSON
     text = text.strip()
     fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, flags=re.S)
@@ -47,7 +47,7 @@ def _extract_json(text: str) -> dict[str, Any]:
     return json.loads(text)
 
 
-def diagnose_with_ollama(title: str, detail: str, severity: str) -> tuple[str, list[str], str]:
+def diagnose_with_ollama(title: str, detail: str, severity: str) -> tuple[str, List[str], str]:
     prompt = f"""
 你是企业运维故障分析助手。请仅返回 JSON（不要任何额外文本），格式：
 {{
@@ -92,7 +92,7 @@ def diagnose_with_ollama(title: str, detail: str, severity: str) -> tuple[str, l
     return out_severity, suggestions[:5], summary
 
 
-def offline_analyze_with_ollama(title: str, detail: str, severity: str) -> tuple[str, str, list[str], list[dict[str, str]]]:
+def offline_analyze_with_ollama(title: str, detail: str, severity: str) -> tuple[str, str, List[str], list[Dict[str, str]]]:
     prompt = f"""
 你是离线错误日志分析引擎。请仅返回 JSON：
 {{
@@ -136,7 +136,7 @@ def offline_analyze_with_ollama(title: str, detail: str, severity: str) -> tuple
 
     matched_rules_raw = data.get("matched_rules") or []
 
-    matched_rules: list[dict[str, str]] = []
+    matched_rules: list[Dict[str, str]] = []
     for item in matched_rules_raw:
         if not isinstance(item, dict):
             continue

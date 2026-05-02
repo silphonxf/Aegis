@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -11,8 +12,8 @@ class CreateAssetRequest(BaseModel):
     asset_code: str = Field(min_length=2, max_length=64)
     name: str = Field(min_length=1, max_length=128)
     category: str = Field(default="server", min_length=1, max_length=64)
-    system_id: int | None = None
-    location: str | None = Field(default=None, max_length=255)
+    system_id: Optional[int] = None
+    location: Optional[str] = Field(default=None, max_length=255)
     status: str = Field(default="in_use", min_length=1, max_length=32)
 
 
@@ -21,7 +22,7 @@ class BatchCreateAssetsRequest(BaseModel):
 
 
 class ThreatIntelQueryRequest(BaseModel):
-    ips: list[str] = Field(default_factory=list, min_length=1, max_length=100)
+    ips: List[str] = Field(default_factory=list, min_length=1, max_length=100)
     lang: str = Field(default="zh", pattern="^(zh|en)$")
     realtime_verdict: bool = True
 
@@ -42,7 +43,7 @@ class ThreatIntelQuickInputRequest(BaseModel):
 
 class ThreatIntelBlockRequest(BaseModel):
     ip: str = Field(min_length=2, max_length=64)
-    risk_level: str | None = Field(default=None, max_length=32)
-    reason: str | None = Field(default=None, max_length=500)
+    risk_level: Optional[str] = Field(default=None, max_length=32)
+    reason: Optional[str] = Field(default=None, max_length=500)
     source: str = Field(default="threatbook", max_length=64)
     dry_run: bool = True

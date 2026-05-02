@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -12,7 +13,7 @@ from app.services.audit import log_action
 router = APIRouter(prefix="/systems", tags=["systems"])
 
 
-def _normalize_metric(value: int | None, warn: int, critical: int) -> str:
+def _normalize_metric(value: Optional[int], warn: int, critical: int) -> str:
     if value is None:
         return "unknown"
     if value >= critical:
@@ -22,7 +23,7 @@ def _normalize_metric(value: int | None, warn: int, critical: int) -> str:
     return "normal"
 
 
-def _calc_color(levels: list[str], host_online: str, port_ok: str, last_inspection_result: str, last_selfcheck_result: str) -> str:
+def _calc_color(levels: List[str], host_online: str, port_ok: str, last_inspection_result: str, last_selfcheck_result: str) -> str:
     if host_online == "abnormal" or port_ok == "abnormal":
         return "red"
     if last_inspection_result == "abnormal" or last_selfcheck_result == "critical":

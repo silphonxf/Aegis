@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Set, Tuple
 import csv
 import shutil
 import socket
@@ -73,7 +74,7 @@ def _build_overview(db: Session):
     return summary, items, abnormal
 
 
-def _normalize_metric(value: int | None, warn: int, critical: int) -> str:
+def _normalize_metric(value: Optional[int], warn: int, critical: int) -> str:
     if value is None:
         return "unknown"
     if value >= critical:
@@ -83,7 +84,7 @@ def _normalize_metric(value: int | None, warn: int, critical: int) -> str:
     return "normal"
 
 
-def _calc_color(levels: list[str], host_online: str, port_ok: str, last_inspection_result: str, last_selfcheck_result: str) -> str:
+def _calc_color(levels: List[str], host_online: str, port_ok: str, last_inspection_result: str, last_selfcheck_result: str) -> str:
     if host_online == "abnormal" or port_ok == "abnormal":
         return "red"
     if last_inspection_result == "abnormal" or last_selfcheck_result == "critical":
@@ -96,7 +97,7 @@ def _calc_color(levels: list[str], host_online: str, port_ok: str, last_inspecti
 
 
 def _cpu_percent() -> int:
-    def read_cpu_times() -> tuple[int, int]:
+    def read_cpu_times() -> Tuple[int, int]:
         with open("/proc/stat", "r", encoding="utf-8") as f:
             first = f.readline().split()
         values = [int(x) for x in first[1:]]
