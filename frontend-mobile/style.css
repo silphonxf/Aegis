@@ -64,10 +64,30 @@ main { padding: 12px; display: grid; gap: 12px; }
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 12px; box-shadow: 0 10px 24px rgba(0, 0, 0, .25);
 }
-.hidden { display: none; }
+.hidden { display: none !important; }
 .card h2 { margin: 0 0 12px; font-size: 1rem; }
 .card h3 { margin: 4px 0 8px; font-size: .9rem; color: #9dd6f5; }
 .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.subpage-card {
+  min-height: calc(100vh - 148px);
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+.subpage-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.subpage-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.back-left {
+  justify-self: start;
+}
 .center-card { min-height: 280px; display: grid; align-content: center; gap: 12px; }
 .menu-grid { display: grid; gap: 10px; }
 .grid { display: grid; gap: 10px; }
@@ -100,6 +120,122 @@ pre {
 pre:empty { display: none; }
 .charts { display: grid; gap: 10px; }
 canvas { width: 100%; border: 1px solid #1d3a51; border-radius: 10px; background: #071320; }
+.ai-chat-screen {
+  padding-bottom: 14px;
+}
+.ai-chat-layout {
+  display: grid;
+  gap: 12px;
+}
+.ai-chat-messages {
+  display: grid;
+  gap: 10px;
+  min-height: 320px;
+  max-height: 52vh;
+  overflow: auto;
+  padding: 4px;
+}
+.chat-bubble {
+  max-width: 86%;
+  padding: 10px 12px;
+  border-radius: 16px;
+  line-height: 1.5;
+  font-size: 13px;
+  border: 1px solid transparent;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-bubble.user {
+  margin-left: auto;
+  background: linear-gradient(135deg, #1ecad3, #38bdf8);
+  color: #052035;
+}
+.chat-bubble.ai {
+  margin-right: auto;
+  background: #091724;
+  border-color: #1a3c56;
+  color: #d9efff;
+}
+.chat-bubble.welcome {
+  opacity: .95;
+}
+.attachment-list {
+  display: grid;
+  gap: 8px;
+}
+.attachment-list:empty {
+  display: none;
+}
+.attachment-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #0a1a29;
+  border: 1px solid #1d3d58;
+  color: #cbe6fb;
+  font-size: 12px;
+}
+.attachment-meta {
+  display: grid;
+  gap: 2px;
+}
+.attachment-name {
+  font-weight: 600;
+  color: #e6f2ff;
+}
+.attachment-size {
+  color: var(--muted);
+}
+.attachment-remove {
+  width: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #18354b;
+  color: #bfe7ff;
+}
+.card-inline {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid #173754;
+  background: #06111c;
+}
+.textarea,
+textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  border: 1px solid #23435f;
+  background: #0a1b2b;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 12px;
+  font: inherit;
+}
+.upload-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 132px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  border: 1px solid #2e5a7d;
+  color: #9ed9ff;
+  background: transparent;
+}
+.ai-attachment-preview {
+  margin-top: 6px;
+  width: 100%;
+  max-height: 140px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #21455f;
+}
 .avatar-editor {
   display: grid; grid-template-columns: 70px 1fr; gap: 10px; align-items: center;
   margin-bottom: 10px;

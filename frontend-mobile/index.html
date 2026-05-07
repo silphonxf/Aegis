@@ -60,8 +60,8 @@
             </div>
           </section>
 
-          <section class="card hidden" data-sub="inspection-qr">
-            <div class="card-head"><h2>二维码巡检</h2><button class="ghost small" data-back="inspection-home">返回</button></div>
+          <section class="card hidden subpage-card" data-sub="inspection-qr">
+            <div class="subpage-head"><button class="ghost small back-left" data-back="inspection-home">返回</button><h2>二维码巡检</h2></div>
             <div class="grid two">
               <label class="full">巡检点名称
                 <input id="inspectionPointName" placeholder="扫码后自动识别，不可修改" readonly />
@@ -83,8 +83,8 @@
             <pre id="inspectionResult"></pre>
           </section>
 
-          <section class="card hidden" data-sub="inspection-nfc">
-            <div class="card-head"><h2>NFC 巡检</h2><button class="ghost small" data-back="inspection-home">返回</button></div>
+          <section class="card hidden subpage-card" data-sub="inspection-nfc">
+            <div class="subpage-head"><button class="ghost small back-left" data-back="inspection-home">返回</button><h2>NFC 巡检</h2></div>
             <div class="grid two">
               <label>结果
                 <select id="nfcResult"><option value="normal">正常</option><option value="abnormal">异常</option></select>
@@ -111,8 +111,8 @@
             </div>
           </section>
 
-          <section class="card hidden" data-sub="selfcheck-status">
-            <div class="card-head"><h2>系统性能状态（动态）</h2><button class="ghost small" data-back="selfcheck-home">返回</button></div>
+          <section class="card hidden subpage-card" data-sub="selfcheck-status">
+            <div class="subpage-head"><button class="ghost small back-left" data-back="selfcheck-home">返回</button><h2>系统性能状态（动态）</h2></div>
             <div class="grid two">
               <label class="full">选择系统
                 <select id="scStatusSystem"></select>
@@ -127,8 +127,8 @@
             </div>
           </section>
 
-          <section class="card hidden" data-sub="selfcheck-form">
-            <div class="card-head"><h2>提交自检记录</h2><button class="ghost small" data-back="selfcheck-home">返回</button></div>
+          <section class="card hidden subpage-card" data-sub="selfcheck-form">
+            <div class="subpage-head"><button class="ghost small back-left" data-back="selfcheck-home">返回</button><h2>提交自检记录</h2></div>
             <div class="grid two">
               <label class="full">自检内容<input id="scSummary" placeholder="输入自检内容" /></label>
               <label>自检结果
@@ -140,8 +140,8 @@
             <pre id="selfcheckResult"></pre>
           </section>
 
-          <section class="card hidden" data-sub="selfcheck-errors">
-            <div class="card-head"><h2>错误日志 + AI 分析</h2><button class="ghost small" data-back="selfcheck-home">返回</button></div>
+          <section class="card hidden subpage-card" data-sub="selfcheck-errors">
+            <div class="subpage-head"><button class="ghost small back-left" data-back="selfcheck-home">返回</button><h2>错误日志 + AI 分析</h2></div>
             <div class="grid two">
               <label>时间范围
                 <select id="errorRange"><option value="1">最近1小时</option><option value="6">最近6小时</option><option value="24" selected>最近24小时</option></select>
@@ -169,8 +169,8 @@
             </div>
           </section>
 
-          <section class="card hidden" data-sub="toolbox-ping">
-            <div class="card-head"><h2>Ping 工具</h2><button class="ghost small" data-back="toolbox-home">返回</button></div>
+          <section class="card hidden subpage-card" data-sub="toolbox-ping">
+            <div class="subpage-head"><button class="ghost small back-left" data-back="toolbox-home">返回</button><h2>Ping 工具</h2></div>
             <div class="grid two">
               <label>主机<input id="tbPingHost" value="127.0.0.1" /></label>
               <label>次数<input id="tbPingCount" type="number" value="1" /></label>
@@ -180,8 +180,8 @@
             <pre id="pingResult"></pre>
           </section>
 
-          <section class="card hidden" data-sub="toolbox-capture">
-            <div class="card-head"><h2>抓包工具（Mock）</h2><button class="ghost small" data-back="toolbox-home">返回</button></div>
+          <section class="card hidden subpage-card" data-sub="toolbox-capture">
+            <div class="subpage-head"><button class="ghost small back-left" data-back="toolbox-home">返回</button><h2>抓包工具（Mock）</h2></div>
             <div class="actions">
               <button id="btnCaptureStart">开始抓包</button>
               <button id="btnCaptureStop">停止抓包</button>
@@ -189,14 +189,35 @@
             <pre id="captureResult"></pre>
           </section>
 
-          <section class="card hidden" data-sub="toolbox-app">
-            <div class="card-head"><h2>应用工具</h2><button class="ghost small" data-back="toolbox-home">返回</button></div>
+          <section class="card hidden subpage-card" data-sub="toolbox-app">
+            <div class="subpage-head"><button class="ghost small back-left" data-back="toolbox-home">返回</button><h2>应用工具</h2></div>
             <div class="menu-grid">
               <button id="btnAppRestart">创建应用重启任务</button>
-              <button id="btnAppAiQa">AI 问答（Mock）</button>
+              <button id="btnAppAiQa">进入 AI 问答</button>
             </div>
             <div class="actions one" style="margin-top:12px;"><button id="btnRefreshToolTasks">查看最近工具任务</button></div>
             <pre id="appToolResult"></pre>
+          </section>
+
+          <section class="card hidden ai-chat-screen subpage-card" data-sub="toolbox-aiqa">
+            <div class="subpage-head"><button class="ghost small back-left" data-back="toolbox-home">返回</button><h2>AI 问答</h2></div>
+            <div class="ai-chat-layout">
+              <div id="aiChatMessages" class="ai-chat-messages">
+                <div class="chat-bubble ai welcome">
+                  你好，我是 Aegis AI 助手。你可以直接提问，也可以上传图片或文件让我一起分析。
+                </div>
+              </div>
+              <div id="aiAttachmentList" class="attachment-list"></div>
+              <div class="ai-composer card-inline">
+                <label class="upload-trigger" for="aiFileInput">上传图片/文件</label>
+                <input id="aiFileInput" type="file" accept="image/*,.txt,.log,.json,.csv,.md,.pdf,.doc,.docx,.xls,.xlsx" multiple hidden />
+                <textarea id="aiQuestionInput" rows="3" placeholder="输入你的问题，或描述你想让 AI 帮你分析的内容"></textarea>
+                <div class="actions one">
+                  <button id="btnSendAiQuestion">发送给 AI</button>
+                </div>
+              </div>
+              <div id="aiQaResult" class="hint">支持纯文字问答，也支持带附件一起发起分析。</div>
+            </div>
           </section>
         </section>
 

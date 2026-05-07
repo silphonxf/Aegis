@@ -12,12 +12,40 @@ from app.db.session import get_db
 from app.models.ai_diagnosis import AIDiagnosis
 from app.models.offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from app.models.user import User
-from app.schemas.ai import DiagnoseRequest
+from app.schemas.ai import ChatRequest, ChatResponse, DiagnoseRequest
 from app.schemas.offline_ai import OfflineAnalyzeRequest
 from app.services.audit import log_action
 from app.services.offline_llm import OfflineLLMError, diagnose_with_ollama, offline_analyze_with_ollama
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+def _build_chat_attachment_notes(attachments: List[dict]) -> List[str]:
+    notes: List[str] = []
+    for item in attachments:
+        name = str(item.get("name") or "未命名附件")
+        kind = str(item.get("type") or "unknown")
+        size = int(item.get("size") or 0)
+        size_text = f"{round(size / 1024, 1)}KB" if size >= 1024 else f"{size}B"
+        notes.append(f"已收到附件：{name}（{kind}，{size_text}）")
+    return notes
+
+
+def _extract_attachment_text_blocks(attachments: List[dict]) -> List[str]:
+    blocks: List[str] = []
+    for item in attachments:
+        name = str(item.get("name") or "")
+        kind = str(item.get("type") or "")
+        data_url = str(item.get("data_url") or "")
+        if not data_url:
+            continue
+        if not (re.search(r"(json|text|csv|log|plain|markdown)", kind, flags=re.I) or re.search(r"\.(txt|log|json|csv|md)$", name, flags=re.I)):
+            continue
+        excerpt = data_url[:1600]
+        blocks.append(f"附件摘录 {name}: {excerpt}")
+        if len(blocks) >= 3:
+            break
+    return blocks
 
 
 def _mock_suggestions(payload: DiagnoseRequest) -> List[str]:
@@ -108,6 +136,101 @@ def _offline_rule_analyze(text: str, fallback_severity: str) -> tuple[str, List[
 
     excerpt = "\n".join([ln for ln in text.splitlines() if ln.strip()][:60])
     return final_severity, matched, list(dict.fromkeys(suggestions)), summary, excerpt
+
+
+@router.post("/chat", response_model=ChatResponse)
+def chat_with_ai(
+    payload: ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    message = (payload.message or "").strip()
+    attachments = [item.dict() for item in payload.attachments]
+    if not message and not attachments:
+        raise HTTPException(status_code=400, detail={"code": "EMPTY_CHAT", "message": "消息和附件不能同时为空"})
+
+    attachment_notes = _build_chat_attachment_notes(attachments)
+    detail_parts = []
+    if message:
+        detail_parts.append(f"用户问题：{message}")
+    if attachment_notes:
+        detail_parts.append("附件概览：\n" + "\n".join(f"- {item}" for item in attachment_notes))
+    detail_parts.extend(_extract_attachment_text_blocks(attachments))
+
+    diagnose_payload = DiagnoseRequest(
+        title=message[:120] or "移动端 AI 问答",
+        detail="\n\n".join(detail_parts)[:2000],
+        severity="medium",
+    )
+
+    mode = "rule_fallback"
+    severity = diagnose_payload.severity
+    summary = ""
+    fallback_reason: Optional[str] = None
+    started_at = time.perf_counter()
+
+    if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
+        try:
+            severity, suggestions, summary = diagnose_with_ollama(
+                diagnose_payload.title, diagnose_payload.detail, diagnose_payload.severity
+            )
+            mode = "offline_ollama"
+        except OfflineLLMError as e:
+            suggestions = _mock_suggestions(diagnose_payload)
+            summary = "离线模型不可用，已回退规则建议。"
+            fallback_reason = str(e)[:200]
+    else:
+        suggestions = _mock_suggestions(diagnose_payload)
+        summary = "离线模型未启用，已使用规则建议。"
+        fallback_reason = "offline_ai_disabled_or_provider_mismatch"
+
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+
+    reply_sections = []
+    if summary:
+        reply_sections.append(f"结论：{summary}")
+    if attachment_notes:
+        reply_sections.append("我已结合这些附件一起看：\n" + "\n".join(f"- {item}" for item in attachment_notes))
+    if suggestions:
+        reply_sections.append("建议下一步：\n" + "\n".join(f"{idx + 1}. {item}" for idx, item in enumerate(suggestions[:5])))
+    reply = "\n\n".join(reply_sections).strip() or "我已经收到你的问题，但暂时没有生成可用建议。"
+
+    row = AIDiagnosis(
+        title=diagnose_payload.title,
+        severity=severity,
+        detail=diagnose_payload.detail,
+        suggestions=json.dumps(suggestions, ensure_ascii=False),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+
+    log_action(
+        db,
+        "ai_chat",
+        "ai",
+        current_user,
+        {
+            "diagnosis_id": row.id,
+            "severity": severity,
+            "mode": mode,
+            "elapsed_ms": elapsed_ms,
+            "fallback_reason": fallback_reason,
+            "attachment_count": len(attachments),
+        },
+    )
+
+    return ChatResponse(
+        conversation_id=payload.conversation_id or f"chat-{row.id}",
+        mode=mode,
+        summary=summary,
+        reply=reply,
+        severity=severity,
+        suggestions=suggestions,
+        attachment_notes=attachment_notes,
+        elapsed_ms=elapsed_ms,
+        fallback_reason=fallback_reason,
+    )
 
 
 @router.post("/diagnose")
