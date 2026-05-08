@@ -192,31 +192,6 @@ canvas { width: 100%; border: 1px solid #1d3a51; border-radius: 10px; background
   gap: 8px;
   flex-wrap: wrap;
 }
-.ai-conversation-list {
-  display: grid;
-  gap: 8px;
-}
-.ai-conversation-list:empty {
-  display: none;
-}
-.ai-conversation-item {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #0a1a29;
-  border: 1px solid #1d3d58;
-  text-align: left;
-  color: inherit;
-}
-.ai-conversation-title {
-  font-weight: 600;
-  color: #e6f2ff;
-}
-.ai-conversation-meta {
-  color: var(--muted);
-  font-size: 12px;
-}
 .attachment-list {
   display: grid;
   gap: 8px;

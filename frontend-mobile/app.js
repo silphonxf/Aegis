@@ -238,42 +238,6 @@ function renderAiMessages() {
   });
 }
 
-async function restoreAiConversation(conversationId) {
-  const detail = await api(`/api/v1/ai/conversations/${conversationId}`, {
-    method: 'GET',
-    headers: state.token ? { Authorization: `Bearer ${state.token}` } : {},
-  });
-  state.aiConversationId = detail.conversation_id;
-  state.aiMessages = detail.messages?.length
-    ? detail.messages.map((item) => ({ role: item.role === 'assistant' ? 'ai' : 'user', text: item.content || '' }))
-    : buildDefaultAiMessages();
-  state.aiAttachments.forEach((item) => item.previewUrl && URL.revokeObjectURL(item.previewUrl));
-  state.aiAttachments = [];
-  renderAiAttachmentList();
-  renderAiMessages();
-  $('aiQaResult').textContent = `已恢复会话：${detail.title || '未命名会话'}（最近 ${detail.message_count || 0} 条消息）`;
-}
-
-async function loadRecentAiConversations() {
-  const result = await api('/api/v1/ai/conversations', {
-    method: 'GET',
-    headers: state.token ? { Authorization: `Bearer ${state.token}` } : {},
-  });
-  const box = $('aiConversationList');
-  if (!box) return;
-  box.innerHTML = (result.items || []).map((item) => `
-    <button class="ai-conversation-item" data-ai-conversation-id="${escapeHtml(item.conversation_id)}">
-      <div class="ai-conversation-title">${escapeHtml(item.title || '新会话')}</div>
-      <div class="ai-conversation-meta">${escapeHtml(item.conversation_id)} · ${escapeHtml(item.updated_at || '')}</div>
-    </button>
-  `).join('');
-  box.querySelectorAll('[data-ai-conversation-id]').forEach((btn) => {
-    btn.onclick = () => restoreAiConversation(btn.dataset.aiConversationId).catch((e) => {
-      $('aiQaResult').textContent = e.message || '恢复会话失败';
-    });
-  });
-}
-
 function renderAiAttachmentList() {
   const box = $('aiAttachmentList');
   if (!box) return;
@@ -532,7 +496,6 @@ function initSubNavigation() {
     showSub('panel-toolbox', 'toolbox-aiqa');
     renderAiMessages();
     renderAiAttachmentList();
-    loadRecentAiConversations().catch(() => {});
   };
 
   document.querySelectorAll('[data-back]').forEach((btn) => {
@@ -1241,9 +1204,6 @@ $('btnRefreshToolTasks').onclick = async () => {
 };
 $('aiFileInput').addEventListener('change', handleAiFileChange);
 $('btnSendAiQuestion').onclick = sendAiQuestion;
-$('btnRefreshAiConversations').onclick = () => loadRecentAiConversations().catch((e) => {
-  $('aiQaResult').textContent = e.message || '加载最近会话失败';
-});
 $('btnNewAiChat').onclick = () => {
   state.aiConversationId = '';
   state.aiMessages = buildDefaultAiMessages();
