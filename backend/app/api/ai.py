@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,6 +9,7 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.ai_chat_file import AIChatFile
 from app.models.ai_chat_message import AIChatMessage
+from app.models.ai_conversation import AIConversation
 from app.models.ai_diagnosis import AIDiagnosis
 from app.models.offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from app.models.user import User
@@ -71,6 +73,12 @@ def _save_conversation_turn(db: Session, conversation_id: str | None, user_messa
         db.add(AIChatMessage(conversation_id=conversation_id, role="user", content=user_message.strip()))
     if ai_reply.strip():
         db.add(AIChatMessage(conversation_id=conversation_id, role="assistant", content=ai_reply.strip()))
+
+    row = db.query(AIConversation).filter(AIConversation.conversation_id == conversation_id).first()
+    if row:
+        if user_message.strip() and row.title.strip() in {"", "新会话"}:
+            row.title = user_message.strip()[:40]
+        row.updated_at = datetime.utcnow()
 
 
 @router.post("/chat", response_model=ChatResponse)

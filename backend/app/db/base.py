@@ -1,6 +1,7 @@
 from app.models.ai_chat_file import AIChatFile
 from app.models.ai_chat_message import AIChatMessage
 from app.models.ai_chat_summary import AIChatSummary
+from app.models.ai_conversation import AIConversation
 from app.models.ai_diagnosis import AIDiagnosis
 from app.models.asset import Asset
 from app.models.audit import AuditLog
@@ -31,4 +32,5 @@ __all__ = [
     "AIChatFile",
     "AIChatMessage",
     "AIChatSummary",
+    "AIConversation",
 ]

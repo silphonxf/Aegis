@@ -27,7 +27,7 @@ function loadAiMessages() {
 }
 
 function loadAiConversationId() {
-  return sessionStorage.getItem(AI_CHAT_CONVERSATION_KEY) || `mobile-ai-chat-${Date.now()}`;
+  return sessionStorage.getItem(AI_CHAT_CONVERSATION_KEY) || '';
 }
 
 const state = {
@@ -156,8 +156,11 @@ async function api(path, options = {}) {
   const method = options.method || 'GET';
   const url = `${getBase()}${path}`;
   const started = Date.now();
+  const timeoutMs = options.timeoutMs || 0;
+  const controller = timeoutMs ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
   try {
-    const resp = await fetch(url, options);
+    const resp = await fetch(url, { ...options, signal: controller?.signal });
     const data = await resp.json().catch(() => ({}));
     rememberLog({ at: new Date().toISOString(), method, url, status: resp.status, ok: resp.ok, body: summarizeBody(options.body), response: data, duration_ms: Date.now() - started });
     if (!resp.ok) throw new Error((data && (data.message || data.detail)) || `HTTP ${resp.status}`);
@@ -165,6 +168,8 @@ async function api(path, options = {}) {
   } catch (e) {
     rememberLog({ at: new Date().toISOString(), method, url, status: 0, ok: false, network_error: e.message || 'fetch failed', duration_ms: Date.now() - started });
     throw e;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
 
@@ -195,7 +200,9 @@ function showSub(panelId, subName) {
 function saveAiMessages() {
   try {
     sessionStorage.setItem(AI_CHAT_HISTORY_KEY, JSON.stringify(state.aiMessages.slice(-80)));
-    sessionStorage.setItem(AI_CHAT_CONVERSATION_KEY, state.aiConversationId);
+    if (state.aiConversationId) {
+      sessionStorage.setItem(AI_CHAT_CONVERSATION_KEY, state.aiConversationId);
+    }
   } catch {}
 }
 
@@ -203,7 +210,7 @@ function updateAiConversationMeta() {
   const el = $('aiConversationMeta');
   if (!el) return;
   const count = state.aiMessages.filter((item) => !item.welcome).length;
-  const shortId = state.aiConversationId.slice(-6);
+  const shortId = state.aiConversationId ? state.aiConversationId.slice(-6) : '------';
   el.textContent = count ? `会话 ${shortId} · 当前打开期间已记录 ${count} 条消息。` : `会话 ${shortId} · 关闭应用后将自动清空，本次打开期间会保留当前对话。`;
 }
 
@@ -228,6 +235,42 @@ function renderAiMessages() {
   updateAiConversationMeta();
   requestAnimationFrame(() => {
     box.scrollTop = box.scrollHeight;
+  });
+}
+
+async function restoreAiConversation(conversationId) {
+  const detail = await api(`/api/v1/ai/conversations/${conversationId}`, {
+    method: 'GET',
+    headers: state.token ? { Authorization: `Bearer ${state.token}` } : {},
+  });
+  state.aiConversationId = detail.conversation_id;
+  state.aiMessages = detail.messages?.length
+    ? detail.messages.map((item) => ({ role: item.role === 'assistant' ? 'ai' : 'user', text: item.content || '' }))
+    : buildDefaultAiMessages();
+  state.aiAttachments.forEach((item) => item.previewUrl && URL.revokeObjectURL(item.previewUrl));
+  state.aiAttachments = [];
+  renderAiAttachmentList();
+  renderAiMessages();
+  $('aiQaResult').textContent = `已恢复会话：${detail.title || '未命名会话'}（最近 ${detail.message_count || 0} 条消息）`;
+}
+
+async function loadRecentAiConversations() {
+  const result = await api('/api/v1/ai/conversations', {
+    method: 'GET',
+    headers: state.token ? { Authorization: `Bearer ${state.token}` } : {},
+  });
+  const box = $('aiConversationList');
+  if (!box) return;
+  box.innerHTML = (result.items || []).map((item) => `
+    <button class="ai-conversation-item" data-ai-conversation-id="${escapeHtml(item.conversation_id)}">
+      <div class="ai-conversation-title">${escapeHtml(item.title || '新会话')}</div>
+      <div class="ai-conversation-meta">${escapeHtml(item.conversation_id)} · ${escapeHtml(item.updated_at || '')}</div>
+    </button>
+  `).join('');
+  box.querySelectorAll('[data-ai-conversation-id]').forEach((btn) => {
+    btn.onclick = () => restoreAiConversation(btn.dataset.aiConversationId).catch((e) => {
+      $('aiQaResult').textContent = e.message || '恢复会话失败';
+    });
   });
 }
 
@@ -330,6 +373,19 @@ async function fileToDataUrl(file) {
   });
 }
 
+async function ensureAiConversation() {
+  if (state.aiConversationId) return state.aiConversationId;
+  const result = await api('/api/v1/ai/conversations', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ title: '新会话', source: 'mobile' }),
+  });
+  state.aiConversationId = result.conversation_id;
+  saveAiMessages();
+  updateAiConversationMeta();
+  return state.aiConversationId;
+}
+
 async function uploadAiAttachment(item) {
   const dataUrl = await fileToDataUrl(item.file);
   const result = await api('/api/v1/ai/files/upload', {
@@ -380,6 +436,7 @@ async function sendAiQuestion(reusePayload = null) {
   $('aiQaResult').textContent = 'AI 正在分析，请稍等...';
 
   try {
+    await ensureAiConversation();
     $('aiQaResult').textContent = attachmentsSource.length ? '正在上传附件，请稍等...' : '正在整理上下文，请稍等...';
     const uploadedFiles = reusePayload?.uploadedFiles ?? await Promise.all(attachmentsSource.map(uploadAiAttachment));
 
@@ -405,6 +462,7 @@ async function sendAiQuestion(reusePayload = null) {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(payload),
+      timeoutMs: 45000,
     });
 
     const reply = formatAiReply(result);
@@ -420,7 +478,7 @@ async function sendAiQuestion(reusePayload = null) {
     state.aiAttachments = [];
     renderAiAttachmentList();
   } catch (e) {
-    const msg = e.message || 'AI 问答失败';
+    const msg = e.name === 'AbortError' ? 'AI 响应超时，请稍后重试或缩短问题内容。' : (e.message || 'AI 问答失败');
     state.aiMessages = state.aiMessages.filter((item) => !item.pending);
     const hasUserBubble = state.aiMessages.some((item) => item.role === 'user' && item.text === (question || '请帮我分析这些附件。'));
     if (!hasUserBubble) {
@@ -474,6 +532,7 @@ function initSubNavigation() {
     showSub('panel-toolbox', 'toolbox-aiqa');
     renderAiMessages();
     renderAiAttachmentList();
+    loadRecentAiConversations().catch(() => {});
   };
 
   document.querySelectorAll('[data-back]').forEach((btn) => {
@@ -1182,8 +1241,11 @@ $('btnRefreshToolTasks').onclick = async () => {
 };
 $('aiFileInput').addEventListener('change', handleAiFileChange);
 $('btnSendAiQuestion').onclick = sendAiQuestion;
+$('btnRefreshAiConversations').onclick = () => loadRecentAiConversations().catch((e) => {
+  $('aiQaResult').textContent = e.message || '加载最近会话失败';
+});
 $('btnNewAiChat').onclick = () => {
-  state.aiConversationId = `mobile-ai-chat-${Date.now()}`;
+  state.aiConversationId = '';
   state.aiMessages = buildDefaultAiMessages();
   state.lastAiRequestPayload = null;
   state.aiAttachments.forEach((item) => item.previewUrl && URL.revokeObjectURL(item.previewUrl));

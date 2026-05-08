@@ -211,10 +211,12 @@
               <div class="ai-toolbar">
                 <div id="aiConversationMeta" class="hint">当前会话将保留最近聊天记录，便于连续追问。</div>
                 <div class="ai-toolbar-actions">
+                  <button id="btnRefreshAiConversations" class="ghost small">最近会话</button>
                   <button id="btnNewAiChat" class="ghost small">新会话</button>
                   <button id="btnClearAiChat" class="ghost small">清空会话</button>
                 </div>
               </div>
+              <div id="aiConversationList" class="ai-conversation-list"></div>
               <div id="aiAttachmentList" class="attachment-list"></div>
               <div class="ai-composer card-inline">
                 <label class="upload-trigger" for="aiFileInput">上传图片/文件</label>
