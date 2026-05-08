@@ -18,6 +18,10 @@
   - 联调与快速启动说明
 - `offline-ai-setup.md`
   - 离线 AI（Ollama）安装与接入
+- `openclaw-ai-provider-design.md`
+  - Aegis 对接 OpenClaw 的 AI provider 技术设计（第一版）
+- `openclaw-ai-adapter-local-dev.md`
+  - 本地 OpenClaw AI Adapter 联调说明（第一版）
 - `login-common-pitfalls.md`
   - 登录常见误区（应用账号 vs 数据库账号）
 - `mvp-scope.md`

@@ -30,6 +30,9 @@ dist/
 # Local runtime logs
 .logs/
 
+# Runtime uploads
+backend/uploads/
+
 # Local certs / secrets
 .certs/
 *.key

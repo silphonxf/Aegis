@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aegis 项目里程碑总览</title>
+  <style>
+    :root {
+      --bg: #07111b;
+      --panel: #0d1b2a;
+      --panel-2: #10263a;
+      --line: #1f3f5b;
+      --text: #e8f3ff;
+      --muted: #8fa9c2;
+      --ok: #22c55e;
+      --doing: #38bdf8;
+      --warn: #f59e0b;
+      --accent: #2dd4bf;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at top, #10253a 0%, var(--bg) 55%);
+      color: var(--text);
+      line-height: 1.65;
+    }
+    .wrap {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 28px 0 64px;
+    }
+    .hero {
+      display: grid;
+      gap: 18px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: linear-gradient(145deg, rgba(16,38,58,.96), rgba(7,17,27,.96));
+      box-shadow: 0 20px 60px rgba(0,0,0,.28);
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1.15;
+    }
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      max-width: 920px;
+    }
+    .chips, .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .chip {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(9, 23, 36, .88);
+      color: #c8e5fb;
+      font-size: 13px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+      margin-top: 18px;
+    }
+    .card {
+      grid-column: span 12;
+      padding: 20px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: rgba(13, 27, 42, .96);
+    }
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+    }
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      color: #bfe8ff;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .kpi {
+      padding: 16px;
+      border-radius: 16px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+    }
+    .kpi .num {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .kpi .label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .timeline {
+      display: grid;
+      gap: 14px;
+    }
+    .step {
+      display: grid;
+      gap: 8px;
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: #0b1826;
+    }
+    .step-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .done { background: rgba(34,197,94,.14); color: #9bf2bb; border: 1px solid rgba(34,197,94,.4); }
+    .doing { background: rgba(56,189,248,.14); color: #9ee3ff; border: 1px solid rgba(56,189,248,.4); }
+    .next { background: rgba(245,158,11,.14); color: #ffd79a; border: 1px solid rgba(245,158,11,.4); }
+    ul { margin: 0; padding-left: 18px; }
+    li + li { margin-top: 6px; }
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+    .module {
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: #0b1826;
+    }
+    .module p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .focus {
+      border-left: 4px solid var(--accent);
+      padding-left: 14px;
+      color: #d8f5f0;
+    }
+    .footer-note {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    @media (max-width: 960px) {
+      .kpis { grid-template-columns: repeat(2, 1fr); }
+      .matrix { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .wrap { width: min(100vw - 20px, 1180px); padding-top: 18px; }
+      .hero, .card { padding: 16px; }
+      .kpis { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="chips">
+        <span class="chip">Aegis 运维助手</span>
+        <span class="chip">Milestone Overview</span>
+        <span class="chip">聚焦 AI 持续迭代</span>
+      </div>
+      <div>
+        <h1>Aegis 项目里程碑总览</h1>
+        <p>
+          Aegis 是一个面向移动端与后台管理的一体化运维助手，覆盖巡检、自检、监控、资产、工具箱、审批流、AI 诊断与 AI 问答等场景。
+          当前项目已经从“能演示”推进到“本地可联调、可持续迭代”的阶段，并且 AI 主链路已经完成从 skeleton 到真实 OpenClaw 接入。
+        </p>
+      </div>
+      <div class="meta">
+        <span class="chip">当前总体状态：v1.0.0 主体功能完成</span>
+        <span class="chip">当前开发重心：AI 能力体验与稳定性增强</span>
+        <span class="chip">本地联调：已打通</span>
+        <span class="chip">局域网 / Tailscale 访问：已支持</span>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>项目快照</h2>
+        <div class="kpis">
+          <div class="kpi">
+            <div class="num">3</div>
+            <div class="label">核心端形态：移动端 / 管理端 / 后端 API</div>
+          </div>
+          <div class="kpi">
+            <div class="num">10+</div>
+            <div class="label">核心业务域：认证、巡检、自检、监控、工具箱、AI 等</div>
+          </div>
+          <div class="kpi">
+            <div class="num">18</div>
+            <div class="label">已跑通后端回归测试数量（阶段文档记录）</div>
+          </div>
+          <div class="kpi">
+            <div class="num">1</div>
+            <div class="label">当前明确主线：继续优化 AI 功能体验</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>里程碑演进</h2>
+        <div class="timeline">
+          <div class="step">
+            <div class="step-head">
+              <h3>M1 · 产品主体功能落地</h3>
+              <span class="badge done">已完成</span>
+            </div>
+            <ul>
+              <li>完成认证、巡检、自检、报表、管理看板、资产管理、审计、工具箱基础能力。</li>
+              <li>形成 v1.0.0 主体功能范围，具备整体演示能力。</li>
+            </ul>
+          </div>
+
+          <div class="step">
+            <div class="step-head">
+              <h3>M2 · 本地开发基线整理</h3>
+              <span class="badge done">已完成</span>
+            </div>
+            <ul>
+              <li>恢复默认 seed，支持本地启动后直接使用默认管理员登录。</li>
+              <li>补齐本地脚本：dev-up / dev-stop / dev-reset / dev-status / dev-check。</li>
+              <li>完善联调文档，降低新环境接手成本。</li>
+            </ul>
+          </div>
+
+          <div class="step">
+            <div class="step-head">
+              <h3>M3 · 回归测试与 Smoke 护栏</h3>
+              <span class="badge done">已完成</span>
+            </div>
+            <ul>
+              <li>补齐 auth、inspections、selfchecks、toolbox、ai、assets、systems、audit 等测试。</li>
+              <li>增强 smoke 脚本，覆盖健康检查、登录、自检、工具任务、AI 诊断、资产 summary、审计日志等主链路。</li>
+            </ul>
+          </div>
+
+          <div class="step">
+            <div class="step-head">
+              <h3>M4 · 工具箱 / 审批流闭环增强</h3>
+              <span class="badge doing">进行中 / 已完成第一阶段</span>
+            </div>
+            <ul>
+              <li>扩展工具任务状态机：pending_approval / approved / running / done / failed / rejected / cancelled。</li>
+              <li>统一任务 result 结构，增强执行元数据、结构化日志与后台展示。</li>
+              <li>移动端已能创建应用重启任务并查看最近工具任务。</li>
+            </ul>
+          </div>
+
+          <div class="step">
+            <div class="step-head">
+              <h3>M5 · AI 能力接入与升级</h3>
+              <span class="badge doing">当前重点</span>
+            </div>
+            <ul>
+              <li>离线 AI（Ollama）已接入诊断与离线日志分析，保留规则引擎回退。</li>
+              <li>OpenClaw provider 抽象已完成，Aegis AI 问答 / AI 诊断已真实接入 OpenClaw。</li>
+              <li>移动端 AI 问答已支持纯文本、图片/文件附件、对话气泡展示、聊天记录持久化。</li>
+              <li>已修复：Tailscale 跨域、附件日志导致页面崩溃、图片 data_url 校验长度不足、聊天输入清空与气泡样式问题。</li>
+            </ul>
+          </div>
+
+          <div class="step">
+            <div class="step-head">
+              <h3>M6 · 下一阶段方向</h3>
+              <span class="badge next">下一步</span>
+            </div>
+            <ul>
+              <li>继续优化 AI 问答体验：附件策略、图片分析质量、会话上下文、提示词稳定性。</li>
+              <li>提升移动端 AI 的“像真实聊天产品”的体验：loading 态、消息状态、附件卡片、异常恢复。</li>
+              <li>进一步沉淀 AI 能力到产品化功能，而不是只停留在接口联调层。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>已开发功能点梳理</h2>
+        <div class="matrix">
+          <div class="module">
+            <h3>1. 认证与账号体系</h3>
+            <p>项目基础登录与用户身份能力已经具备。</p>
+            <ul>
+              <li>管理员登录 / Token 持久化</li>
+              <li>当前用户信息读取（/auth/me）</li>
+              <li>个人资料修改</li>
+              <li>修改密码</li>
+              <li>默认 seed 管理员自动初始化</li>
+            </ul>
+          </div>
+
+          <div class="module">
+            <h3>2. 巡检模块（移动端）</h3>
+            <p>覆盖机房巡检的移动端操作入口。</p>
+            <ul>
+              <li>二维码巡检</li>
+              <li>NFC 巡检入口</li>
+              <li>巡检点解析</li>
+              <li>巡检记录提交与查询</li>
+            </ul>
+          </div>
+
+          <div class="module">
+            <h3>3. 自检模块</h3>
+            <p>支持标准化自检与系统状态查看。</p>
+            <ul>
+              <li>自检模板创建与读取</li>
+              <li>简化自检提交</li>
+              <li>自检记录查询</li>
+              <li>系统状态页（CPU / MEM / DISK 曲线）</li>
+              <li>错误日志读取与 AI 分析入口</li>
+            </ul>
+          </div>
+
+          <div class="module">
+            <h3>4. 工具箱与审批流</h3>
+            <p>从简单工具接口扩展到任务化闭环。</p>
+            <ul>
+              <li>Ping / 端口检测</li>
+              <li>错误日志提取</li>
+              <li>应用重启任务创建</li>
+              <li>工具任务状态流转与审批</li>
+              <li>结构化执行结果记录</li>
+            </ul>
+          </div>
+
+          <div class="module">
+            <h3>5. 管理后台</h3>
+            <p>管理端已具备可联调的核心运营能力。</p>
+            <ul>
+              <li>全局看板 / 监控总览</li>
+              <li>用户管理</li>
+              <li>系统管理</li>
+              <li>模板管理</li>
+              <li>状态规则读取 / 更新</li>
+              <li>资产创建、批量导入、导出、summary</li>
+              <li>审计日志查询</li>
+              <li>ThreatBook 相关接入</li>
+            </ul>
+          </div>
+
+          <div class="module">
+            <h3>6. 数据与数据库适配</h3>
+            <p>兼顾本地轻量联调与达梦环境接入。</p>
+            <ul>
+              <li>SQLite 本地默认开发模式</li>
+              <li>达梦 DATABASE_URL / 拆分 DM_* 配置支持</li>
+              <li>Alembic 迁移</li>
+              <li>达梦检查脚本与验收增强</li>
+            </ul>
+          </div>
+
+          <div class="module">
+            <h3>7. AI 诊断与离线分析</h3>
+            <p>AI 能力已经进入实际主链路。</p>
+            <ul>
+              <li>AI 诊断接口</li>
+              <li>离线错误日志分析</li>
+              <li>规则引擎回退</li>
+              <li>Ollama provider 接入</li>
+              <li>elapsed_ms / fallback_reason 观测增强</li>
+            </ul>
+          </div>
+
+          <div class="module">
+            <h3>8. OpenClaw AI 问答（最新进展）</h3>
+            <p>这是当前最值得继续深挖的方向。</p>
+            <ul>
+              <li>Aegis AI provider 抽象已建立</li>
+              <li>OpenClaw gateway 本地真实接入已打通</li>
+              <li>移动端 AI 问答支持文本 + 附件</li>
+              <li>支持局域网 / Tailscale 访问</li>
+              <li>支持聊天记录保留与 UI 基础优化</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>当前 AI 迭代现状</h2>
+        <div class="focus">
+          你现在已经不再是在做“把 AI 接上去”这一步了，而是在进入“把 AI 做好用”这个阶段。
+        </div>
+        <ul style="margin-top: 12px;">
+          <li>OpenClaw 已经不是 skeleton/mock，而是真实接入。</li>
+          <li>移动端 AI 问答已经具备产品雏形：消息区、输入区、附件、会话保留、局域网可访问。</li>
+          <li>当前短板主要集中在体验稳定性与产品感，而不是基础连通性。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>后续建议：AI 模块下一轮优化方向</h2>
+        <div class="matrix">
+          <div class="module">
+            <h3>体验层</h3>
+            <ul>
+              <li>发送中 loading 气泡</li>
+              <li>消息失败重试</li>
+              <li>附件卡片化展示</li>
+              <li>图片上传压缩 / 大小限制</li>
+              <li>更好的移动端输入体验</li>
+            </ul>
+          </div>
+          <div class="module">
+            <h3>能力层</h3>
+            <ul>
+              <li>图片内容分析质量提升</li>
+              <li>日志 / 文本附件提取策略优化</li>
+              <li>会话上下文连续性增强</li>
+              <li>更稳定的运维诊断提示词</li>
+              <li>按场景切换 AI 工作模式（问答 / 诊断 / 日志分析）</li>
+            </ul>
+          </div>
+          <div class="module">
+            <h3>工程层</h3>
+            <ul>
+              <li>AI 问答自动化测试补充</li>
+              <li>附件大小、类型、异常处理护栏</li>
+              <li>前端请求日志继续轻量化</li>
+              <li>OpenClaw provider 响应结构进一步标准化</li>
+            </ul>
+          </div>
+          <div class="module">
+            <h3>产品层</h3>
+            <ul>
+              <li>把 AI 从“工具箱里的子页面”升级成更核心能力</li>
+              <li>考虑沉淀为：故障助手 / 日志助手 / 巡检助手</li>
+              <li>让 AI 真正参与运维闭环，而不是仅做文本回复</li>
+            </ul>
+          </div>
+        </div>
+        <p class="footer-note">
+          建议你下一轮就围绕「AI 问答体验稳定化 + 附件策略 + 场景化诊断」继续推进，这样最能把 Aegis 的差异化做出来。
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>查看说明</h2>
+        <ul>
+          <li>文件名：<code>milestone-overview.html</code></li>
+          <li>路径：<code>/home/xf/.openclaw/workspace/projects/Aegis/milestone-overview.html</code></li>
+          <li>可直接在浏览器中打开，作为你当前项目阶段的展示页。</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
