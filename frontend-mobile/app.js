@@ -1,5 +1,34 @@
 const $ = (id) => document.getElementById(id);
 const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%230f2c44"/><circle cx="32" cy="24" r="12" fill="%236bd5ff"/><path d="M12 56c4-10 12-16 20-16s16 6 20 16" fill="%2338bdf8"/></svg>';
+const AI_CHAT_HISTORY_KEY = 'aegis_ai_chat_history';
+const AI_CHAT_CONVERSATION_KEY = 'aegis_ai_chat_conversation';
+const AI_MAX_ATTACHMENTS = 4;
+const AI_MAX_FILE_SIZE = 2 * 1024 * 1024;
+const DEFAULT_AI_MESSAGES = [
+  {
+    role: 'ai',
+    text: '你好，我是 Aegis AI 助手。你可以直接提问，也可以上传图片或文件让我一起分析。',
+    welcome: true,
+  },
+];
+
+function buildDefaultAiMessages() {
+  return DEFAULT_AI_MESSAGES.map((item) => ({ ...item }));
+}
+
+function loadAiMessages() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(AI_CHAT_HISTORY_KEY) || 'null');
+    if (Array.isArray(raw) && raw.length) {
+      return raw.filter((item) => item && typeof item.text === 'string').slice(-80);
+    }
+  } catch {}
+  return buildDefaultAiMessages();
+}
+
+function loadAiConversationId() {
+  return sessionStorage.getItem(AI_CHAT_CONVERSATION_KEY) || `mobile-ai-chat-${Date.now()}`;
+}
 
 const state = {
   token: '',
@@ -14,13 +43,11 @@ const state = {
   qrScanText: '',
   qrResolvedPoint: null,
   aiAttachments: [],
-  aiMessages: [
-    {
-      role: 'ai',
-      text: '你好，我是 Aegis AI 助手。你可以直接提问，也可以上传图片或文件让我一起分析。',
-      welcome: true,
-    },
-  ],
+  aiMessages: loadAiMessages(),
+  aiConversationId: loadAiConversationId(),
+  isAnalyzingErrors: false,
+  isSendingAiMessage: false,
+  lastAiRequestPayload: null,
 };
 
 function getBase() {
@@ -36,6 +63,30 @@ function authHeaders() {
   return h;
 }
 function show(id, data) { $(id).textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2); }
+function setButtonLoading(id, loading, loadingText) {
+  const btn = $(id);
+  if (!btn) return;
+  if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
+  btn.disabled = loading;
+  btn.classList.toggle('secondary', loading);
+  btn.textContent = loading ? (loadingText || '处理中...') : btn.dataset.originalText;
+}
+
+function formatErrorAiResult(data) {
+  if (!data || typeof data !== 'object') return '暂无分析结果';
+  const lines = [];
+  if (data.summary) lines.push(`分析结果：${data.summary}`);
+  if (Array.isArray(data.suggestions) && data.suggestions.length) {
+    lines.push('', '建议动作：');
+    data.suggestions.forEach((item, idx) => lines.push(`${idx + 1}. ${item}`));
+  }
+  return lines.join('\n');
+}
+
+function formatAiReply(result) {
+  if (!result || typeof result !== 'object') return 'AI 暂未返回有效内容。';
+  return result.reply || result.summary || 'AI 暂未返回有效内容。';
+}
 function setLoginState(text) { $('loginState').textContent = text; }
 function escapeHtml(value) {
   return String(value || '')
@@ -65,10 +116,40 @@ function applyProfileUI() {
   if ($('profileUsername')) $('profileUsername').value = state.profile.username || $('username').value.trim() || 'admin';
 }
 
+function summarizeBody(body) {
+  if (body == null) return null;
+  if (typeof body !== 'string') return body;
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed === 'object') {
+      const summary = { ...parsed };
+      if (Array.isArray(summary.attachments)) {
+        summary.attachments = summary.attachments.map((item) => ({
+          name: item?.name,
+          type: item?.type,
+          size: item?.size,
+          has_data_url: Boolean(item?.data_url),
+        }));
+      }
+      return summary;
+    }
+    return parsed;
+  } catch {
+    return body.length > 200 ? `${body.slice(0, 200)}...` : body;
+  }
+}
+
 function rememberLog(log) {
   state.requestLogs.unshift(log);
-  if (state.requestLogs.length > 300) state.requestLogs = state.requestLogs.slice(0, 300);
-  localStorage.setItem('aegis_request_logs', JSON.stringify(state.requestLogs));
+  if (state.requestLogs.length > 120) state.requestLogs = state.requestLogs.slice(0, 120);
+  try {
+    localStorage.setItem('aegis_request_logs', JSON.stringify(state.requestLogs));
+  } catch {
+    state.requestLogs = state.requestLogs.slice(0, 40);
+    try {
+      localStorage.setItem('aegis_request_logs', JSON.stringify(state.requestLogs));
+    } catch {}
+  }
 }
 
 async function api(path, options = {}) {
@@ -78,7 +159,7 @@ async function api(path, options = {}) {
   try {
     const resp = await fetch(url, options);
     const data = await resp.json().catch(() => ({}));
-    rememberLog({ at: new Date().toISOString(), method, url, status: resp.status, ok: resp.ok, body: options.body ? JSON.parse(options.body) : null, response: data, duration_ms: Date.now() - started });
+    rememberLog({ at: new Date().toISOString(), method, url, status: resp.status, ok: resp.ok, body: summarizeBody(options.body), response: data, duration_ms: Date.now() - started });
     if (!resp.ok) throw new Error((data && (data.message || data.detail)) || `HTTP ${resp.status}`);
     return data;
   } catch (e) {
@@ -111,18 +192,43 @@ function showSub(panelId, subName) {
   });
 }
 
+function saveAiMessages() {
+  try {
+    sessionStorage.setItem(AI_CHAT_HISTORY_KEY, JSON.stringify(state.aiMessages.slice(-80)));
+    sessionStorage.setItem(AI_CHAT_CONVERSATION_KEY, state.aiConversationId);
+  } catch {}
+}
+
+function updateAiConversationMeta() {
+  const el = $('aiConversationMeta');
+  if (!el) return;
+  const count = state.aiMessages.filter((item) => !item.welcome).length;
+  const shortId = state.aiConversationId.slice(-6);
+  el.textContent = count ? `会话 ${shortId} · 当前打开期间已记录 ${count} 条消息。` : `会话 ${shortId} · 关闭应用后将自动清空，本次打开期间会保留当前对话。`;
+}
+
 function renderAiMessages() {
   const box = $('aiChatMessages');
   if (!box) return;
-  box.innerHTML = state.aiMessages.map((item) => {
+  box.innerHTML = state.aiMessages.map((item, index) => {
     const cls = item.role === 'user' ? 'user' : 'ai';
     const welcome = item.welcome ? ' welcome' : '';
+    const pending = item.pending ? ' pending' : '';
     const attachments = Array.isArray(item.attachments) && item.attachments.length
       ? `<div class="hint" style="margin-top:8px;">附件：${item.attachments.map((f) => escapeHtml(f.name)).join('、')}</div>`
       : '';
-    return `<div class="chat-bubble ${cls}${welcome}">${escapeHtml(item.text)}${attachments}</div>`;
+    const retry = item.failed && index === state.aiMessages.length - 1
+      ? '<div style="margin-top:8px;"><button class="ghost small" id="btnRetryAiMessage">重试</button></div>'
+      : '';
+    return `<div class="chat-bubble ${cls}${welcome}${pending}">${escapeHtml(item.text)}${attachments}${retry}</div>`;
   }).join('');
-  box.scrollTop = box.scrollHeight;
+  const retryBtn = $('btnRetryAiMessage');
+  if (retryBtn) retryBtn.onclick = retryLastAiMessage;
+  saveAiMessages();
+  updateAiConversationMeta();
+  requestAnimationFrame(() => {
+    box.scrollTop = box.scrollHeight;
+  });
 }
 
 function renderAiAttachmentList() {
@@ -132,11 +238,14 @@ function renderAiAttachmentList() {
     const preview = file.previewUrl && file.type?.startsWith('image/')
       ? `<img class="ai-attachment-preview" src="${file.previewUrl}" alt="${escapeHtml(file.name)}" />`
       : '';
+    const warnClass = file.invalid ? ' warn' : '';
+    const warnText = file.invalid ? `<div class="attachment-size" style="color:#ffd79a;">${escapeHtml(file.invalid)}</div>` : '';
     return `
-      <div class="attachment-chip">
+      <div class="attachment-chip${warnClass}">
         <div class="attachment-meta">
           <div class="attachment-name">${escapeHtml(file.name)}</div>
           <div class="attachment-size">${escapeHtml(file.type || '未知类型')} · ${formatFileSize(file.size)}</div>
+          ${warnText}
           ${preview}
         </div>
         <button class="attachment-remove" data-ai-remove="${index}">移除</button>
@@ -155,18 +264,59 @@ function renderAiAttachmentList() {
   });
 }
 
+async function compressImageFile(file) {
+  if (!file.type?.startsWith('image/') || file.size <= AI_MAX_FILE_SIZE) return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = () => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxWidth = 1600;
+        const scale = Math.min(1, maxWidth / img.width);
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (!blob) return resolve(file);
+          const compressed = new File([blob], file.name, { type: 'image/jpeg' });
+          resolve(compressed);
+        }, 'image/jpeg', 0.78);
+      };
+      img.onerror = () => resolve(file);
+      img.src = reader.result;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
 async function handleAiFileChange(event) {
   const files = Array.from(event.target.files || []);
   if (!files.length) return;
-  files.forEach((file) => {
+
+  const remainSlots = Math.max(0, AI_MAX_ATTACHMENTS - state.aiAttachments.length);
+  const accepted = files.slice(0, remainSlots);
+  const droppedCount = Math.max(0, files.length - accepted.length);
+
+  for (const originalFile of accepted) {
+    const processedFile = await compressImageFile(originalFile);
     state.aiAttachments.push({
-      file,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      previewUrl: file.type?.startsWith('image/') ? URL.createObjectURL(file) : '',
+      file: processedFile,
+      name: processedFile.name,
+      size: processedFile.size,
+      type: processedFile.type,
+      invalid: processedFile.size > AI_MAX_FILE_SIZE ? `附件过大，建议控制在 ${formatFileSize(AI_MAX_FILE_SIZE)} 以内` : '',
+      previewUrl: processedFile.type?.startsWith('image/') ? URL.createObjectURL(processedFile) : '',
     });
-  });
+  }
+
+  if (droppedCount > 0) {
+    $('aiQaResult').textContent = `最多支持 ${AI_MAX_ATTACHMENTS} 个附件，其余 ${droppedCount} 个未加入。`;
+  } else {
+    $('aiQaResult').textContent = `已选择 ${accepted.length} 个附件，发送时将一并提交给 AI。`;
+  }
   renderAiAttachmentList();
   event.target.value = '';
 }
@@ -180,70 +330,119 @@ async function fileToDataUrl(file) {
   });
 }
 
-async function sendAiQuestion() {
-  const question = $('aiQuestionInput').value.trim();
+async function uploadAiAttachment(item) {
+  const dataUrl = await fileToDataUrl(item.file);
+  const result = await api('/api/v1/ai/files/upload', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      conversation_id: state.aiConversationId,
+      name: item.name,
+      type: item.type || 'application/octet-stream',
+      size: item.size,
+      data_url: dataUrl,
+    }),
+  });
+  return result.file;
+}
+
+async function sendAiQuestion(reusePayload = null) {
+  if (state.isSendingAiMessage) return;
+  const inputEl = $('aiQuestionInput');
+  const question = reusePayload?.question ?? inputEl.value.trim();
   if (!question && !state.aiAttachments.length) {
     $('aiQaResult').textContent = '请先输入问题，或至少上传一个附件。';
     return;
   }
 
-  const attachmentMeta = state.aiAttachments.map((item) => ({
+  const attachmentsSource = reusePayload?.attachmentsSource ?? state.aiAttachments;
+  const invalidAttachment = attachmentsSource.find((item) => item.invalid);
+  if (invalidAttachment) {
+    $('aiQaResult').textContent = `附件“${invalidAttachment.name}”过大，请先压缩或移除后再发送。`;
+    return;
+  }
+
+  state.isSendingAiMessage = true;
+  setButtonLoading('btnSendAiQuestion', true, 'AI 回复中...');
+
+  const attachmentMeta = attachmentsSource.map((item) => ({
     name: item.name,
     size: item.size,
     type: item.type || 'application/octet-stream',
   }));
 
-  state.aiMessages.push({ role: 'user', text: question || '请帮我分析这些附件。', attachments: attachmentMeta });
+  if (!reusePayload) {
+    state.aiMessages.push({ role: 'user', text: question || '请帮我分析这些附件。', attachments: attachmentMeta });
+  }
+  inputEl.value = '';
+  state.aiMessages.push({ role: 'ai', text: 'AI 正在思考中，请稍等...', pending: true });
   renderAiMessages();
   $('aiQaResult').textContent = 'AI 正在分析，请稍等...';
 
   try {
-    const filesPayload = await Promise.all(state.aiAttachments.map(async (item) => ({
-      name: item.name,
-      type: item.type || 'application/octet-stream',
-      size: item.size,
-      data_url: await fileToDataUrl(item.file),
-    })));
+    $('aiQaResult').textContent = attachmentsSource.length ? '正在上传附件，请稍等...' : '正在整理上下文，请稍等...';
+    const uploadedFiles = reusePayload?.uploadedFiles ?? await Promise.all(attachmentsSource.map(uploadAiAttachment));
 
-    const detailParts = [];
-    if (question) detailParts.push(`用户问题：${question}`);
-    if (filesPayload.length) {
-      detailParts.push(`附件清单：\n${filesPayload.map((f) => `- ${f.name} (${f.type}, ${formatFileSize(f.size)})`).join('\n')}`);
-      const textLikeFiles = filesPayload.filter((f) => /json|text|csv|log|markdown|plain/.test(f.type) || /\.(txt|log|json|csv|md)$/i.test(f.name));
-      for (const item of textLikeFiles.slice(0, 3)) {
-        detailParts.push(`附件内容摘录 ${item.name}：${String(item.data_url).slice(0, 1200)}`);
-      }
-      const imageFiles = filesPayload.filter((f) => /^image\//.test(f.type));
-      if (imageFiles.length) {
-        detailParts.push(`已上传图片 ${imageFiles.map((f) => f.name).join('、')}，请结合图片内容给出分析建议。`);
-      }
-    }
+    $('aiQaResult').textContent = uploadedFiles.length ? '附件上传完成，正在整理上下文...' : '正在整理上下文，请稍等...';
 
     const payload = {
       message: question,
-      conversation_id: 'mobile-ai-chat',
-      attachments: filesPayload,
+      conversation_id: state.aiConversationId,
+      attachments: uploadedFiles.map((item) => ({
+        file_id: item.file_id,
+        name: item.name,
+        type: item.type,
+        size: item.size,
+      })),
     };
-    const result = await api('/api/v1/ai/chat', {
+    state.lastAiRequestPayload = {
+      question,
+      attachmentsSource,
+      uploadedFiles,
+    };
+    $('aiQaResult').textContent = 'AI 回复中，请稍等...';
+    const result = await api('/api/v1/ai/chat/v2', {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(payload),
     });
 
-    const reply = result?.reply || result?.summary || JSON.stringify(result, null, 2);
+    const reply = formatAiReply(result);
+    state.aiMessages = state.aiMessages.filter((item) => !item.pending);
+    const hasUserBubble = state.aiMessages.some((item) => item.role === 'user' && item.text === (question || '请帮我分析这些附件。'));
+    if (!hasUserBubble) {
+      state.aiMessages.push({ role: 'user', text: question || '请帮我分析这些附件。', attachments: attachmentMeta });
+    }
     state.aiMessages.push({ role: 'ai', text: reply });
     renderAiMessages();
     $('aiQaResult').textContent = 'AI 已返回结果。';
     state.aiAttachments.forEach((item) => item.previewUrl && URL.revokeObjectURL(item.previewUrl));
     state.aiAttachments = [];
     renderAiAttachmentList();
-    $('aiQuestionInput').value = '';
   } catch (e) {
     const msg = e.message || 'AI 问答失败';
-    state.aiMessages.push({ role: 'ai', text: `处理失败：${msg}` });
+    state.aiMessages = state.aiMessages.filter((item) => !item.pending);
+    const hasUserBubble = state.aiMessages.some((item) => item.role === 'user' && item.text === (question || '请帮我分析这些附件。'));
+    if (!hasUserBubble) {
+      state.aiMessages.push({ role: 'user', text: question || '请帮我分析这些附件。', attachments: attachmentMeta });
+    }
+    state.aiMessages.push({ role: 'ai', text: `处理失败：${msg}`, failed: true });
     renderAiMessages();
     $('aiQaResult').textContent = msg;
+  } finally {
+    state.isSendingAiMessage = false;
+    setButtonLoading('btnSendAiQuestion', false);
   }
+}
+
+function retryLastAiMessage() {
+  if (!state.lastAiRequestPayload) {
+    $('aiQaResult').textContent = '没有可重试的上一条 AI 请求。';
+    return;
+  }
+  state.aiMessages = state.aiMessages.filter((item) => !item.failed);
+  renderAiMessages();
+  sendAiQuestion(state.lastAiRequestPayload);
 }
 
 function initSubNavigation() {
@@ -900,13 +1099,26 @@ $('btnLoadErrors').onclick = async () => {
 };
 
 $('btnAnalyzeErrors').onclick = async () => {
+  if (state.isAnalyzingErrors) return;
+  state.isAnalyzingErrors = true;
+  setButtonLoading('btnAnalyzeErrors', true, 'AI 分析中...');
+  $('errorAiStatus').textContent = 'AI 分析中，请稍等...';
+  show('errorAiView', '正在分析当前错误日志，请稍候...');
   try {
     const detail = state.extractedErrors.length
       ? state.extractedErrors.map((e) => e.line || `${e.at} ${e.method || ''} ${e.url || ''} status=${e.status || 0} err=${e.network_error || ''}`).join('\n').slice(0, 1800)
       : '暂无错误日志，建议先执行“提取错误日志”。';
     const payload = { title: '错误日志分析', detail, severity: $('errorAiSeverity').value };
-    show('errorAiView', await api('/api/v1/ai/diagnose', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) }));
-  } catch (e) { show('errorAiView', e.message); }
+    const result = await api('/api/v1/ai/diagnose', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
+    $('errorAiStatus').textContent = 'AI 分析完成。';
+    show('errorAiView', formatErrorAiResult(result));
+  } catch (e) {
+    $('errorAiStatus').textContent = 'AI 分析失败，请稍后重试。';
+    show('errorAiView', e.message);
+  } finally {
+    state.isAnalyzingErrors = false;
+    setButtonLoading('btnAnalyzeErrors', false);
+  }
 };
 
 // toolbox
@@ -970,6 +1182,34 @@ $('btnRefreshToolTasks').onclick = async () => {
 };
 $('aiFileInput').addEventListener('change', handleAiFileChange);
 $('btnSendAiQuestion').onclick = sendAiQuestion;
+$('btnNewAiChat').onclick = () => {
+  state.aiConversationId = `mobile-ai-chat-${Date.now()}`;
+  state.aiMessages = buildDefaultAiMessages();
+  state.lastAiRequestPayload = null;
+  state.aiAttachments.forEach((item) => item.previewUrl && URL.revokeObjectURL(item.previewUrl));
+  state.aiAttachments = [];
+  sessionStorage.removeItem(AI_CHAT_HISTORY_KEY);
+  sessionStorage.removeItem(AI_CHAT_CONVERSATION_KEY);
+  renderAiAttachmentList();
+  saveAiMessages();
+  renderAiMessages();
+  $('aiQaResult').textContent = '已开启新会话。';
+};
+$('btnClearAiChat').onclick = () => {
+  state.aiMessages = buildDefaultAiMessages();
+  state.lastAiRequestPayload = null;
+  sessionStorage.removeItem(AI_CHAT_HISTORY_KEY);
+  renderAiAttachmentList();
+  saveAiMessages();
+  renderAiMessages();
+  $('aiQaResult').textContent = '已清空当前 AI 会话。';
+};
+$('aiQuestionInput').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    sendAiQuestion();
+  }
+});
 $('btnAppAiQa').onclick = () => {
   showSub('panel-toolbox', 'toolbox-aiqa');
   renderAiMessages();

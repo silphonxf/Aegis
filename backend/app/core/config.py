@@ -30,6 +30,20 @@ class Settings(BaseSettings):
     INIT_ADMIN_USERNAME: str = "admin"
     INIT_ADMIN_PASSWORD: str
 
+    # AI provider routing
+    AI_PROVIDER: str = "ollama"
+    AI_FALLBACK_PROVIDER: str = "mock"
+    OPENCLAW_BASE_URL: Optional[str] = None
+    OPENCLAW_API_KEY: Optional[str] = None
+    OPENCLAW_TIMEOUT_SECONDS: int = 120
+    OPENCLAW_MODEL: str = "openclaw"
+    OPENCLAW_RESPONSES_PATH: str = "/v1/responses"
+    OPENCLAW_ADAPTER_ENABLED: bool = False
+    OPENCLAW_ADAPTER_TOKEN: str = "local-dev-openclaw-token"
+    OPENCLAW_CHAT_PATH: str = "/aegis/ai/chat"
+    OPENCLAW_DIAGNOSE_PATH: str = "/aegis/ai/diagnose"
+    OPENCLAW_LOG_ANALYZE_PATH: str = "/aegis/ai/log-analyze"
+
     # 离线 AI（默认开启，优先走本地 Ollama）
     OFFLINE_AI_ENABLED: bool = True
     OFFLINE_AI_PROVIDER: str = "ollama"

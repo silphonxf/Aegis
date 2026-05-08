@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api import admin, ai, auth, health, inspections, monitoring, reports, selfchecks, systems, toolbox
+from app.api import admin, ai, ai_files, auth, health, inspections, monitoring, openclaw_adapter, reports, selfchecks, systems, toolbox
 from app.core.config import settings
 from app.core.security import get_password_hash
 from app.db.session import SessionLocal
@@ -34,6 +34,8 @@ app.include_router(reports.router, prefix=settings.API_PREFIX)
 app.include_router(admin.router, prefix=settings.API_PREFIX)
 app.include_router(toolbox.router, prefix=settings.API_PREFIX)
 app.include_router(ai.router, prefix=settings.API_PREFIX)
+app.include_router(ai_files.router, prefix=settings.API_PREFIX)
+app.include_router(openclaw_adapter.router)
 
 
 def _next_id(db: Session, model) -> int:

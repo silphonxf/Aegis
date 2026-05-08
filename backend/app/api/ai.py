@@ -1,27 +1,26 @@
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Optional
 import json
-import re
-import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
-from app.core.config import settings
 from app.db.session import get_db
+from app.models.ai_chat_file import AIChatFile
+from app.models.ai_chat_message import AIChatMessage
 from app.models.ai_diagnosis import AIDiagnosis
 from app.models.offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from app.models.user import User
-from app.schemas.ai import ChatRequest, ChatResponse, DiagnoseRequest
+from app.schemas.ai import ChatRequest, ChatResponse, ChatV2Request, DiagnoseRequest
 from app.schemas.offline_ai import OfflineAnalyzeRequest
+from app.services.ai_provider import run_chat, run_diagnose, run_offline_analyze
 from app.services.audit import log_action
-from app.services.offline_llm import OfflineLLMError, diagnose_with_ollama, offline_analyze_with_ollama
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
-def _build_chat_attachment_notes(attachments: List[dict]) -> List[str]:
-    notes: List[str] = []
+def _build_chat_attachment_notes(attachments: list[dict]) -> list[str]:
+    notes: list[str] = []
     for item in attachments:
         name = str(item.get("name") or "未命名附件")
         kind = str(item.get("type") or "unknown")
@@ -31,111 +30,47 @@ def _build_chat_attachment_notes(attachments: List[dict]) -> List[str]:
     return notes
 
 
-def _extract_attachment_text_blocks(attachments: List[dict]) -> List[str]:
-    blocks: List[str] = []
-    for item in attachments:
-        name = str(item.get("name") or "")
-        kind = str(item.get("type") or "")
-        data_url = str(item.get("data_url") or "")
-        if not data_url:
+def _load_chat_files(db: Session, file_refs: list[dict]) -> list[dict]:
+    items: list[dict] = []
+    for ref in file_refs:
+        row = db.query(AIChatFile).filter(AIChatFile.id == ref.get("file_id")).first()
+        if not row:
             continue
-        if not (re.search(r"(json|text|csv|log|plain|markdown)", kind, flags=re.I) or re.search(r"\.(txt|log|json|csv|md)$", name, flags=re.I)):
-            continue
-        excerpt = data_url[:1600]
-        blocks.append(f"附件摘录 {name}: {excerpt}")
-        if len(blocks) >= 3:
-            break
-    return blocks
+        items.append(
+            {
+                "file_id": row.id,
+                "name": row.original_name,
+                "type": row.mime_type,
+                "size": row.size_bytes,
+                "extracted_text": row.extracted_text,
+            }
+        )
+    return items
 
 
-def _mock_suggestions(payload: DiagnoseRequest) -> List[str]:
-    text = payload.detail.lower()
-    suggestions = []
 
-    if "cpu" in text or "load" in text:
-        suggestions.append("先检查最近15分钟CPU突增进程（top/ps），确认是否发布或批处理引发。")
-    if "内存" in payload.detail or "memory" in text:
-        suggestions.append("检查内存泄漏与缓存命中率，必要时分时重启高占用服务。")
-    if "连接" in payload.detail or "timeout" in text:
-        suggestions.append("优先排查网络连通、连接池上限、下游依赖RT抖动。")
-
-    if not suggestions:
-        suggestions = [
-            "先定位影响范围（单实例/全局），再按CPU、内存、磁盘、网络四象限逐项排查。",
-            "保留现场日志与关键指标快照，避免重启后丢失证据。",
-        ]
-    return suggestions
+def _load_conversation_history(db: Session, conversation_id: str | None) -> list[dict]:
+    if not conversation_id:
+        return []
+    rows = (
+        db.query(AIChatMessage)
+        .filter(AIChatMessage.conversation_id == conversation_id)
+        .order_by(AIChatMessage.created_at.desc(), AIChatMessage.id.desc())
+        .limit(6)
+        .all()
+    )
+    rows.reverse()
+    return [{"role": row.role, "content": row.content[:800]} for row in rows]
 
 
-OFFLINE_RULES = [
-    {
-        "code": "DB_CONN_FAIL",
-        "pattern": r"(connection refused|could not connect|db.*timeout|数据库连接失败)",
-        "severity": "high",
-        "suggestion": "检查数据库连通性、账号权限、连接池上限；确认数据库实例状态正常。",
-    },
-    {
-        "code": "DISK_FULL",
-        "pattern": r"(no space left on device|disk full|磁盘.*已满)",
-        "severity": "high",
-        "suggestion": "清理日志与临时文件，扩容磁盘；为关键目录设置容量告警阈值。",
-    },
-    {
-        "code": "OOM_KILLED",
-        "pattern": r"(out of memory|oom-killer|killed process)",
-        "severity": "high",
-        "suggestion": "排查内存泄漏，限制进程内存，必要时分批任务并降低并发。",
-    },
-    {
-        "code": "PORT_CONFLICT",
-        "pattern": r"(address already in use|端口.*被占用)",
-        "severity": "medium",
-        "suggestion": "定位端口占用进程并释放，或调整服务端口并更新配置。",
-    },
-    {
-        "code": "AUTH_FAILED",
-        "pattern": r"(unauthorized|forbidden|invalid token|鉴权失败|权限不足)",
-        "severity": "medium",
-        "suggestion": "核对凭证有效期、签名密钥和角色权限映射，检查网关转发头。",
-    },
-    {
-        "code": "SERVICE_TIMEOUT",
-        "pattern": r"(timeout|timed out|read timeout|请求超时)",
-        "severity": "medium",
-        "suggestion": "检查下游RT、网络抖动与重试策略，避免无上限重试放大故障。",
-    },
-]
 
-
-def _severity_rank(level: str) -> int:
-    return {"low": 1, "medium": 2, "high": 3}.get(level, 1)
-
-
-def _offline_rule_analyze(text: str, fallback_severity: str) -> tuple[str, List[dict], List[str], str]:
-    matched = []
-    suggestions = []
-    summary_items = []
-    final_severity = fallback_severity
-
-    for rule in OFFLINE_RULES:
-        if re.search(rule["pattern"], text, flags=re.I):
-            matched.append({"code": rule["code"], "severity": rule["severity"]})
-            suggestions.append(rule["suggestion"])
-            summary_items.append(rule["code"])
-            if _severity_rank(rule["severity"]) > _severity_rank(final_severity):
-                final_severity = rule["severity"]
-
-    if not matched:
-        suggestions = [
-            "未命中已知规则，请先按时间线定位首个报错，再关联上下游依赖日志进行排查。",
-            "建议补充业务日志关键字段（trace_id/system_id/error_code）提升自动分析命中率。",
-        ]
-        summary = "未命中规则，建议人工复核。"
-    else:
-        summary = f"命中规则: {', '.join(summary_items)}"
-
-    excerpt = "\n".join([ln for ln in text.splitlines() if ln.strip()][:60])
-    return final_severity, matched, list(dict.fromkeys(suggestions)), summary, excerpt
+def _save_conversation_turn(db: Session, conversation_id: str | None, user_message: str, ai_reply: str) -> None:
+    if not conversation_id:
+        return
+    if user_message.strip():
+        db.add(AIChatMessage(conversation_id=conversation_id, role="user", content=user_message.strip()))
+    if ai_reply.strip():
+        db.add(AIChatMessage(conversation_id=conversation_id, role="assistant", content=ai_reply.strip()))
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -145,63 +80,27 @@ def chat_with_ai(
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
     message = (payload.message or "").strip()
-    attachments = [item.dict() for item in payload.attachments]
-    if not message and not attachments:
+    if not message and not payload.attachments:
         raise HTTPException(status_code=400, detail={"code": "EMPTY_CHAT", "message": "消息和附件不能同时为空"})
 
-    attachment_notes = _build_chat_attachment_notes(attachments)
+    history = _load_conversation_history(db, payload.conversation_id)
+    result = run_chat(payload, history=history)
     detail_parts = []
     if message:
         detail_parts.append(f"用户问题：{message}")
+    attachment_notes = _build_chat_attachment_notes([item.dict() for item in payload.attachments])
     if attachment_notes:
         detail_parts.append("附件概览：\n" + "\n".join(f"- {item}" for item in attachment_notes))
-    detail_parts.extend(_extract_attachment_text_blocks(attachments))
-
-    diagnose_payload = DiagnoseRequest(
-        title=message[:120] or "移动端 AI 问答",
-        detail="\n\n".join(detail_parts)[:2000],
-        severity="medium",
-    )
-
-    mode = "rule_fallback"
-    severity = diagnose_payload.severity
-    summary = ""
-    fallback_reason: Optional[str] = None
-    started_at = time.perf_counter()
-
-    if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
-        try:
-            severity, suggestions, summary = diagnose_with_ollama(
-                diagnose_payload.title, diagnose_payload.detail, diagnose_payload.severity
-            )
-            mode = "offline_ollama"
-        except OfflineLLMError as e:
-            suggestions = _mock_suggestions(diagnose_payload)
-            summary = "离线模型不可用，已回退规则建议。"
-            fallback_reason = str(e)[:200]
-    else:
-        suggestions = _mock_suggestions(diagnose_payload)
-        summary = "离线模型未启用，已使用规则建议。"
-        fallback_reason = "offline_ai_disabled_or_provider_mismatch"
-
-    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-
-    reply_sections = []
-    if summary:
-        reply_sections.append(f"结论：{summary}")
-    if attachment_notes:
-        reply_sections.append("我已结合这些附件一起看：\n" + "\n".join(f"- {item}" for item in attachment_notes))
-    if suggestions:
-        reply_sections.append("建议下一步：\n" + "\n".join(f"{idx + 1}. {item}" for idx, item in enumerate(suggestions[:5])))
-    reply = "\n\n".join(reply_sections).strip() or "我已经收到你的问题，但暂时没有生成可用建议。"
 
     row = AIDiagnosis(
-        title=diagnose_payload.title,
-        severity=severity,
-        detail=diagnose_payload.detail,
-        suggestions=json.dumps(suggestions, ensure_ascii=False),
+        title=message[:120] or "移动端 AI 问答",
+        severity=result.get("severity", "medium"),
+        detail="\n\n".join(detail_parts)[:2000] or "移动端 AI 问答",
+        suggestions=json.dumps(result.get("suggestions", []), ensure_ascii=False),
     )
+    conversation_id = payload.conversation_id or f"chat-{row.id}"
     db.add(row)
+    _save_conversation_turn(db, conversation_id, message, result.get("reply", ""))
     db.commit()
     db.refresh(row)
 
@@ -212,24 +111,102 @@ def chat_with_ai(
         current_user,
         {
             "diagnosis_id": row.id,
-            "severity": severity,
-            "mode": mode,
-            "elapsed_ms": elapsed_ms,
-            "fallback_reason": fallback_reason,
+            "severity": result.get("severity", "medium"),
+            "mode": result.get("mode"),
+            "elapsed_ms": result.get("elapsed_ms"),
+            "fallback_reason": result.get("fallback_reason"),
+            "attachment_count": len(payload.attachments),
+        },
+    )
+
+    return ChatResponse(
+        conversation_id=result.get("conversation_id") or payload.conversation_id or f"chat-{row.id}",
+        mode=result.get("mode", "rule_fallback"),
+        summary=result.get("summary", ""),
+        reply=result.get("reply", ""),
+        severity=result.get("severity", "medium"),
+        suggestions=result.get("suggestions", []),
+        attachment_notes=result.get("attachment_notes", []),
+        elapsed_ms=result.get("elapsed_ms", 0),
+        fallback_reason=result.get("fallback_reason"),
+    )
+
+
+@router.post("/chat/v2", response_model=ChatResponse)
+def chat_with_ai_v2(
+    payload: ChatV2Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    message = (payload.message or "").strip()
+    file_refs = [item.dict() for item in payload.attachments]
+    attachments = _load_chat_files(db, file_refs)
+    if not message and not attachments:
+        raise HTTPException(status_code=400, detail={"code": "EMPTY_CHAT", "message": "消息和附件不能同时为空"})
+
+    enriched_message = message
+    if attachments:
+        attachment_blocks = []
+        for item in attachments:
+            excerpt = (item.get("extracted_text") or "")[:600]
+            if excerpt:
+                attachment_blocks.append(f"附件 {item['name']} 内容摘录：\n{excerpt}")
+            else:
+                attachment_blocks.append(f"附件 {item['name']}（{item['type']}，{item['size']} bytes）")
+        enriched_message = (message + "\n\n" + "\n\n".join(attachment_blocks)).strip()
+
+    chat_payload = ChatRequest(
+        message=enriched_message,
+        conversation_id=payload.conversation_id,
+        attachments=[],
+    )
+    history = _load_conversation_history(db, payload.conversation_id)
+    result = run_chat(chat_payload, history=history)
+
+    attachment_notes = _build_chat_attachment_notes(attachments)
+    detail_parts = []
+    if message:
+        detail_parts.append(f"用户问题：{message}")
+    if attachment_notes:
+        detail_parts.append("附件概览：\n" + "\n".join(f"- {item}" for item in attachment_notes))
+
+    row = AIDiagnosis(
+        title=message[:120] or "移动端 AI 问答",
+        severity=result.get("severity", "medium"),
+        detail="\n\n".join(detail_parts)[:2000] or "移动端 AI 问答",
+        suggestions=json.dumps(result.get("suggestions", []), ensure_ascii=False),
+    )
+    conversation_id = payload.conversation_id or f"chat-{row.id}"
+    db.add(row)
+    _save_conversation_turn(db, conversation_id, message, result.get("reply", ""))
+    db.commit()
+    db.refresh(row)
+
+    log_action(
+        db,
+        "ai_chat_v2",
+        "ai",
+        current_user,
+        {
+            "diagnosis_id": row.id,
+            "severity": result.get("severity", "medium"),
+            "mode": result.get("mode"),
+            "elapsed_ms": result.get("elapsed_ms"),
+            "fallback_reason": result.get("fallback_reason"),
             "attachment_count": len(attachments),
         },
     )
 
     return ChatResponse(
-        conversation_id=payload.conversation_id or f"chat-{row.id}",
-        mode=mode,
-        summary=summary,
-        reply=reply,
-        severity=severity,
-        suggestions=suggestions,
+        conversation_id=result.get("conversation_id") or payload.conversation_id or f"chat-{row.id}",
+        mode=result.get("mode", "rule_fallback"),
+        summary=result.get("summary", ""),
+        reply=result.get("reply", ""),
+        severity=result.get("severity", "medium"),
+        suggestions=result.get("suggestions", []),
         attachment_notes=attachment_notes,
-        elapsed_ms=elapsed_ms,
-        fallback_reason=fallback_reason,
+        elapsed_ms=result.get("elapsed_ms", 0),
+        fallback_reason=result.get("fallback_reason"),
     )
 
 
@@ -239,32 +216,13 @@ def diagnose(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
-    mode = "rule_fallback"
-    severity = payload.severity
-    summary = ""
-    fallback_reason: Optional[str] = None
-    started_at = time.perf_counter()
-
-    if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
-        try:
-            severity, suggestions, summary = diagnose_with_ollama(payload.title, payload.detail, payload.severity)
-            mode = "offline_ollama"
-        except OfflineLLMError as e:
-            suggestions = _mock_suggestions(payload)
-            summary = "离线模型不可用，已回退规则建议。"
-            fallback_reason = str(e)[:200]
-    else:
-        suggestions = _mock_suggestions(payload)
-        summary = "离线模型未启用，已使用规则建议。"
-        fallback_reason = "offline_ai_disabled_or_provider_mismatch"
-
-    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+    result = run_diagnose(payload.title, payload.detail, payload.severity)
 
     row = AIDiagnosis(
         title=payload.title,
-        severity=severity,
+        severity=result.get("severity", payload.severity),
         detail=payload.detail,
-        suggestions=json.dumps(suggestions, ensure_ascii=False),
+        suggestions=json.dumps(result.get("suggestions", []), ensure_ascii=False),
     )
     db.add(row)
     db.commit()
@@ -277,21 +235,21 @@ def diagnose(
         current_user,
         {
             "diagnosis_id": row.id,
-            "severity": severity,
-            "mode": mode,
-            "elapsed_ms": elapsed_ms,
-            "fallback_reason": fallback_reason,
+            "severity": result.get("severity", payload.severity),
+            "mode": result.get("mode"),
+            "elapsed_ms": result.get("elapsed_ms"),
+            "fallback_reason": result.get("fallback_reason"),
         },
     )
     return {
         "id": row.id,
-        "mode": mode,
+        "mode": result.get("mode", "rule_fallback"),
         "title": payload.title,
-        "severity": severity,
-        "summary": summary,
-        "suggestions": suggestions,
-        "elapsed_ms": elapsed_ms,
-        "fallback_reason": fallback_reason,
+        "severity": result.get("severity", payload.severity),
+        "summary": result.get("summary", ""),
+        "suggestions": result.get("suggestions", []),
+        "elapsed_ms": result.get("elapsed_ms", 0),
+        "fallback_reason": result.get("fallback_reason"),
     }
 
 
@@ -338,44 +296,27 @@ def offline_analyze(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
-    mode = "rule_fallback"
-    fallback_reason: Optional[str] = None
-    started_at = time.perf_counter()
-    if settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
-        try:
-            final_severity, summary, suggestions, matched = offline_analyze_with_ollama(
-                payload.title, payload.detail, payload.severity
-            )
-            excerpt = "\n".join([ln for ln in payload.detail.splitlines() if ln.strip()][:80])
-            mode = "offline_ollama"
-        except OfflineLLMError as e:
-            final_severity, matched, suggestions, summary, excerpt = _offline_rule_analyze(payload.detail, payload.severity)
-            fallback_reason = str(e)[:200]
-    else:
-        final_severity, matched, suggestions, summary, excerpt = _offline_rule_analyze(payload.detail, payload.severity)
-        fallback_reason = "offline_ai_disabled_or_provider_mismatch"
-
-    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+    result = run_offline_analyze(payload)
 
     task = OfflineAnalysisTask(
         source_type=payload.source_type,
         source_ref=payload.source_ref,
         status="done",
-        severity=final_severity,
+        severity=result.get("severity", payload.severity),
         title=payload.title,
-        summary=summary,
+        summary=result.get("summary", ""),
         created_by=current_user.username,
     )
     db.add(task)
     db.flush()
 
-    result = OfflineAnalysisResult(
+    analysis_result = OfflineAnalysisResult(
         task_id=task.id,
-        matched_rules=json.dumps(matched, ensure_ascii=False),
-        suggestions=json.dumps(suggestions, ensure_ascii=False),
-        raw_excerpt=excerpt,
+        matched_rules=json.dumps(result.get("matched_rules", []), ensure_ascii=False),
+        suggestions=json.dumps(result.get("suggestions", []), ensure_ascii=False),
+        raw_excerpt=result.get("excerpt", ""),
     )
-    db.add(result)
+    db.add(analysis_result)
     db.commit()
 
     log_action(
@@ -385,22 +326,22 @@ def offline_analyze(
         current_user,
         {
             "task_id": task.id,
-            "severity": final_severity,
-            "mode": mode,
-            "elapsed_ms": elapsed_ms,
-            "fallback_reason": fallback_reason,
+            "severity": result.get("severity", payload.severity),
+            "mode": result.get("mode"),
+            "elapsed_ms": result.get("elapsed_ms"),
+            "fallback_reason": result.get("fallback_reason"),
         },
     )
     return {
         "task_id": task.id,
         "status": task.status,
-        "mode": mode,
-        "severity": final_severity,
-        "summary": summary,
-        "matched_rules": matched,
-        "suggestions": suggestions,
-        "elapsed_ms": elapsed_ms,
-        "fallback_reason": fallback_reason,
+        "mode": result.get("mode", "rule_fallback"),
+        "severity": result.get("severity", payload.severity),
+        "summary": result.get("summary", ""),
+        "matched_rules": result.get("matched_rules", []),
+        "suggestions": result.get("suggestions", []),
+        "elapsed_ms": result.get("elapsed_ms", 0),
+        "fallback_reason": result.get("fallback_reason"),
     }
 
 

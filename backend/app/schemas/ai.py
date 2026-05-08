@@ -2,6 +2,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.schemas.ai_chat_file import AIChatFileRef
+
 
 class DiagnoseRequest(BaseModel):
     title: str = Field(min_length=1, max_length=120)
@@ -13,7 +15,7 @@ class ChatAttachment(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     type: str = Field(default="application/octet-stream", min_length=1, max_length=120)
     size: int = Field(default=0, ge=0)
-    data_url: Optional[str] = Field(default=None, max_length=300000)
+    data_url: Optional[str] = Field(default=None, max_length=6000000)
 
 
 class ChatRequest(BaseModel):
@@ -32,3 +34,9 @@ class ChatResponse(BaseModel):
     attachment_notes: List[str] = Field(default_factory=list)
     elapsed_ms: int
     fallback_reason: Optional[str] = None
+
+
+class ChatV2Request(BaseModel):
+    message: str = Field(default="", max_length=4000)
+    conversation_id: Optional[str] = Field(default=None, max_length=64)
+    attachments: List[AIChatFileRef] = Field(default_factory=list, max_items=8)
