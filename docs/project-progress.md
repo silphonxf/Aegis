@@ -1,12 +1,104 @@
-# Aegis 项目进度（更新于 2026-04-05）
+# Aegis 项目进度（更新于 2026-05-08）
 
 ## 当前总体状态
 
 - 已完成：`v1.0.0` 正式版主体范围（认证、巡检、自检、报表、管理看板、资产管理、审计、工具箱与审批流基础能力）
-- 当前重点：从“可演示 / 可局部联调”推进到“稳定、可持续迭代的开发基线”
+- 当前重点：Aegis AI 能力已从 skeleton/mock 联调推进到真实 OpenClaw 接入，并完成阶段2第一版附件引用式链路与移动端 AI 体验收尾
 - 当前开发路线：`docs/phase1-development-plan.md`
 
-## 本次新增进展（2026-04-05）
+## 本次新增进展（2026-05-08）
+
+### 1) OpenClaw 真实接入替换 skeleton 适配链路
+
+已完成：
+- Aegis 后端 AI provider 从本地 skeleton/mock 适配层切换到真实 OpenClaw gateway
+- 默认本机联调地址为：`http://127.0.0.1:18789`
+- 已确认 `/v1/responses` 真实可用
+- `POST /api/v1/ai/chat` 与 `POST /api/v1/ai/diagnose` 已可真实走 OpenClaw
+
+涉及文件：
+- `backend/app/services/openclaw_client.py`
+- `backend/app/services/ai_provider.py`
+- `backend/app/core/config.py`
+- `backend/.env`
+- `backend/.env.example`
+
+### 2) 局域网 / Tailscale / HTTPS 联调能力补齐
+
+已完成：
+- 启动局域网 HTTPS 访问：5173 / 5174 / 8000
+- 修复移动端与 Tailscale 下的 CORS 问题
+- 当前可通过 LAN / Tailscale 继续做移动端真机联调
+
+关键结论：
+- 之前 `Failed to fetch` 的核心原因是 CORS，而不是 AI 接口本身不可用
+
+### 3) 移动端 AI 问答阶段1体验增强完成
+
+已完成：
+- 聊天气泡高度修复
+- 发送后清空输入框
+- `Enter` 发送 / `Shift+Enter` 换行
+- AI 占位气泡
+- 失败重试
+- 按钮 loading 与防重复提交
+- 附件数限制（最多 4 个）
+- 附件大小限制（2MB）
+- 图片上传前压缩
+- 错误日志 AI 分析 loading / 禁用 / 精简结果展示
+- 会话顶部状态提示
+- “新会话”与“清空会话”分离
+
+涉及文件：
+- `frontend-mobile/index.html`
+- `frontend-mobile/style.css`
+- `frontend-mobile/app.js`
+
+### 4) AI 阶段2第一版：附件引用式链路落地
+
+已完成：
+- 新增附件上传接口：`POST /api/v1/ai/files/upload`
+- 新增引用式聊天接口：`POST /api/v1/ai/chat/v2`
+- 附件不再直接作为 base64 塞入聊天接口
+- 后端保存附件并返回 `file_id`
+- 聊天接口改为传 `file_id + name + type + size`
+- 文本附件支持轻量 `extracted_text` 提取后参与 prompt
+
+新增模型 / 迁移：
+- `backend/app/models/ai_chat_file.py`
+- `backend/app/models/ai_chat_message.py`
+- `backend/app/models/ai_chat_summary.py`
+- `backend/alembic/versions/20260508_11_ai_chat_files.py`
+- `backend/alembic/versions/20260508_12_ai_chat_messages.py`
+- `backend/alembic/versions/20260508_13_ai_chat_summaries.py`
+
+新增接口 / schema：
+- `backend/app/api/ai_files.py`
+- `backend/app/schemas/ai_chat_file.py`
+
+### 5) 连续对话需求最终收敛结论
+
+这轮中连续对话需求经历过几次收敛，最终确定为：
+- **同一次打开应用期间**：允许连续对话
+- **关闭应用 / 重新打开后**：默认空白新会话
+- **不保留本次打开之前的聊天历史**
+
+因此当前产品实现方向是：
+- 前端 AI 聊天记录改为 `sessionStorage`
+- 页面打开期间保留当前会话
+- 关闭应用后自动清空
+- 服务端仅按当前 `conversation_id` 回放最近几轮上下文，不做长期历史恢复
+
+### 6) 当前已知现实问题
+
+- OpenClaw 真实响应耗时仍偏高，联调时观察到约 `20~33s`
+- 因此前端已增加分阶段提示：
+  - 上传附件中
+  - 整理上下文中
+  - AI 回复中
+- 服务端摘要型长期历史方案已尝试过，但当前不是最终方向，后续如需恢复，应优先做更轻的增量式方案
+
+## 历史进展（保留）
 
 ### 1) 本地启动与默认登录能力修复
 
