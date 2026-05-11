@@ -11,7 +11,7 @@
     <section id="loginScreen" class="screen active">
       <header class="topbar simple">
         <div>
-          <h1>Aegis 运维助手 <span class="badge">v1.1 UI</span></h1>
+          <h1>Aegis 运维助手 <span class="badge">v2 UI</span></h1>
           <p class="subtitle">山东航空AI+项目：运维助手</p>
         </div>
       </header>
@@ -32,92 +32,309 @@
     </section>
 
     <section id="appScreen" class="screen">
-      <header class="topbar">
+      <header class="topbar app-topbar">
         <div>
-          <h1>Aegis 运维助手 <span class="badge">v1.1 UI</span></h1>
-          <p class="subtitle">顶部菜单：巡检 / 自检 / 工具箱</p>
-        </div>
-        <div class="header-actions">
-          <button id="btnUserCenter" class="avatar-btn" title="用户中心">
-            <img id="headerAvatar" alt="avatar" />
-          </button>
+          <h1 id="appTopTitle">工作台 <span class="badge">v2 UI</span></h1>
+          <p id="appTopSubtitle" class="subtitle">今日待办、快捷操作与辅助工具</p>
         </div>
       </header>
 
-      <nav class="menu-tabs">
-        <button class="tab active" data-panel="panel-inspection">巡检</button>
-        <button class="tab" data-panel="panel-selfcheck">自检</button>
-        <button class="tab" data-panel="panel-toolbox">工具箱</button>
-      </nav>
-
-      <main>
-        <section id="panel-inspection" class="panel active">
-          <section class="card center-card" data-sub="inspection-home">
-            <h2>巡检工作台</h2>
-            <div class="menu-grid">
-              <button id="btnGoQr">扫描二维码</button>
-              <button id="btnGoNfc">NFC 碰一碰</button>
+      <main class="app-main-shell">
+        <section id="tab-workbench" class="tab-screen active">
+          <section class="page-block">
+            <div class="section-head">
+              <h2>今日待办</h2>
+              <span class="section-meta">优先处理高风险项</span>
+            </div>
+            <div class="summary-grid">
+              <button class="summary-card" data-open-page="page-inspection-records">
+                <strong>3</strong>
+                <span>待巡检</span>
+              </button>
+              <button class="summary-card" data-open-page="page-selfcheck-form">
+                <strong>2</strong>
+                <span>待自检</span>
+              </button>
+              <button class="summary-card warn" data-open-page="page-selfcheck-errors">
+                <strong>1</strong>
+                <span>异常提醒</span>
+              </button>
             </div>
           </section>
 
-          <section class="card hidden subpage-card" data-sub="inspection-qr">
-            <div class="subpage-head"><button class="ghost small back-left" data-back="inspection-home">返回</button><h2>二维码巡检</h2></div>
-            <div class="grid two">
-              <label class="full">巡检点名称
-                <input id="inspectionPointName" placeholder="扫码后自动识别，不可修改" readonly />
-              </label>
-              <label>结果
-                <select id="insResult"><option value="normal">正常</option><option value="abnormal">异常</option></select>
-              </label>
-              <label class="full">备注<input id="insNote" placeholder="可选" /></label>
+          <section class="page-block">
+            <div class="section-head">
+              <h2>快捷操作</h2>
+              <span class="section-meta">高频任务直达</span>
             </div>
+            <div class="entry-grid">
+              <button class="entry-card" data-open-page="page-inspection-qr">
+                <span class="entry-title">扫码巡检</span>
+                <span class="entry-desc">调用相机识别二维码</span>
+              </button>
+              <button class="entry-card" data-open-page="page-inspection-nfc">
+                <span class="entry-title">NFC 巡检</span>
+                <span class="entry-desc">碰一碰读取巡检点</span>
+              </button>
+              <button class="entry-card" data-open-page="page-selfcheck-form">
+                <span class="entry-title">提交自检</span>
+                <span class="entry-desc">快速上报自检结果</span>
+              </button>
+              <button class="entry-card" data-open-page="page-selfcheck-status">
+                <span class="entry-title">系统状态</span>
+                <span class="entry-desc">查看系统运行趋势</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="page-block">
+            <div class="section-head">
+              <h2>辅助工具</h2>
+              <span class="section-meta">排障与分析</span>
+            </div>
+            <div class="entry-grid tools">
+              <button class="entry-card" data-open-page="page-tool-aiqa">
+                <span class="entry-title">AI 问答</span>
+                <span class="entry-desc">结合附件分析问题</span>
+              </button>
+              <button class="entry-card" data-open-page="page-tool-ping">
+                <span class="entry-title">Ping</span>
+                <span class="entry-desc">快速检测网络连通</span>
+              </button>
+              <button class="entry-card" data-open-page="page-tool-capture">
+                <span class="entry-title">抓包分析</span>
+                <span class="entry-desc">粘贴摘录并交给 AI</span>
+              </button>
+              <button class="entry-card" data-open-page="page-tool-tasks">
+                <span class="entry-title">工具任务</span>
+                <span class="entry-desc">查看最近执行记录</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="page-block">
+            <div class="section-head">
+              <h2>最近动态</h2>
+              <span class="section-meta">最近 24 小时</span>
+            </div>
+            <div class="activity-list">
+              <div class="activity-item">
+                <strong>巡检记录</strong>
+                <span>最近一次巡检：主机房 A 区 · 正常</span>
+              </div>
+              <div class="activity-item">
+                <strong>自检记录</strong>
+                <span>最近一次自检：航班调度系统 · 正常</span>
+              </div>
+              <div class="activity-item warn">
+                <strong>异常摘要</strong>
+                <span>检测到 1 条高优先级错误日志待分析</span>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section id="tab-inspection" class="tab-screen hidden">
+          <section class="page-block hero-block">
+            <div>
+              <h2>巡检</h2>
+              <p class="hint">聚焦现场巡检任务，扫码与 NFC 使用同一套提交模式。</p>
+            </div>
+          </section>
+          <section class="page-block">
+            <div class="entry-grid single-column">
+              <button class="entry-card large" data-open-page="page-inspection-qr">
+                <span class="entry-title">扫码巡检</span>
+                <span class="entry-desc">通过二维码快速识别巡检点并提交记录</span>
+              </button>
+              <button class="entry-card large" data-open-page="page-inspection-nfc">
+                <span class="entry-title">NFC 巡检</span>
+                <span class="entry-desc">通过 NFC 碰一碰读取巡检点并提交记录</span>
+              </button>
+              <button class="entry-card large" data-open-page="page-inspection-records">
+                <span class="entry-title">最近巡检记录</span>
+                <span class="entry-desc">查看近几次巡检结果与异常说明</span>
+              </button>
+            </div>
+          </section>
+        </section>
+
+        <section id="tab-selfcheck" class="tab-screen hidden">
+          <section class="page-block hero-block">
+            <div>
+              <h2>自检</h2>
+              <p class="hint">形成“看状态 → 提交自检 → 分析日志”的闭环。</p>
+            </div>
+          </section>
+          <section class="page-block">
+            <div class="entry-grid single-column">
+              <button class="entry-card large" data-open-page="page-selfcheck-status">
+                <span class="entry-title">系统状态</span>
+                <span class="entry-desc">查看 CPU / 内存 / 磁盘趋势与当前系统概况</span>
+              </button>
+              <button class="entry-card large" data-open-page="page-selfcheck-form">
+                <span class="entry-title">提交自检</span>
+                <span class="entry-desc">快速上报日检 / 周检结果</span>
+              </button>
+              <button class="entry-card large" data-open-page="page-selfcheck-errors">
+                <span class="entry-title">错误日志分析</span>
+                <span class="entry-desc">提取错误日志并结合 AI 生成建议</span>
+              </button>
+            </div>
+          </section>
+        </section>
+
+        <section id="tab-me" class="tab-screen hidden">
+          <section class="page-block profile-block">
+            <div class="profile-head">
+              <img id="profileAvatarPreview" alt="avatar" />
+              <div>
+                <h2 id="profileTitleName">我的账号</h2>
+                <p class="hint">仅保留账号与个人设置相关功能</p>
+              </div>
+            </div>
+            <div class="summary-grid single-row">
+              <div class="summary-card">
+                <strong id="profileSummaryName">未设置昵称</strong>
+                <span>昵称</span>
+              </div>
+              <div class="summary-card">
+                <strong id="profileSummaryUser">admin</strong>
+                <span>账号</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="page-block">
+            <div class="section-head">
+              <h2>账号与设置</h2>
+              <span class="section-meta">点击进入详情</span>
+            </div>
+            <div class="entry-grid single-column">
+              <button class="entry-card large" data-open-page="page-me-profile">
+                <span class="entry-title">账号信息</span>
+                <span class="entry-desc">查看并修改头像、昵称等资料</span>
+              </button>
+              <button class="entry-card large" data-open-page="page-me-password">
+                <span class="entry-title">修改密码</span>
+                <span class="entry-desc">进入密码修改页后再填写旧密码和新密码</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="page-block">
+            <div class="actions one">
+              <button id="btnLogout" class="secondary">退出登录</button>
+            </div>
+          </section>
+        </section>
+
+        <section id="page-me-profile" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>账号信息</h2>
+          </div>
+          <div class="detail-body">
+            <label>头像地址
+              <input id="profileAvatarUrl" placeholder="输入头像 URL，留空使用默认头像" />
+            </label>
+            <label>昵称
+              <input id="profileNickname" placeholder="输入昵称" />
+            </label>
+            <label class="full">账号
+              <input id="profileUsername" disabled />
+            </label>
+            <div class="actions one sticky-actions">
+              <button id="btnSaveProfile">保存账号信息</button>
+            </div>
+            <pre id="profileResult"></pre>
+          </div>
+        </section>
+
+        <section id="page-me-password" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>修改密码</h2>
+          </div>
+          <div class="detail-body">
+            <div class="grid two">
+              <label>旧密码<input id="oldPassword" type="password" /></label>
+              <label>新密码<input id="newPassword" type="password" /></label>
+            </div>
+            <div class="actions one sticky-actions"><button id="btnChangePassword">提交密码修改</button></div>
+            <pre id="passwordResult"></pre>
+          </div>
+        </section>
+
+        <section id="page-inspection-qr" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>扫码巡检</h2>
+          </div>
+          <div class="detail-body">
+            <label class="full">巡检点名称
+              <input id="inspectionPointName" placeholder="扫码后自动识别，不可修改" readonly />
+            </label>
+            <label>结果
+              <select id="insResult"><option value="normal">正常</option><option value="abnormal">异常</option></select>
+            </label>
+            <label class="full">备注<input id="insNote" placeholder="可选" /></label>
             <div class="actions">
               <button id="btnStartQrScan">调用相机扫码</button>
               <button id="btnStopQrScan" class="secondary">停止扫码</button>
             </div>
             <div id="qrScanState" class="hint">点击“调用相机扫码”，识别后自动返回。</div>
             <canvas id="qrCanvas" style="display:none;"></canvas>
-            <div class="actions one">
+            <div class="actions one sticky-actions">
               <button id="btnCreateInspection">提交巡检</button>
             </div>
             <pre id="inspectionResult"></pre>
-          </section>
+          </div>
+        </section>
 
-          <section class="card hidden subpage-card" data-sub="inspection-nfc">
-            <div class="subpage-head"><button class="ghost small back-left" data-back="inspection-home">返回</button><h2>NFC 巡检</h2></div>
-            <div class="grid two">
-              <label>结果
-                <select id="nfcResult"><option value="normal">正常</option><option value="abnormal">异常</option></select>
-              </label>
-              <label class="full">备注<input id="nfcNote" placeholder="可选" /></label>
-            </div>
+        <section id="page-inspection-nfc" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>NFC 巡检</h2>
+          </div>
+          <div class="detail-body">
+            <label>结果
+              <select id="nfcResult"><option value="normal">正常</option><option value="abnormal">异常</option></select>
+            </label>
+            <label class="full">备注<input id="nfcNote" placeholder="可选" /></label>
             <div class="actions">
               <button id="btnStartNfcScan">开始 NFC 碰一碰</button>
               <button id="btnStopNfcScan" class="secondary">停止 NFC</button>
             </div>
             <div id="nfcScanState" class="hint">点击“开始 NFC 碰一碰”，将手机靠近标签读取机房点位。</div>
-            <div class="actions one"><button id="btnSubmitNfc">提交 NFC 巡检</button></div>
+            <div class="actions one sticky-actions"><button id="btnSubmitNfc">提交 NFC 巡检</button></div>
             <pre id="nfcResultView"></pre>
-          </section>
+          </div>
         </section>
 
-        <section id="panel-selfcheck" class="panel">
-          <section class="card center-card" data-sub="selfcheck-home">
-            <h2>自检工作台</h2>
-            <div class="menu-grid">
-              <button id="btnGoStatus">查看系统状态</button>
-              <button id="btnGoSelfForm">提交自检记录</button>
-              <button id="btnGoErrorLogs">查看错误日志</button>
+        <section id="page-inspection-records" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>最近巡检记录</h2>
+          </div>
+          <div class="detail-body">
+            <div class="activity-list">
+              <div class="activity-item"><strong>机房 A-01</strong><span>09:20 · 正常 · 已提交</span></div>
+              <div class="activity-item"><strong>机房 B-03</strong><span>昨天 16:40 · 异常 · 已补充备注</span></div>
+              <div class="activity-item"><strong>航信链路点位</strong><span>昨天 10:12 · 正常</span></div>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section class="card hidden subpage-card" data-sub="selfcheck-status">
-            <div class="subpage-head"><button class="ghost small back-left" data-back="selfcheck-home">返回</button><h2>系统性能状态（动态）</h2></div>
-            <div class="grid two">
-              <label class="full">选择系统
-                <select id="scStatusSystem"></select>
-              </label>
-            </div>
+        <section id="page-selfcheck-status" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>系统状态</h2>
+          </div>
+          <div class="detail-body">
+            <label class="full">选择系统
+              <select id="scStatusSystem"></select>
+            </label>
             <div id="statusSystemHint" class="hint">请先选择系统，再查看状态曲线。</div>
             <div class="actions one"><button id="btnRefreshStatus">刷新基线数据</button></div>
             <div class="charts">
@@ -125,31 +342,37 @@
               <div><h3>MEM</h3><canvas id="memChart" width="360" height="130"></canvas></div>
               <div><h3>DISK</h3><canvas id="diskChart" width="360" height="130"></canvas></div>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section class="card hidden subpage-card" data-sub="selfcheck-form">
-            <div class="subpage-head"><button class="ghost small back-left" data-back="selfcheck-home">返回</button><h2>提交自检记录</h2></div>
-            <div class="grid two">
-              <label class="full">自检内容<input id="scSummary" placeholder="输入自检内容" /></label>
-              <label>自检结果
-                <select id="scResult"><option value="normal">正常</option><option value="critical">异常</option></select>
-              </label>
-              <label class="full">备注<input id="scNote" placeholder="可选" /></label>
-            </div>
-            <div class="actions one"><button id="btnCreateSelfcheck">提交自检</button></div>
+        <section id="page-selfcheck-form" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>提交自检</h2>
+          </div>
+          <div class="detail-body">
+            <label class="full">自检内容<input id="scSummary" placeholder="输入自检内容" /></label>
+            <label>自检结果
+              <select id="scResult"><option value="normal">正常</option><option value="critical">异常</option></select>
+            </label>
+            <label class="full">备注<input id="scNote" placeholder="可选" /></label>
+            <div class="actions one sticky-actions"><button id="btnCreateSelfcheck">提交自检</button></div>
             <pre id="selfcheckResult"></pre>
-          </section>
+          </div>
+        </section>
 
-          <section class="card hidden subpage-card" data-sub="selfcheck-errors">
-            <div class="subpage-head"><button class="ghost small back-left" data-back="selfcheck-home">返回</button><h2>错误日志 + AI 分析</h2></div>
-            <div class="grid two">
-              <label>时间范围
-                <select id="errorRange"><option value="1">最近1小时</option><option value="6">最近6小时</option><option value="24" selected>最近24小时</option></select>
-              </label>
-              <label>严重级别
-                <select id="errorAiSeverity"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option></select>
-              </label>
-            </div>
+        <section id="page-selfcheck-errors" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>错误日志分析</h2>
+          </div>
+          <div class="detail-body tool-layout">
+            <label>时间范围
+              <select id="errorRange"><option value="1">最近1小时</option><option value="6">最近6小时</option><option value="24" selected>最近24小时</option></select>
+            </label>
+            <label>严重级别
+              <select id="errorAiSeverity"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option></select>
+            </label>
             <div class="actions">
               <button id="btnLoadErrors">提取错误日志</button>
               <button id="btnAnalyzeErrors">AI 分析</button>
@@ -157,111 +380,126 @@
             <div id="errorAiStatus" class="hint">点击“AI 分析”后，将结合当前日志生成结论与建议。</div>
             <pre id="errorLogsView"></pre>
             <pre id="errorAiView"></pre>
-          </section>
+          </div>
         </section>
 
-        <section id="panel-toolbox" class="panel">
-          <section class="card center-card" data-sub="toolbox-home">
-            <h2>工具箱</h2>
-            <div class="menu-grid">
-              <button id="btnGoPing">Ping 工具</button>
-              <button id="btnGoCapture">抓包工具</button>
-              <button id="btnGoAppTools">应用工具</button>
+        <section id="page-tool-aiqa" class="detail-screen hidden ai-chat-screen">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>AI 问答</h2>
+          </div>
+          <div class="ai-chat-layout detail-body">
+            <div id="aiChatMessages" class="ai-chat-messages">
+              <div class="chat-bubble ai welcome">
+                你好，我是 Aegis AI 助手。你可以直接提问，也可以上传图片或文件让我一起分析。
+              </div>
             </div>
-          </section>
+            <div class="ai-toolbar">
+              <div id="aiConversationMeta" class="hint">当前会话将保留最近聊天记录，便于连续追问。</div>
+              <div class="ai-toolbar-actions">
+                <button id="btnRefreshAiConversations" class="ghost small">最近会话</button>
+                <button id="btnNewAiChat" class="ghost small">新会话</button>
+                <button id="btnClearAiChat" class="ghost small">清空会话</button>
+              </div>
+            </div>
+            <div id="aiConversationList" class="ai-conversation-list hidden"></div>
+            <div id="aiAttachmentList" class="attachment-list"></div>
+            <div class="ai-composer card-inline">
+              <label class="upload-trigger" for="aiFileInput">上传图片/文件</label>
+              <input id="aiFileInput" type="file" accept="image/*,.txt,.log,.json,.csv,.md,.pdf,.doc,.docx,.xls,.xlsx" multiple hidden />
+              <textarea id="aiQuestionInput" rows="3" placeholder="输入你的问题，或描述你想让 AI 帮你分析的内容"></textarea>
+              <div class="actions one">
+                <button id="btnSendAiQuestion">发送给 AI</button>
+              </div>
+            </div>
+            <div id="aiQaResult" class="hint">支持纯文字问答，也支持带附件一起发起分析。</div>
+          </div>
+        </section>
 
-          <section class="card hidden subpage-card" data-sub="toolbox-ping">
-            <div class="subpage-head"><button class="ghost small back-left" data-back="toolbox-home">返回</button><h2>Ping 工具</h2></div>
-            <div class="grid two">
-              <label>主机<input id="tbPingHost" value="127.0.0.1" /></label>
-              <label>次数<input id="tbPingCount" type="number" value="1" /></label>
-            </div>
+        <section id="page-tool-ping" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>Ping 工具</h2>
+          </div>
+          <div class="detail-body tool-layout">
+            <label>主机<input id="tbPingHost" value="127.0.0.1" /></label>
+            <label>次数<input id="tbPingCount" type="number" value="1" /></label>
             <div class="actions one"><button id="btnToolPing">执行 Ping</button></div>
             <div id="pingStatus" class="status-dot">状态：待检测</div>
             <pre id="pingResult"></pre>
-          </section>
-
-          <section class="card hidden subpage-card" data-sub="toolbox-capture">
-            <div class="subpage-head"><button class="ghost small back-left" data-back="toolbox-home">返回</button><h2>抓包工具（Mock）</h2></div>
-            <div class="actions">
-              <button id="btnCaptureStart">开始抓包</button>
-              <button id="btnCaptureStop">停止抓包</button>
-            </div>
-            <pre id="captureResult"></pre>
-          </section>
-
-          <section class="card hidden subpage-card" data-sub="toolbox-app">
-            <div class="subpage-head"><button class="ghost small back-left" data-back="toolbox-home">返回</button><h2>应用工具</h2></div>
-            <div class="menu-grid">
-              <button id="btnAppRestart">创建应用重启任务</button>
-              <button id="btnAppAiQa">进入 AI 问答</button>
-            </div>
-            <div class="actions one" style="margin-top:12px;"><button id="btnRefreshToolTasks">查看最近工具任务</button></div>
-            <pre id="appToolResult"></pre>
-          </section>
-
-          <section class="card hidden ai-chat-screen subpage-card" data-sub="toolbox-aiqa">
-            <div class="subpage-head"><button class="ghost small back-left" data-back="toolbox-home">返回</button><h2>AI 问答</h2></div>
-            <div class="ai-chat-layout">
-              <div id="aiChatMessages" class="ai-chat-messages">
-                <div class="chat-bubble ai welcome">
-                  你好，我是 Aegis AI 助手。你可以直接提问，也可以上传图片或文件让我一起分析。
-                </div>
-              </div>
-              <div class="ai-toolbar">
-                <div id="aiConversationMeta" class="hint">当前会话将保留最近聊天记录，便于连续追问。</div>
-                <div class="ai-toolbar-actions">
-                  <button id="btnNewAiChat" class="ghost small">新会话</button>
-                  <button id="btnClearAiChat" class="ghost small">清空会话</button>
-                </div>
-              </div>
-              <div id="aiAttachmentList" class="attachment-list"></div>
-              <div class="ai-composer card-inline">
-                <label class="upload-trigger" for="aiFileInput">上传图片/文件</label>
-                <input id="aiFileInput" type="file" accept="image/*,.txt,.log,.json,.csv,.md,.pdf,.doc,.docx,.xls,.xlsx" multiple hidden />
-                <textarea id="aiQuestionInput" rows="3" placeholder="输入你的问题，或描述你想让 AI 帮你分析的内容"></textarea>
-                <div class="actions one">
-                  <button id="btnSendAiQuestion">发送给 AI</button>
-                </div>
-              </div>
-              <div id="aiQaResult" class="hint">支持纯文字问答，也支持带附件一起发起分析。</div>
-            </div>
-          </section>
+          </div>
         </section>
 
-        <section id="panel-user-center" class="panel">
-          <section class="card">
-            <div class="card-head"><h2>用户中心</h2><button id="btnBackFromUser" class="ghost small">返回主页</button></div>
-            <div class="avatar-editor">
-              <img id="profileAvatarPreview" alt="avatar" />
-              <label>头像地址
-                <input id="profileAvatarUrl" placeholder="输入头像 URL，留空使用默认头像" />
-              </label>
+        <section id="page-tool-capture" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>抓包分析</h2>
+          </div>
+          <div class="detail-body tool-layout">
+            <label>抓包来源
+              <select id="captureSource">
+                <option value="manual_capture" selected>手工粘贴结果</option>
+                <option value="browser_console">浏览器控制台</option>
+                <option value="tcpdump_excerpt">tcpdump 摘录</option>
+              </select>
+            </label>
+            <label>严重级别
+              <select id="captureAiSeverity">
+                <option value="low">low</option>
+                <option value="medium" selected>medium</option>
+                <option value="high">high</option>
+              </select>
+            </label>
+            <label class="full">备注
+              <input id="captureNote" placeholder="可选，例如：登录接口超时、某域名握手失败" />
+            </label>
+            <label class="full">抓包结果 / 摘录
+              <textarea id="captureContent" rows="10" placeholder="粘贴抓包结果、控制台网络日志、tcpdump/wireshark 摘录等内容"></textarea>
+            </label>
+            <div class="actions">
+              <button id="btnCaptureMockFill">填入示例</button>
+              <button id="btnCaptureUseRecentRequests">导入最近请求</button>
+              <button id="btnCaptureUseFailedRequests">导入失败请求</button>
+              <button id="btnAnalyzeCapture">AI 分析抓包结果</button>
             </div>
-            <div class="grid two">
-              <label>昵称<input id="profileNickname" placeholder="输入昵称" /></label>
-              <label>账号<input id="profileUsername" disabled /></label>
-            </div>
-            <div class="actions one"><button id="btnSaveProfile">保存昵称与头像</button></div>
-            <pre id="profileResult"></pre>
-          </section>
+            <div id="captureAiStatus" class="hint">建议先粘贴关键摘录，再交给 AI 分析，避免一次性贴太长内容。</div>
+            <pre id="captureResult"></pre>
+          </div>
+        </section>
 
-          <section class="card">
-            <h2>修改密码</h2>
-            <div class="grid two">
-              <label>旧密码<input id="oldPassword" type="password" /></label>
-              <label>新密码<input id="newPassword" type="password" /></label>
+        <section id="page-tool-tasks" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>工具任务</h2>
+          </div>
+          <div class="detail-body tool-layout">
+            <div class="actions">
+              <button id="btnCreateToolTask">创建应用重启任务</button>
+              <button id="btnRefreshToolTasks">查看最近工具任务</button>
             </div>
-            <div class="actions one"><button id="btnChangePassword">提交密码修改</button></div>
-            <pre id="passwordResult"></pre>
-            <div class="actions one" style="margin-top:12px;">
-              <button id="btnLogoutInUserCenter" class="secondary">退出登录</button>
-            </div>
-          </section>
+            <pre id="toolTaskResult"></pre>
+          </div>
         </section>
       </main>
+
+      <nav class="bottom-tabs">
+        <button class="bottom-tab active" data-tab="tab-workbench">
+          <span>工作台</span>
+        </button>
+        <button class="bottom-tab" data-tab="tab-inspection">
+          <span>巡检</span>
+        </button>
+        <button class="bottom-tab" data-tab="tab-selfcheck">
+          <span>自检</span>
+        </button>
+        <button class="bottom-tab" data-tab="tab-me">
+          <span>我的</span>
+        </button>
+      </nav>
     </section>
   </div>
+
+  <div id="toast" class="app-toast hidden"></div>
 
   <div id="qrScannerOverlay" class="scanner-overlay hidden">
     <video id="qrVideo" class="scanner-video" playsinline muted></video>

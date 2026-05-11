@@ -1,7 +1,16 @@
 const $ = (id) => document.getElementById(id);
+const onClick = (id, handler) => {
+  const el = $(id);
+  if (el) el.onclick = handler;
+};
+const onEvent = (id, eventName, handler) => {
+  const el = $(id);
+  if (el) el.addEventListener(eventName, handler);
+};
 const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%230f2c44"/><circle cx="32" cy="24" r="12" fill="%236bd5ff"/><path d="M12 56c4-10 12-16 20-16s16 6 20 16" fill="%2338bdf8"/></svg>';
 const AI_CHAT_HISTORY_KEY = 'aegis_ai_chat_history';
 const AI_CHAT_CONVERSATION_KEY = 'aegis_ai_chat_conversation';
+const ACTIVE_TAB_KEY = 'aegis_mobile_active_tab';
 const AI_MAX_ATTACHMENTS = 4;
 const AI_MAX_FILE_SIZE = 2 * 1024 * 1024;
 const DEFAULT_AI_MESSAGES = [
@@ -30,6 +39,21 @@ function loadAiConversationId() {
   return sessionStorage.getItem(AI_CHAT_CONVERSATION_KEY) || '';
 }
 
+function loadActiveTab() {
+  const value = sessionStorage.getItem(ACTIVE_TAB_KEY) || '';
+  return value || 'tab-workbench';
+}
+
+function mapConversationMessagesToUi(messages) {
+  if (!Array.isArray(messages) || !messages.length) return buildDefaultAiMessages();
+  return messages
+    .filter((item) => item && typeof item.content === 'string')
+    .map((item) => ({
+      role: item.role === 'assistant' ? 'ai' : 'user',
+      text: item.content,
+    }));
+}
+
 const state = {
   token: '',
   requestLogs: JSON.parse(localStorage.getItem('aegis_request_logs') || '[]'),
@@ -45,24 +69,29 @@ const state = {
   aiAttachments: [],
   aiMessages: loadAiMessages(),
   aiConversationId: loadAiConversationId(),
+  aiConversationItems: [],
+  activeTab: loadActiveTab(),
+  activeDetailPage: '',
   isAnalyzingErrors: false,
+  isAnalyzingCapture: false,
   isSendingAiMessage: false,
   lastAiRequestPayload: null,
 };
 
 function getBase() {
-  const protocol = window.location.protocol && window.location.protocol.startsWith('http')
-    ? window.location.protocol
-    : 'http:';
   const host = window.location.hostname || '127.0.0.1';
-  return `${protocol}//${host}:8000`;
+  return `http://${host}:8000`;
 }
 function authHeaders() {
   const h = { 'Content-Type': 'application/json' };
   if (state.token) h.Authorization = `Bearer ${state.token}`;
   return h;
 }
-function show(id, data) { $(id).textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2); }
+function show(id, data) {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = typeof data === 'string' ? data : '操作已完成。';
+}
 function setButtonLoading(id, loading, loadingText) {
   const btn = $(id);
   if (!btn) return;
@@ -70,6 +99,66 @@ function setButtonLoading(id, loading, loadingText) {
   btn.disabled = loading;
   btn.classList.toggle('secondary', loading);
   btn.textContent = loading ? (loadingText || '处理中...') : btn.dataset.originalText;
+}
+
+let toastTimer = null;
+function showToast(message, type = 'info') {
+  const el = $('toast');
+  if (!el) return;
+  el.textContent = message || '';
+  el.className = `app-toast ${type}`;
+  el.classList.remove('hidden');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.classList.add('hidden');
+  }, 2200);
+}
+
+function explainActionError(error, featureName, roleHint) {
+  const msg = error?.message || '操作失败';
+  if (msg.includes('未登录或登录已过期')) {
+    return `${featureName}失败：请先登录，再重试。`;
+  }
+  if (msg.includes('当前账号权限不足')) {
+    return `${featureName}失败：当前账号权限不足，通常需要 ${roleHint}。`;
+  }
+  if (msg.includes('请求发送失败')) {
+    return `${featureName}失败：接口请求未发出。请检查后端是否可达，或确认手机浏览器没有拦截 HTTPS 页面访问 HTTP 接口。`;
+  }
+  if (msg.includes('请求超时')) {
+    return `${featureName}失败：接口响应超时，请稍后重试。`;
+  }
+  return `${featureName}失败：${msg}`;
+}
+
+function formatCaptureAiResult(data) {
+  if (!data || typeof data !== 'object') return '暂无分析结果';
+  const lines = [];
+  if (data.summary) lines.push(`分析结果：${data.summary}`);
+  if (Array.isArray(data.matched_rules) && data.matched_rules.length) {
+    lines.push('', '命中特征：');
+    data.matched_rules.forEach((item, idx) => lines.push(`${idx + 1}. ${item.code || 'UNKNOWN'} (${item.severity || 'unknown'})`));
+  }
+  if (Array.isArray(data.suggestions) && data.suggestions.length) {
+    lines.push('', '建议动作：');
+    data.suggestions.forEach((item, idx) => lines.push(`${idx + 1}. ${item}`));
+  }
+  return lines.join('\n');
+}
+
+function buildCaptureLogFromRequests(items, { failedOnly = false } = {}) {
+  const filtered = (items || []).filter((item) => failedOnly ? !item.ok : true).slice(0, 20);
+  return filtered.map((item, idx) => {
+    const responseText = item.response ? JSON.stringify(item.response).slice(0, 300) : '';
+    const bodyText = item.body ? JSON.stringify(item.body).slice(0, 300) : '';
+    return [
+      `#${idx + 1} ${item.method || 'GET'} ${item.url || ''}`,
+      `time=${item.at || ''} status=${item.status ?? 0} ok=${item.ok ? 'true' : 'false'} duration_ms=${item.duration_ms ?? ''}`,
+      item.network_error ? `error=${item.network_error}` : '',
+      bodyText ? `request=${bodyText}` : '',
+      responseText ? `response=${responseText}` : '',
+    ].filter(Boolean).join('\n');
+  }).join('\n\n');
 }
 
 function formatErrorAiResult(data) {
@@ -109,11 +198,15 @@ function saveProfileState() {
 
 function applyProfileUI() {
   const avatar = state.profile.avatar || DEFAULT_AVATAR;
+  const nickname = state.profile.nickname || '未设置昵称';
+  const username = state.profile.username || $('username').value.trim() || 'admin';
   if ($('headerAvatar')) $('headerAvatar').src = avatar;
   if ($('profileAvatarPreview')) $('profileAvatarPreview').src = avatar;
   if ($('profileAvatarUrl')) $('profileAvatarUrl').value = state.profile.avatar || '';
   if ($('profileNickname')) $('profileNickname').value = state.profile.nickname || '';
-  if ($('profileUsername')) $('profileUsername').value = state.profile.username || $('username').value.trim() || 'admin';
+  if ($('profileUsername')) $('profileUsername').value = username;
+  if ($('profileSummaryName')) $('profileSummaryName').textContent = nickname;
+  if ($('profileSummaryUser')) $('profileSummaryUser').textContent = username;
 }
 
 function summarizeBody(body) {
@@ -152,6 +245,26 @@ function rememberLog(log) {
   }
 }
 
+function normalizeApiError(error, resp, data, url) {
+  if (resp) {
+    if (resp.status === 401) return new Error('未登录或登录已过期，请重新登录后再试。');
+    if (resp.status === 403) return new Error('当前账号权限不足，无法执行该操作。');
+    if (resp.status === 404) return new Error(`接口不存在：${url}`);
+    return new Error((data && (data.message || data.detail)) || `HTTP ${resp.status}`);
+  }
+
+  if (error?.name === 'AbortError') {
+    return new Error('请求超时，请稍后重试。');
+  }
+
+  const raw = error?.message || 'fetch failed';
+  if (/Failed to fetch|NetworkError|Load failed|fetch failed/i.test(raw)) {
+    return new Error('请求发送失败：请检查后端是否可达，或确认手机浏览器没有拦截 HTTPS 页面访问 HTTP 接口。');
+  }
+
+  return error instanceof Error ? error : new Error(String(raw));
+}
+
 async function api(path, options = {}) {
   const method = options.method || 'GET';
   const url = `${getBase()}${path}`;
@@ -163,11 +276,15 @@ async function api(path, options = {}) {
     const resp = await fetch(url, { ...options, signal: controller?.signal });
     const data = await resp.json().catch(() => ({}));
     rememberLog({ at: new Date().toISOString(), method, url, status: resp.status, ok: resp.ok, body: summarizeBody(options.body), response: data, duration_ms: Date.now() - started });
-    if (!resp.ok) throw new Error((data && (data.message || data.detail)) || `HTTP ${resp.status}`);
+    if (!resp.ok) throw normalizeApiError(null, resp, data, url);
     return data;
   } catch (e) {
-    rememberLog({ at: new Date().toISOString(), method, url, status: 0, ok: false, network_error: e.message || 'fetch failed', duration_ms: Date.now() - started });
-    throw e;
+    if (e instanceof Error && /未登录或登录已过期|当前账号权限不足|接口不存在：|HTTP\s\d+/u.test(e.message || '')) {
+      throw e;
+    }
+    const normalized = normalizeApiError(e, null, null, url);
+    rememberLog({ at: new Date().toISOString(), method, url, status: 0, ok: false, network_error: normalized.message || 'fetch failed', duration_ms: Date.now() - started });
+    throw normalized;
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }
@@ -178,23 +295,71 @@ function switchScreen(loggedIn) {
   $('appScreen').classList.toggle('active', loggedIn);
 }
 
-function switchPanel(panelId) {
-  document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
-  document.querySelectorAll('.menu-tabs .tab').forEach((t) => t.classList.remove('active'));
-  document.getElementById(panelId)?.classList.add('active');
-  document.querySelector(`.menu-tabs .tab[data-panel="${panelId}"]`)?.classList.add('active');
+const TAB_META = {
+  'tab-workbench': { title: '工作台', subtitle: '今日待办、快捷操作与辅助工具' },
+  'tab-inspection': { title: '巡检', subtitle: '扫码巡检、NFC 巡检与最近记录' },
+  'tab-selfcheck': { title: '自检', subtitle: '系统状态、自检提交与错误日志分析' },
+  'tab-me': { title: '我的', subtitle: '账号信息、密码修改与登录设置' },
+};
+
+const DETAIL_PAGE_META = {
+  'page-me-profile': '账号信息',
+  'page-me-password': '修改密码',
+  'page-inspection-qr': '扫码巡检',
+  'page-inspection-nfc': 'NFC 巡检',
+  'page-inspection-records': '最近巡检记录',
+  'page-selfcheck-status': '系统状态',
+  'page-selfcheck-form': '提交自检',
+  'page-selfcheck-errors': '错误日志分析',
+  'page-tool-aiqa': 'AI 问答',
+  'page-tool-ping': 'Ping 工具',
+  'page-tool-capture': '抓包分析',
+  'page-tool-tasks': '工具任务',
+};
+
+function updateTopbarByTab(tabId) {
+  const meta = TAB_META[tabId] || TAB_META['tab-workbench'];
+  if ($('appTopTitle')) $('appTopTitle').innerHTML = `${meta.title} <span class="badge">v2 UI</span>`;
+  if ($('appTopSubtitle')) $('appTopSubtitle').textContent = meta.subtitle;
 }
 
-function showSub(panelId, subName) {
-  const panel = $(panelId);
-  const target = panel.querySelector(`[data-sub="${subName}"]`);
-  panel.querySelectorAll('[data-sub]').forEach((el) => {
-    if (el === target) {
-      el.classList.remove('hidden');
-    } else {
-      el.classList.add('hidden');
-    }
-  });
+function switchTab(tabId) {
+  state.activeTab = tabId;
+  try {
+    sessionStorage.setItem(ACTIVE_TAB_KEY, tabId);
+  } catch {}
+  document.querySelectorAll('.tab-screen').forEach((el) => el.classList.add('hidden'));
+  document.querySelectorAll('.bottom-tab').forEach((el) => el.classList.remove('active'));
+  $(tabId)?.classList.remove('hidden');
+  document.querySelector(`.bottom-tab[data-tab="${tabId}"]`)?.classList.add('active');
+  if (!state.activeDetailPage) {
+    updateTopbarByTab(tabId);
+  }
+}
+
+function getDetailPageTitle(pageId) {
+  return document.querySelector(`#${pageId} .detail-topbar h2`)?.textContent?.trim()
+    || DETAIL_PAGE_META[pageId]
+    || '';
+}
+
+function openDetailPage(pageId) {
+  state.activeDetailPage = pageId;
+  document.querySelectorAll('.detail-screen').forEach((el) => el.classList.add('hidden'));
+  $(pageId)?.classList.remove('hidden');
+  const title = getDetailPageTitle(pageId);
+  if (title && $('appTopTitle')) {
+    $('appTopTitle').innerHTML = `${title} <span class="badge">v2 UI</span>`;
+  }
+  if ($('appTopSubtitle')) {
+    $('appTopSubtitle').textContent = '功能页 · 点击返回回到上一层';
+  }
+}
+
+function closeDetailPages() {
+  state.activeDetailPage = '';
+  document.querySelectorAll('.detail-screen').forEach((el) => el.classList.add('hidden'));
+  updateTopbarByTab(state.activeTab || 'tab-workbench');
 }
 
 function saveAiMessages() {
@@ -211,7 +376,50 @@ function updateAiConversationMeta() {
   if (!el) return;
   const count = state.aiMessages.filter((item) => !item.welcome).length;
   const shortId = state.aiConversationId ? state.aiConversationId.slice(-6) : '------';
-  el.textContent = count ? `会话 ${shortId} · 当前打开期间已记录 ${count} 条消息。` : `会话 ${shortId} · 关闭应用后将自动清空，本次打开期间会保留当前对话。`;
+  const listCount = state.aiConversationItems.length;
+  el.textContent = count
+    ? `会话 ${shortId} · 当前已记录 ${count} 条消息 · 最近会话 ${listCount} 条。`
+    : `会话 ${shortId} · 关闭应用后将自动清空，本次打开期间会保留当前对话 · 最近会话 ${listCount} 条。`;
+}
+
+function formatConversationTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function renderAiConversationList() {
+  const box = $('aiConversationList');
+  if (!box) return;
+  if (!state.aiConversationItems.length) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    updateAiConversationMeta();
+    return;
+  }
+  box.classList.remove('hidden');
+  box.innerHTML = state.aiConversationItems.map((item) => {
+    const active = item.conversation_id === state.aiConversationId ? ' active' : '';
+    return `
+      <div class="ai-conversation-item${active}">
+        <div class="ai-conversation-item-head">
+          <div class="ai-conversation-title">${escapeHtml(item.title || '新会话')}</div>
+          <button class="ai-conversation-open" data-ai-open-conversation="${escapeHtml(item.conversation_id)}">继续</button>
+        </div>
+        <div class="ai-conversation-meta">${escapeHtml(item.source || 'mobile')} · ${escapeHtml(formatConversationTime(item.updated_at) || '')}</div>
+      </div>
+    `;
+  }).join('');
+  box.querySelectorAll('[data-ai-open-conversation]').forEach((btn) => {
+    btn.onclick = async () => {
+      state.aiConversationId = btn.dataset.aiOpenConversation || '';
+      saveAiMessages();
+      await restoreAiConversationFromServer();
+      renderAiConversationList();
+    };
+  });
+  updateAiConversationMeta();
 }
 
 function renderAiMessages() {
@@ -350,6 +558,46 @@ async function ensureAiConversation() {
   return state.aiConversationId;
 }
 
+async function restoreAiConversationFromServer() {
+  if (!state.aiConversationId) return;
+  try {
+    const detail = await api(`/api/v1/ai/conversations/${state.aiConversationId}`, {
+      headers: authHeaders(),
+      timeoutMs: 15000,
+    });
+    state.aiMessages = mapConversationMessagesToUi(detail.messages);
+    renderAiMessages();
+    renderAiConversationList();
+    $('aiQaResult').textContent = detail.message_count
+      ? `已恢复当前会话，共 ${detail.message_count} 条消息。`
+      : '当前会话暂无历史消息。';
+  } catch (e) {
+    state.aiConversationId = '';
+    sessionStorage.removeItem(AI_CHAT_CONVERSATION_KEY);
+    state.aiMessages = buildDefaultAiMessages();
+    renderAiMessages();
+    renderAiConversationList();
+    $('aiQaResult').textContent = '之前的会话未恢复成功，已自动切回新会话。';
+  }
+}
+
+async function refreshAiConversationList() {
+  try {
+    const result = await api('/api/v1/ai/conversations', {
+      headers: authHeaders(),
+      timeoutMs: 15000,
+    });
+    state.aiConversationItems = Array.isArray(result.items) ? result.items : [];
+    renderAiConversationList();
+    return result.items || [];
+  } catch (e) {
+    state.aiConversationItems = [];
+    renderAiConversationList();
+    $('aiQaResult').textContent = '读取最近会话失败，请稍后重试。';
+    return [];
+  }
+}
+
 async function uploadAiAttachment(item) {
   const dataUrl = await fileToDataUrl(item.file);
   const result = await api('/api/v1/ai/files/upload', {
@@ -442,7 +690,9 @@ async function sendAiQuestion(reusePayload = null) {
     state.aiAttachments = [];
     renderAiAttachmentList();
   } catch (e) {
-    const msg = e.name === 'AbortError' ? 'AI 响应超时，请稍后重试或缩短问题内容。' : (e.message || 'AI 问答失败');
+    const msg = e.name === 'AbortError'
+      ? 'AI 响应超时，请稍后重试或缩短问题内容。'
+      : explainActionError(e, 'AI 问答', 'admin / super_admin');
     state.aiMessages = state.aiMessages.filter((item) => !item.pending);
     const hasUserBubble = state.aiMessages.some((item) => item.role === 'user' && item.text === (question || '请帮我分析这些附件。'));
     if (!hasUserBubble) {
@@ -468,48 +718,147 @@ function retryLastAiMessage() {
 }
 
 function initSubNavigation() {
-  $('btnGoQr').onclick = () => {
-    showSub('panel-inspection', 'inspection-qr');
-    state.qrScanText = '';
-    state.qrResolvedPoint = null;
-    if ($('inspectionPointName')) $('inspectionPointName').value = '';
-    show('inspectionResult', '');
-  };
-  $('btnUserCenter').onclick = () => {
+  onClick('btnUserCenter', () => {
     stopStatusLoop();
-    switchPanel('panel-user-center');
+    switchTab('tab-me');
+    closeDetailPages();
     applyProfileUI();
-  };
-  $('btnBackFromUser').onclick = () => switchPanel('panel-inspection');
-  $('btnGoNfc').onclick = () => showSub('panel-inspection', 'inspection-nfc');
-  $('btnGoStatus').onclick = () => {
-    showSub('panel-selfcheck', 'selfcheck-status');
-    state.metricSeries = { cpu: [], mem: [], disk: [] };
-    startStatusLoop();
-  };
-  $('btnGoSelfForm').onclick = () => showSub('panel-selfcheck', 'selfcheck-form');
-  $('btnGoErrorLogs').onclick = () => showSub('panel-selfcheck', 'selfcheck-errors');
-  $('btnGoPing').onclick = () => showSub('panel-toolbox', 'toolbox-ping');
-  $('btnGoCapture').onclick = () => showSub('panel-toolbox', 'toolbox-capture');
-  $('btnGoAppTools').onclick = () => showSub('panel-toolbox', 'toolbox-app');
-  $('btnAppAiQa').onclick = () => {
-    showSub('panel-toolbox', 'toolbox-aiqa');
-    renderAiMessages();
-    renderAiAttachmentList();
-  };
+  });
 
-  document.querySelectorAll('[data-back]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const target = btn.dataset.back;
-      const panelId = btn.closest('.panel').id;
-      showSub(panelId, target);
-      if (target === 'selfcheck-home') stopStatusLoop();
-      if (panelId === 'panel-inspection' && target === 'inspection-home') {
-        stopQrScanner();
-        stopNfcScanner();
+  document.querySelectorAll('[data-open-page]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const pageId = btn.dataset.openPage;
+      if (!pageId) return;
+
+      if (pageId === 'page-inspection-qr') {
+        state.qrScanText = '';
+        state.qrResolvedPoint = null;
+        if ($('inspectionPointName')) $('inspectionPointName').value = '';
+        show('inspectionResult', '可先手动填写巡检点，也可以点击“开始扫码”自动识别。');
+      }
+
+      openDetailPage(pageId);
+
+      if (pageId === 'page-selfcheck-status') {
+        state.metricSeries = { cpu: [], mem: [], disk: [] };
+        await refreshStatusBase();
+        startStatusLoop();
+      }
+
+      if (pageId === 'page-selfcheck-errors') {
+        $('errorAiView').textContent = '先加载错误日志，再点击“AI 分析”生成结论与建议。';
+      }
+
+      if (pageId === 'page-tool-aiqa') {
+        $('aiQaResult').textContent = '支持纯文字问答，也支持带附件一起发起分析。';
+        renderAiMessages();
+        renderAiAttachmentList();
+        await refreshAiConversationList();
+        if (state.aiConversationId) await restoreAiConversationFromServer();
+      }
+
+      if (pageId === 'page-tool-ping') {
+        $('pingResult').textContent = '输入目标地址后点击“执行 Ping”，查看网络连通情况。';
+      }
+
+      if (pageId === 'page-tool-capture') {
+        $('captureResult').textContent = '可粘贴抓包摘录，或导入最近请求日志，再交给 AI 分析。';
+      }
+
+      if (pageId === 'page-tool-tasks') {
+        $('toolTaskResult').textContent = '正在加载最近工具任务...';
+        $('btnRefreshToolTasks')?.click();
       }
     });
   });
+
+  document.querySelectorAll('[data-close-page]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      closeDetailPages();
+      stopStatusLoop();
+      stopQrScanner();
+      stopNfcScanner();
+    });
+  });
+}
+
+function bindCaptureToolActions() {
+  const btnMock = $('btnCaptureMockFill');
+  const btnRecent = $('btnCaptureUseRecentRequests');
+  const btnFailed = $('btnCaptureUseFailedRequests');
+  const btnAnalyze = $('btnAnalyzeCapture');
+
+  if (btnMock) {
+    btnMock.onclick = () => {
+      $('captureContent').value = `12:00:01.123 IP 10.0.0.10.52314 > 10.0.0.20.443: Flags [S], seq 123456, win 64240\n12:00:04.456 IP 10.0.0.10.52314 > 10.0.0.20.443: Flags [S], retransmission\n12:00:09.999 ERROR upstream connect timeout while TLS handshake`;
+      $('captureNote').value = '登录接口访问异常，怀疑握手超时';
+      $('captureResult').textContent = '已填入示例抓包内容，可直接点 AI 分析。';
+    };
+  }
+
+  if (btnRecent) {
+    btnRecent.onclick = () => {
+      const content = buildCaptureLogFromRequests(state.requestLogs, { failedOnly: false });
+      if (!content) {
+        $('captureAiStatus').textContent = '暂无最近请求记录可导入。';
+        return;
+      }
+      $('captureSource').value = 'browser_console';
+      $('captureContent').value = content;
+      $('captureNote').value = '已导入最近请求日志摘录';
+      $('captureResult').textContent = '已导入最近请求日志，可直接点 AI 分析。';
+    };
+  }
+
+  if (btnFailed) {
+    btnFailed.onclick = () => {
+      const content = buildCaptureLogFromRequests(state.requestLogs, { failedOnly: true });
+      if (!content) {
+        $('captureAiStatus').textContent = '暂无失败请求记录可导入。';
+        return;
+      }
+      $('captureSource').value = 'browser_console';
+      $('captureContent').value = content;
+      $('captureNote').value = '已导入失败请求日志摘录';
+      $('captureResult').textContent = '已导入失败请求日志，可直接点 AI 分析。';
+    };
+  }
+
+  if (btnAnalyze) {
+    btnAnalyze.onclick = async () => {
+      if (state.isAnalyzingCapture) return;
+      const content = $('captureContent').value.trim();
+      if (!content) {
+        $('captureAiStatus').textContent = '请先粘贴抓包结果或网络日志摘录。';
+        return;
+      }
+      state.isAnalyzingCapture = true;
+      setButtonLoading('btnAnalyzeCapture', true, 'AI 分析中...');
+      $('captureAiStatus').textContent = 'AI 正在分析抓包结果，请稍等...';
+      try {
+        const data = await api('/api/v1/toolbox/capture/analyze', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({
+            title: '抓包结果分析',
+            content,
+            severity: $('captureAiSeverity').value,
+            source: $('captureSource').value,
+            note: $('captureNote').value.trim(),
+          }),
+          timeoutMs: 45000,
+        });
+        $('captureResult').textContent = formatCaptureAiResult(data);
+        $('captureAiStatus').textContent = 'AI 分析完成。';
+      } catch (e) {
+        $('captureResult').textContent = explainActionError(e, '抓包 AI 分析', 'admin / super_admin');
+        $('captureAiStatus').textContent = 'AI 分析失败，请稍后重试。';
+      } finally {
+        state.isAnalyzingCapture = false;
+        setButtonLoading('btnAnalyzeCapture', false);
+      }
+    };
+  }
 }
 
 function pushMetric(key, val) {
@@ -533,7 +882,7 @@ function drawLine(canvasId, values, color) {
 
   // grid + Y axis percentage labels
   ctx.strokeStyle = '#10324a';
-  ctx.fillStyle = '#7fa8c8';
+  ctx.fillStyle = '#000000';
   ctx.font = '10px sans-serif';
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
@@ -552,7 +901,7 @@ function drawLine(canvasId, values, color) {
   ctx.fillText(fmt(now), width - padR - 30, height - 4);
 
   // axis lines
-  ctx.strokeStyle = '#1d4d6d';
+  ctx.strokeStyle = '#000000';
   ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, height - padB); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(padL, height - padB); ctx.lineTo(width - padR, height - padB); ctx.stroke();
 
@@ -574,7 +923,7 @@ function drawLine(canvasId, values, color) {
   const ly = padT + (1 - (last / 100)) * plotH;
   ctx.fillStyle = color;
   ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#cfe9ff';
+  ctx.fillStyle = '#000000';
   ctx.fillText(`${Math.round(last)}%`, Math.max(padL, lx - 28), Math.max(10, ly - 6));
 }
 
@@ -841,17 +1190,7 @@ function decodeNfcRecord(record) {
 
 async function resolveNfcLocation(tagText) {
   const resolved = await api(`/api/v1/inspections/points/resolve?qr_content=${encodeURIComponent(tagText)}`, { headers: authHeaders() });
-  show('nfcResultView', {
-    message: 'NFC 读取成功，已解析机房位置',
-    nfc_tag: tagText,
-    location: resolved.location || '未配置',
-    system_id: resolved.system_id,
-    system_name: resolved.system_name || '',
-    point_id: resolved.point_id,
-    point_code: resolved.point_code,
-    point_name: resolved.point_name || resolved.location || resolved.point_code,
-    resolved_point: resolved,
-  });
+  show('nfcResultView', `NFC 读取成功，已定位到：${resolved.point_name || resolved.location || resolved.point_code || '未命名点位'}。`);
   return resolved;
 }
 
@@ -860,15 +1199,7 @@ async function resolveQrPoint(tagText) {
   state.qrResolvedPoint = resolved;
   const pointName = resolved.point_name || resolved.location || resolved.point_code || '';
   if ($('inspectionPointName')) $('inspectionPointName').value = pointName;
-  show('inspectionResult', {
-    message: '扫码成功，已定位巡检点',
-    qr_content: tagText,
-    system_id: resolved.system_id,
-    system_name: resolved.system_name || '',
-    point_id: resolved.point_id,
-    point_code: resolved.point_code,
-    point_name: pointName,
-  });
+  show('inspectionResult', `扫码成功，已定位巡检点：${pointName || '未命名点位'}。`);
   return resolved;
 }
 
@@ -919,11 +1250,7 @@ async function startNfcScanner() {
         setNfcScanState(`NFC 读取成功：${resolved.location || '位置未配置'}`);
       } catch (e) {
         setNfcScanState(`NFC 已读取，但点位未匹配：${e.message}`);
-        show('nfcResultView', {
-          message: '已读取 NFC 标签，但后端未找到对应巡检点',
-          nfc_tag: tagText,
-          error: e.message,
-        });
+        show('nfcResultView', `已读取 NFC 标签，但暂未找到对应巡检点：${e.message}`);
       }
     };
 
@@ -940,12 +1267,12 @@ async function startNfcScanner() {
 }
 
 // auth
-$('btnPing').onclick = async () => {
+onClick('btnPing', async () => {
   try { const d = await api('/healthz'); alert(`后端可用：${d.status || 'ok'}`); }
   catch (e) { alert(`连通失败：${e.message}`); }
-};
+});
 
-$('btnLogin').onclick = async () => {
+onClick('btnLogin', async () => {
   try {
     const data = await api('/api/v1/auth/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -960,22 +1287,29 @@ $('btnLogin').onclick = async () => {
     applyProfileUI();
     setLoginState('登录成功');
     switchScreen(true);
-    switchPanel('panel-inspection');
+    closeDetailPages();
+    switchTab(state.activeTab || 'tab-workbench');
   } catch (e) { setLoginState(`登录失败：${e.message}`); }
-};
+});
 
 function doLogout() {
   state.token = '';
+  state.activeDetailPage = '';
+  state.activeTab = 'tab-workbench';
+  try {
+    sessionStorage.removeItem(ACTIVE_TAB_KEY);
+  } catch {}
   stopStatusLoop();
   stopQrScanner();
   stopNfcScanner();
+  closeDetailPages();
   switchScreen(false);
   setLoginState('已退出登录');
 }
 
-$('btnLogoutInUserCenter').onclick = doLogout;
+onClick('btnLogout', doLogout);
 
-$('btnSaveProfile').onclick = async () => {
+onClick('btnSaveProfile', async () => {
   try {
     const payload = {
       nickname: $('profileNickname').value.trim() || null,
@@ -987,13 +1321,14 @@ $('btnSaveProfile').onclick = async () => {
     state.profile.avatar = data.avatar_url || '';
     saveProfileState();
     applyProfileUI();
-    show('profileResult', { ok: true, message: '昵称与头像已保存到后端', profile: state.profile });
+    show('profileResult', '');
+    showToast('账号信息已更新。', 'success');
   } catch (e) {
     show('profileResult', e.message || '保存失败');
   }
-};
+});
 
-$('btnChangePassword').onclick = async () => {
+onClick('btnChangePassword', async () => {
   try {
     const oldPwd = $('oldPassword').value;
     const newPwd = $('newPassword').value;
@@ -1005,38 +1340,38 @@ $('btnChangePassword').onclick = async () => {
       headers: authHeaders(),
       body: JSON.stringify({ old_password: oldPwd, new_password: newPwd }),
     });
-    show('passwordResult', data);
+    show('passwordResult', '');
+    showToast('密码修改成功。', 'success');
     $('oldPassword').value = '';
     $('newPassword').value = '';
   } catch (e) {
     show('passwordResult', e.message || '修改失败');
   }
-};
+});
 
-// top tabs
-Array.from(document.querySelectorAll('.menu-tabs .tab')).forEach((tab) => {
+// bottom tabs
+Array.from(document.querySelectorAll('.bottom-tab')).forEach((tab) => {
   tab.addEventListener('click', () => {
-    if (tab.dataset.panel !== 'panel-selfcheck') stopStatusLoop();
-    if (tab.dataset.panel !== 'panel-inspection') {
-      stopQrScanner();
-      stopNfcScanner();
-    }
-    switchPanel(tab.dataset.panel);
+    stopStatusLoop();
+    stopQrScanner();
+    stopNfcScanner();
+    closeDetailPages();
+    switchTab(tab.dataset.tab);
   });
 });
 
 // inspection
-$('btnStartQrScan').onclick = startQrScanner;
-$('btnStopQrScan').onclick = () => {
+onClick('btnStartQrScan', startQrScanner);
+onClick('btnStopQrScan', () => {
   stopQrScanner();
   setQrScanState('已停止扫码。');
-};
-$('btnCloseScanner').onclick = () => {
+});
+onClick('btnCloseScanner', () => {
   stopQrScanner();
   setQrScanState('已关闭扫码。');
-};
+});
 
-$('btnCreateInspection').onclick = async () => {
+onClick('btnCreateInspection', async () => {
   try {
     const qrText = (state.qrScanText || '').trim();
     if (!qrText) throw new Error('请先调用相机完成二维码扫描');
@@ -1050,22 +1385,17 @@ $('btnCreateInspection').onclick = async () => {
       inspected_at: new Date().toISOString(),
     };
     const created = await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
-    show('inspectionResult', {
-      system_name: resolved.system_name || '',
-      point_name: resolved.point_name || resolved.location || resolved.point_code,
-      resolved_point: resolved,
-      created_record: created,
-    });
-  } catch (e) { show('inspectionResult', e.message); }
-};
+    show('inspectionResult', `巡检提交成功：${resolved.point_name || resolved.location || resolved.point_code || '当前点位'}。`);
+  } catch (e) { show('inspectionResult', explainActionError(e, '提交巡检记录', 'inspector / admin / super_admin')); }
+});
 
-$('btnStartNfcScan').onclick = startNfcScanner;
-$('btnStopNfcScan').onclick = () => {
+onClick('btnStartNfcScan', startNfcScanner);
+onClick('btnStopNfcScan', () => {
   stopNfcScanner();
   setNfcScanState('已停止 NFC 读取。');
-};
+});
 
-$('btnSubmitNfc').onclick = async () => {
+onClick('btnSubmitNfc', async () => {
   try {
     const nfcText = (state.nfcTagText || '').trim();
     if (!nfcText) throw new Error('请先进行 NFC 碰一碰读取标签内容');
@@ -1079,23 +1409,20 @@ $('btnSubmitNfc').onclick = async () => {
       inspected_at: new Date().toISOString(),
     };
     const created = await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
-    show('nfcResultView', {
-      message: 'NFC 巡检提交成功',
-      location: resolved.location || '未配置',
-      resolved_point: resolved,
-      created_record: created,
-    });
+    show('nfcResultView', `NFC 巡检提交成功：${resolved.point_name || resolved.location || resolved.point_code || '当前点位'}。`);
   } catch (e) { show('nfcResultView', e.message); }
-};
+});
 
 // selfcheck
-$('scStatusSystem').onchange = () => {
-  state.selectedStatusSystemId = Number($('scStatusSystem').value || 0) || null;
-  refreshStatusBase();
-};
-$('btnRefreshStatus').onclick = refreshStatusBase;
+if ($('scStatusSystem')) {
+  $('scStatusSystem').onchange = () => {
+    state.selectedStatusSystemId = Number($('scStatusSystem').value || 0) || null;
+    refreshStatusBase();
+  };
+}
+onClick('btnRefreshStatus', refreshStatusBase);
 
-$('btnCreateSelfcheck').onclick = async () => {
+onClick('btnCreateSelfcheck', async () => {
   try {
     const content = $('scSummary').value.trim();
     if (!content) throw new Error('请填写自检内容');
@@ -1105,22 +1432,24 @@ $('btnCreateSelfcheck').onclick = async () => {
       result: $('scResult').value,
       note: $('scNote').value.trim() || null,
     };
-    show('selfcheckResult', await api('/api/v1/selfchecks/records/simple', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) }));
+    await api('/api/v1/selfchecks/records/simple', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
+    show('selfcheckResult', '');
+    showToast('自检提交成功。', 'success');
   } catch (e) { show('selfcheckResult', e.message); }
-};
+});
 
-$('btnLoadErrors').onclick = async () => {
+onClick('btnLoadErrors', async () => {
   try {
     const hours = Number($('errorRange').value || 24);
     const data = await api(`/api/v1/toolbox/error-logs?hours=${hours}&lines=5000`, { headers: authHeaders() });
     state.extractedErrors = String(data.content || '').split('\n').filter(Boolean).slice(0, 5000).map((line) => ({ line }));
-    show('errorLogsView', `日志来源命令: ${data.source}\n\n${data.content || ''}`);
+    show('errorLogsView', data.content || '未读取到错误日志内容。');
   } catch (e) {
     show('errorLogsView', `读取系统日志失败：${e.message}`);
   }
-};
+});
 
-$('btnAnalyzeErrors').onclick = async () => {
+onClick('btnAnalyzeErrors', async () => {
   if (state.isAnalyzingErrors) return;
   state.isAnalyzingErrors = true;
   setButtonLoading('btnAnalyzeErrors', true, 'AI 分析中...');
@@ -1136,15 +1465,15 @@ $('btnAnalyzeErrors').onclick = async () => {
     show('errorAiView', formatErrorAiResult(result));
   } catch (e) {
     $('errorAiStatus').textContent = 'AI 分析失败，请稍后重试。';
-    show('errorAiView', e.message);
+    show('errorAiView', explainActionError(e, '错误日志 AI 分析', 'admin / super_admin'));
   } finally {
     state.isAnalyzingErrors = false;
     setButtonLoading('btnAnalyzeErrors', false);
   }
-};
+});
 
 // toolbox
-$('btnToolPing').onclick = async () => {
+onClick('btnToolPing', async () => {
   try {
     const data = await api('/api/v1/toolbox/ping', {
       method: 'POST', headers: authHeaders(),
@@ -1153,58 +1482,45 @@ $('btnToolPing').onclick = async () => {
     const ok = String(JSON.stringify(data)).toLowerCase().includes('success') || String(JSON.stringify(data)).includes('true');
     $('pingStatus').className = `status-dot ${ok ? 'ok' : 'fail'}`;
     $('pingStatus').textContent = `状态：${ok ? '接通' : '可能异常'}`;
-    show('pingResult', data);
+    const summary = [];
+    if (typeof data?.message === 'string' && data.message) summary.push(data.message);
+    if (typeof data?.output === 'string' && data.output) summary.push(data.output);
+    if (!summary.length) summary.push(ok ? 'Ping 检测完成，网络可达。' : 'Ping 检测完成，但结果可能异常。');
+    show('pingResult', summary.join('\n\n'));
   } catch (e) {
     $('pingStatus').className = 'status-dot fail';
     $('pingStatus').textContent = '状态：失败';
-    show('pingResult', e.message);
+    show('pingResult', explainActionError(e, 'Ping 检测', 'admin / super_admin'));
   }
-};
+});
 
-$('btnCaptureStart').onclick = () => show('captureResult', { status: 'capturing', started_at: new Date().toISOString(), note: '抓包功能当前为 Mock，后续接入真实抓包执行器。' });
-$('btnCaptureStop').onclick = () => show('captureResult', { status: 'stopped', stopped_at: new Date().toISOString() });
-$('btnAppRestart').onclick = async () => {
+onClick('btnCreateToolTask', async () => {
   try {
     const task = await api('/api/v1/toolbox/restart-task', {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ target: 'mobile-selected-app', reason: 'mobile toolbox request' }),
     });
-    show('appToolResult', {
-      message: '已创建重启审批任务，请到管理后台审批或继续查看任务状态。',
-      task,
-    });
+    show('toolTaskResult', `已创建重启审批任务，当前状态：${task.status || 'pending_approval'}。`);
   } catch (e) {
-    show('appToolResult', e.message || '创建任务失败');
+    show('toolTaskResult', explainActionError(e, '创建工具任务', 'admin / super_admin'));
   }
-};
-$('btnRefreshToolTasks').onclick = async () => {
+});
+onClick('btnRefreshToolTasks', async () => {
   try {
     const tasks = await api('/api/v1/toolbox/tasks?page=1&size=10', { headers: authHeaders() });
-    const lines = (tasks.items || []).map((t) => {
+    const lines = (tasks.items || []).map((t, idx) => {
       const result = t.result || {};
-      return {
-        id: t.id,
-        action: t.action,
-        target: t.target,
-        status: t.status,
-        executor: t.executor || result.executor || '-',
-        success: result.success,
-        note: result.note || result.reason || '-',
-        time: t.finished_at || t.started_at || t.created_at || '-',
-      };
+      return `${idx + 1}. ${t.action || 'task'} · ${t.status || '-'} · ${t.target || '-'}\n时间：${t.finished_at || t.started_at || t.created_at || '-'}\n说明：${result.note || result.reason || '-'}${t.executor || result.executor ? `\n执行人：${t.executor || result.executor}` : ''}`;
     });
-    show('appToolResult', {
-      message: '最近工具任务',
-      items: lines,
-    });
+    show('toolTaskResult', lines.length ? lines.join('\n\n') : '暂无最近工具任务。');
   } catch (e) {
-    show('appToolResult', e.message || '读取任务失败');
+    show('toolTaskResult', explainActionError(e, '读取工具任务', 'admin / super_admin'));
   }
-};
-$('aiFileInput').addEventListener('change', handleAiFileChange);
-$('btnSendAiQuestion').onclick = sendAiQuestion;
-$('btnNewAiChat').onclick = () => {
+});
+onEvent('aiFileInput', 'change', handleAiFileChange);
+onClick('btnSendAiQuestion', sendAiQuestion);
+onClick('btnNewAiChat', () => {
   state.aiConversationId = '';
   state.aiMessages = buildDefaultAiMessages();
   state.lastAiRequestPayload = null;
@@ -1215,36 +1531,37 @@ $('btnNewAiChat').onclick = () => {
   renderAiAttachmentList();
   saveAiMessages();
   renderAiMessages();
+  renderAiConversationList();
   $('aiQaResult').textContent = '已开启新会话。';
-};
-$('btnClearAiChat').onclick = () => {
+});
+onClick('btnClearAiChat', () => {
   state.aiMessages = buildDefaultAiMessages();
   state.lastAiRequestPayload = null;
   sessionStorage.removeItem(AI_CHAT_HISTORY_KEY);
   renderAiAttachmentList();
   saveAiMessages();
   renderAiMessages();
-  $('aiQaResult').textContent = '已清空当前 AI 会话。';
-};
-$('aiQuestionInput').addEventListener('keydown', (event) => {
+  renderAiConversationList();
+  $('aiQaResult').textContent = state.aiConversationId ? '已清空本地展示；再次进入会话时会按服务端记录恢复。' : '已清空当前 AI 会话。';
+});
+
+onClick('btnRefreshAiConversations', async () => {
+  const items = await refreshAiConversationList();
+  $('aiQaResult').textContent = items.length ? `已刷新最近会话，共 ${items.length} 条。` : '暂无最近会话记录。';
+});
+onEvent('aiQuestionInput', 'keydown', (event) => {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
     sendAiQuestion();
   }
 });
-$('btnAppAiQa').onclick = () => {
-  showSub('panel-toolbox', 'toolbox-aiqa');
-  renderAiMessages();
-  renderAiAttachmentList();
-};
 
 initSubNavigation();
- renderAiMessages();
- renderAiAttachmentList();
+bindCaptureToolActions();
+renderAiMessages();
+renderAiAttachmentList();
 applyProfileUI();
 setLoginState('未登录');
 switchScreen(false);
-switchPanel('panel-inspection');
-showSub('panel-inspection', 'inspection-home');
-showSub('panel-selfcheck', 'selfcheck-home');
-showSub('panel-toolbox', 'toolbox-home');
+closeDetailPages();
+switchTab('tab-workbench');
