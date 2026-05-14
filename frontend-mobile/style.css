@@ -89,6 +89,9 @@ main { padding: 12px; display: grid; gap: 12px; }
   justify-content: space-between;
   gap: 10px;
 }
+.section-head.compact {
+  align-items: center;
+}
 .section-head h2,
 .page-block h2 {
   margin: 0;
@@ -277,6 +280,51 @@ pre {
   white-space: pre-wrap; word-break: break-word;
 }
 pre:empty { display: none; }
+.capture-primary-card {
+  gap: 12px;
+}
+.capture-ai-card {
+  gap: 8px;
+  border-color: #cfe1f5;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+.capture-ai-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.capture-ai-card pre {
+  margin-top: 0;
+  min-height: 88px;
+}
+.capture-raw-panel {
+  border: 1px solid #d9e5f1;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 0 12px 12px;
+}
+.capture-raw-panel summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #42627f;
+}
+.capture-raw-panel summary::-webkit-details-marker {
+  display: none;
+}
+.capture-raw-panel summary::after {
+  content: '展开';
+  float: right;
+  color: #8aa1b8;
+  font-weight: 500;
+}
+.capture-raw-panel[open] summary::after {
+  content: '收起';
+}
+.capture-raw-field {
+  margin-top: 6px;
+}
 .charts { display: grid; gap: 10px; }
 canvas { width: 100%; border: 1px solid #d9e5f1; border-radius: 10px; background: #ffffff; }
 

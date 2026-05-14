@@ -436,28 +436,41 @@
             <h2>抓包分析</h2>
           </div>
           <div class="detail-body tool-layout">
-            <label class="full">目标 URL
-              <input id="captureUrl" placeholder="输入要抓取的 URL，例如 https://example.com/api/login" />
-            </label>
-            <label>严重级别
-              <select id="captureAiSeverity">
-                <option value="low">low</option>
-                <option value="medium" selected>medium</option>
-                <option value="high">high</option>
-              </select>
-            </label>
-            <label class="full">备注
-              <input id="captureNote" placeholder="可选，例如：登录接口超时、页面白屏、接口返回异常" />
-            </label>
-            <label class="full">抓取结果
-              <textarea id="captureContent" rows="10" placeholder="点击“抓取 URL”后自动填入抓取结果，可再直接点 AI 分析" readonly></textarea>
-            </label>
-            <div class="actions">
-              <button id="btnFetchCaptureUrl">抓取 URL</button>
-              <button id="btnAnalyzeCapture">AI 分析抓包内容</button>
-            </div>
-            <div id="captureAiStatus" class="hint">输入 URL 后直接抓取，再交给 AI 分析即可。</div>
-            <pre id="captureResult"></pre>
+            <section class="card-inline capture-primary-card">
+              <label class="full">目标 URL
+                <input id="captureUrl" placeholder="输入要抓取的 URL，例如 https://example.com/api/login" />
+              </label>
+              <label>严重级别
+                <select id="captureAiSeverity">
+                  <option value="low">low</option>
+                  <option value="medium" selected>medium</option>
+                  <option value="high">high</option>
+                </select>
+              </label>
+              <label class="full">备注
+                <input id="captureNote" placeholder="可选，例如：登录接口超时、页面白屏、接口返回异常" />
+              </label>
+              <div class="actions">
+                <button id="btnFetchCaptureUrl">抓取 URL</button>
+                <button id="btnAnalyzeCapture">AI 分析抓包内容</button>
+              </div>
+              <div id="captureAiStatus" class="hint">输入 URL 后直接抓取，再交给 AI 分析即可。</div>
+            </section>
+
+            <section class="card-inline capture-ai-card">
+              <div class="section-head compact">
+                <h3>AI 分析结论</h3>
+                <span class="section-meta">优先看这里</span>
+              </div>
+              <pre id="captureResult"></pre>
+            </section>
+
+            <details class="capture-raw-panel">
+              <summary>查看抓取原始结果</summary>
+              <label class="full capture-raw-field">抓取结果
+                <textarea id="captureContent" rows="10" placeholder="点击“抓取 URL”后自动填入抓取结果，可再直接点 AI 分析" readonly></textarea>
+              </label>
+            </details>
           </div>
         </section>
 
