@@ -20,11 +20,8 @@ window.AegisAdmin = window.AegisAdmin || {};
   }
 
   function base() {
-    const protocol = window.location.protocol && window.location.protocol.startsWith('http')
-      ? window.location.protocol
-      : 'http:';
     const host = window.location.hostname || '127.0.0.1';
-    return `${protocol}//${host}:8000`;
+    return `http://${host}:8000`;
   }
 
   function headers() {
