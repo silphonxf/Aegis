@@ -67,6 +67,18 @@
             <button class="submenu-btn" data-view="view-tool-debug">调试与错误码</button>
           </div>
         </div>
+
+        <div class="menu-group" data-group="emergency-config">
+          <button class="menu-btn group-btn" data-group-target="emergency-config">
+            <span class="menu-icon">🚨</span><span class="menu-label">应急处置配置</span>
+          </button>
+          <div class="submenu-list">
+            <button class="submenu-btn" data-view="view-emergency-ssh">SSH 主机配置</button>
+            <button class="submenu-btn" data-view="view-emergency-server">服务器动作配置</button>
+            <button class="submenu-btn" data-view="view-emergency-db">数据库动作配置</button>
+            <button class="submenu-btn" data-view="view-emergency-process">进程动作配置</button>
+          </div>
+        </div>
       </nav>
       <button id="btnLogout" class="logout-btn">退出登录</button>
     </aside>
@@ -299,6 +311,135 @@
             <summary>查看任务原始返回</summary>
             <pre id="toolTaskResult"></pre>
           </details>
+        </section>
+      </section>
+
+      <section id="view-emergency-ssh" class="view-panel" data-view-title="SSH 主机配置" data-view-desc="维护应急处置使用的远程 SSH 主机信息与认证方式。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>SSH 主机配置</h2>
+              <p class="muted">维护主机名、IP、端口、认证方式与启用状态。密码 / 私钥字段后续需加密存储且默认不回显。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencySshMockSave">保存主机配置</button>
+              <button id="btnEmergencySshMockList" class="toolbar-btn secondary">刷新列表</button>
+            </div>
+          </div>
+          <div class="grid4 emergency-admin-grid">
+            <input id="emgSshHostCode" placeholder="host_code，如 foc-app-01" />
+            <input id="emgSshHostName" placeholder="主机名" />
+            <input id="emgSshHostIp" placeholder="IP 地址" />
+            <input id="emgSshPort" placeholder="SSH 端口，默认 22" value="22" />
+            <input id="emgSshUser" placeholder="SSH 用户名" />
+            <select id="emgSshAuthType"><option value="password">password</option><option value="private_key">private_key</option></select>
+            <input id="emgSshSecret" placeholder="密码或私钥（演示占位）" />
+            <input id="emgSshRemark" placeholder="备注（可选）" />
+          </div>
+          <div class="summary-strip emergency-tip-strip">
+            <div class="summary-card"><span>敏感字段</span><strong>必须加密存储</strong></div>
+            <div class="summary-card"><span>展示规则</span><strong>默认不回显原文</strong></div>
+            <div class="summary-card"><span>执行方向</span><strong>后续复用到三类动作</strong></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>host_code</th><th>主机名</th><th>IP</th><th>端口</th><th>认证方式</th><th>状态</th></tr></thead>
+              <tbody id="emgSshTbody"><tr><td colspan="6">暂无 SSH 主机配置</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="emgSshResult"></pre>
+        </section>
+      </section>
+
+      <section id="view-emergency-server" class="view-panel" data-view-title="服务器动作配置" data-view-desc="维护服务器重启等高危动作与目标 SSH 主机的绑定关系。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>服务器动作配置</h2>
+              <p class="muted">当前优先支持“服务器重启”。后续由管理端配置脚本模板，移动端只展示主机名、IP、重启按钮。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencyServerMockSave">保存服务器动作</button>
+              <button id="btnEmergencyServerMockList" class="toolbar-btn secondary">刷新列表</button>
+            </div>
+          </div>
+          <div class="grid4 emergency-admin-grid">
+            <input id="emgServerActionCode" placeholder="action_code，如 reboot-server" />
+            <input id="emgServerActionName" placeholder="动作名称，如 服务器重启" />
+            <input id="emgServerHostCode" placeholder="target_host_code" />
+            <input id="emgServerConfirmText" placeholder="确认文案" />
+          </div>
+          <textarea id="emgServerScript" rows="6" placeholder="脚本内容 / shell 模板，例如 sudo systemctl reboot"></textarea>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>action_code</th><th>动作名称</th><th>主机编码</th><th>脚本类型</th><th>状态</th></tr></thead>
+              <tbody id="emgServerTbody"><tr><td colspan="5">暂无服务器动作配置</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="emgServerResult"></pre>
+        </section>
+      </section>
+
+      <section id="view-emergency-db" class="view-panel" data-view-title="数据库动作配置" data-view-desc="维护 FOC 密码查询、死锁处理、闪回与表空间查询等数据库脚本模板。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>数据库动作配置</h2>
+              <p class="muted">支持 SQL / shell 两类模板，当前重点面向 FOC 密码查询、死锁处理、数据库闪回、表空间查询。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencyDbMockSave">保存数据库动作</button>
+              <button id="btnEmergencyDbMockList" class="toolbar-btn secondary">刷新列表</button>
+            </div>
+          </div>
+          <div class="grid4 emergency-admin-grid">
+            <input id="emgDbActionCode" placeholder="action_code" />
+            <input id="emgDbActionName" placeholder="动作名称" />
+            <select id="emgDbType"><option value="oracle">oracle</option><option value="dameng">dameng</option><option value="shell_proxy">shell_proxy</option></select>
+            <input id="emgDbHostCode" placeholder="target_host_code（可选）" />
+          </div>
+          <input id="emgDbParamSchema" placeholder='参数定义 JSON，如 [{"name":"employee_id"}]' />
+          <textarea id="emgDbScript" rows="7" placeholder="脚本 / SQL 模板，支持 {{system_code}} / {{employee_id}} 之类占位符"></textarea>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>action_code</th><th>动作名称</th><th>db_type</th><th>参数</th><th>状态</th></tr></thead>
+              <tbody id="emgDbTbody"><tr><td colspan="5">暂无数据库动作配置</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="emgDbResult"></pre>
+        </section>
+      </section>
+
+      <section id="view-emergency-process" class="view-panel" data-view-title="进程动作配置" data-view-desc="维护进程重启与关闭动作，并绑定目标 SSH 主机和脚本模板。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>进程动作配置</h2>
+              <p class="muted">当前移动端只需要进程名、进程 ID、重启按钮、关闭按钮；后续建议由脚本动态解析 PID，避免误杀。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencyProcessMockSave">保存进程动作</button>
+              <button id="btnEmergencyProcessMockList" class="toolbar-btn secondary">刷新列表</button>
+            </div>
+          </div>
+          <div class="grid4 emergency-admin-grid">
+            <input id="emgProcActionCode" placeholder="action_code" />
+            <input id="emgProcActionName" placeholder="动作名称，如 重启 foc-gateway" />
+            <input id="emgProcHostCode" placeholder="target_host_code" />
+            <input id="emgProcName" placeholder="process_name" />
+            <select id="emgProcIdSource"><option value="runtime_detect">runtime_detect</option><option value="fixed">fixed</option></select>
+            <input id="emgProcDefaultPid" placeholder="default_process_id（可选）" />
+            <input id="emgProcStopActionCode" placeholder="关闭动作编码（可选说明）" />
+            <input id="emgProcRemark" placeholder="备注（可选）" />
+          </div>
+          <textarea id="emgProcScript" rows="7" placeholder="脚本模板，例如 systemctl restart foc-gateway 或按进程名查 PID 后 kill"></textarea>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>action_code</th><th>进程名</th><th>主机编码</th><th>PID 来源</th><th>状态</th></tr></thead>
+              <tbody id="emgProcTbody"><tr><td colspan="5">暂无进程动作配置</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="emgProcResult"></pre>
         </section>
       </section>
 
@@ -622,6 +763,7 @@
   <script src="./js/modals.js"></script>
   <script src="./js/threatbook.js"></script>
   <script src="./js/debug.js"></script>
+  <script src="./js/emergency-config.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

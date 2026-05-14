@@ -64,6 +64,11 @@ function switchView(viewId, groupId) {
   } else {
     ns.dashboard?.stopDashboardAutoRefresh?.();
   }
+
+  if (viewId === 'view-emergency-ssh') ns.emergencyConfig?.listSshHosts?.();
+  if (viewId === 'view-emergency-server') ns.emergencyConfig?.listServerActions?.();
+  if (viewId === 'view-emergency-db') ns.emergencyConfig?.listDbActions?.();
+  if (viewId === 'view-emergency-process') ns.emergencyConfig?.listProcessActions?.();
 }
 
 function openGroup(groupId) {
@@ -93,6 +98,14 @@ bindClick('btnLogout', () => {
 });
 
 bindClick('btnRefreshDashboard', () => ns.dashboard?.refreshDashboard?.());
+bindClick('btnEmergencySshMockSave', () => ns.emergencyConfig?.saveSshHostMock?.());
+bindClick('btnEmergencySshMockList', () => ns.emergencyConfig?.listSshHosts?.());
+bindClick('btnEmergencyServerMockSave', () => ns.emergencyConfig?.saveServerActionMock?.());
+bindClick('btnEmergencyServerMockList', () => ns.emergencyConfig?.listServerActions?.());
+bindClick('btnEmergencyDbMockSave', () => ns.emergencyConfig?.saveDbActionMock?.());
+bindClick('btnEmergencyDbMockList', () => ns.emergencyConfig?.listDbActions?.());
+bindClick('btnEmergencyProcessMockSave', () => ns.emergencyConfig?.saveProcessActionMock?.());
+bindClick('btnEmergencyProcessMockList', () => ns.emergencyConfig?.listProcessActions?.());
 bindClick('btnToolTaskList', () => ns.toolbox.listTasks().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnToolTaskUpdate', () => ns.toolbox.updateTask().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnListAssets', () => ns.assets.listAssets().catch((e) => { $('assetListResult').textContent = formatError('资产列表', e); }));
@@ -179,3 +192,7 @@ switchView('view-dashboard-overview', 'dashboard');
 ns.users?.findUsers?.('').catch(() => {});
 ns.systems?.findSystems?.('').catch(() => {});
 ns.assets?.listAssets?.().catch(() => {});
+ns.emergencyConfig?.listSshHosts?.();
+ns.emergencyConfig?.listServerActions?.();
+ns.emergencyConfig?.listDbActions?.();
+ns.emergencyConfig?.listProcessActions?.();

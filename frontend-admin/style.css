@@ -422,6 +422,15 @@ th { background: #113654; color: #7dd3fc; }
 }
 .details-block summary::-webkit-details-marker { display: none; }
 .details-block pre { margin: 0 12px 12px; }
+.emergency-admin-grid {
+  margin-bottom: 8px;
+}
+.emergency-tip-strip {
+  margin-top: 6px;
+}
+.emergency-tip-strip .summary-card strong {
+  font-size: 13px;
+}
 .debug-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
