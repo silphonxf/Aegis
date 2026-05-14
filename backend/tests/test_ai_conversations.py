@@ -64,3 +64,23 @@ def test_ai_conversation_restore_flow(client, admin_headers):
     assert listed.status_code == 200, listed.text
     items = listed.json()["items"]
     assert any(item["conversation_id"] == conversation_id for item in items)
+
+
+def test_ai_conversation_rename(client, admin_headers):
+    created = client.post(
+        "/api/v1/ai/conversations",
+        headers=admin_headers,
+        json={"title": "新会话", "source": "mobile"},
+    )
+    assert created.status_code == 200, created.text
+    conversation_id = created.json()["conversation_id"]
+
+    renamed = client.put(
+        f"/api/v1/ai/conversations/{conversation_id}",
+        headers=admin_headers,
+        json={"title": "网络超时排查"},
+    )
+    assert renamed.status_code == 200, renamed.text
+    body = renamed.json()
+    assert body["conversation_id"] == conversation_id
+    assert body["title"] == "网络超时排查"

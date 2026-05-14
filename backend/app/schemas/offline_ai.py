@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 class OfflineAnalyzeRequest(BaseModel):
     title: str = Field(default="离线错误日志分析", min_length=1, max_length=120)
-    source_type: str = Field(default="manual", regex="^(manual|system)$")
+    source_type: str = Field(default="manual", regex="^(manual|system|capture_result)$")
     source_ref: Optional[str] = Field(default=None, max_length=255)
     severity: str = Field(default="medium", regex="^(low|medium|high)$")
     detail: str = Field(min_length=1, max_length=20000)

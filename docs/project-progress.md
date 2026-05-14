@@ -1,4 +1,4 @@
-# Aegis 项目进度（更新于 2026-05-08）
+# Aegis 项目进度（更新于 2026-05-11）
 
 ## 当前总体状态
 
@@ -6,7 +6,64 @@
 - 当前重点：Aegis AI 能力已从 skeleton/mock 联调推进到真实 OpenClaw 接入，并完成阶段2第一版附件引用式链路与移动端 AI 体验收尾
 - 当前开发路线：`docs/phase1-development-plan.md`
 
-## 本次新增进展（2026-05-08）
+## 本次新增进展（2026-05-11）
+
+### 0) 移动端新版 UI 骨架重构与联调前核查
+
+已完成：
+- 移动端 `frontend-mobile/index.html` 已重构为新版信息架构：
+  - 底部 4 Tab：`工作台 / 巡检 / 自检 / 我的`
+  - 工作台承载“今日待办 / 快捷操作 / 辅助工具 / 最近动态`
+  - `我的` 收敛为账号相关，不再承载 Ping / 抓包 / AI 问答 / 工具任务
+- 二级功能已改为全屏 detail page：
+  - 巡检：扫码巡检 / NFC 巡检 / 巡检记录
+  - 自检：系统状态 / 提交自检 / 错误日志分析
+  - 工作台工具：AI 问答 / Ping / 抓包分析 / 工具任务
+- `frontend-mobile/style.css` 已按新版结构重排，支持：
+  - bottom tabs
+  - tab-screen / detail-screen
+  - detail-topbar
+  - 工作台卡片 / 列表 / AI 聊天区
+- `frontend-mobile/app.js` 已完成新版导航主线切换：
+  - 底部 Tab 切换
+  - detail page 打开 / 返回
+  - 顶部标题跟随一级页 / 功能页变化
+  - 当前一级 Tab 通过 `sessionStorage` 记忆
+- 旧移动端导航兼容层已清理：
+  - 旧 `panel/subpage` 结构已从 HTML 中移除
+  - 旧 `switchPanel()` / `showSub()` 已从服务版本脚本中移除
+- UI 命名进一步收口：
+  - `btnLogoutInUserCenter` → `btnLogout`
+  - `btnAppRestart` → `btnCreateToolTask`
+  - `appToolResult` → `toolTaskResult`
+
+已完成的联调前核查：
+- 已确认服务输出的 `index.html` / `app.js` 确实是新版，不是工作区与服务版本不一致
+- 已确认以下高频功能在新版 HTML / JS 中的关键 DOM 与绑定字段对位正常：
+  - AI 问答
+  - Ping
+  - 抓包分析
+  - 工具任务
+  - 系统状态
+  - 扫码巡检 / NFC
+- 已确认以下前端 → 后端接口链路在代码层对位正常：
+  - `POST /api/v1/ai/chat/v2`
+  - `POST /api/v1/toolbox/ping`
+  - `POST /api/v1/toolbox/capture/analyze`
+  - `GET /api/v1/toolbox/tasks`
+  - `POST /api/v1/toolbox/restart-task`
+  - `GET /api/v1/monitoring/overview`
+  - `POST /api/v1/inspections/records`
+
+当前已知风险收敛为：
+- 真机移动端仍可能受 **HTTPS 前端 + HTTP 后端** 的 mixed-content / fetch 限制影响
+- 高频功能的真实失败原因后续要区分：
+  - UI 问题
+  - 权限不足（多个接口要求 `admin` / `super_admin`，巡检提交要求 `inspector` / `admin` / `super_admin`）
+  - 浏览器能力限制（相机 / NFC / secure context）
+  - 真机网络与协议问题
+
+### 1) OpenClaw 真实接入替换 skeleton 适配链路
 
 ### 1) OpenClaw 真实接入替换 skeleton 适配链路
 

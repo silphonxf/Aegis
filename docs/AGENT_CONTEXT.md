@@ -86,6 +86,15 @@ Aegis 是一个运维助手系统，包含：
 
 ## 7. 最近更新记录（倒序）
 
+### 2026-05-14
+- 接续确认当前工作分支：`feat/ai-session-restore-test`
+- 已补齐抓包分析 AI 接口：`POST /api/v1/toolbox/capture/analyze`
+- 新增 schema：`backend/app/schemas/capture.py`
+- 放宽离线分析 `source_type`，支持 `capture_result`
+- 新增回归测试：抓包分析接口、AI 会话重命名
+- 已本地跑通：`./.venv/bin/pytest backend/tests/test_toolbox.py backend/tests/test_ai_conversations.py -q`（`6 passed`）
+- 本地开发脚本已切到 `.venv + HTTPS static server` 模式，便于真机/LAN 联调
+
 ### 2026-04-05
 - 新增 `docs/phase1-development-plan.md`，明确第一阶段开发路线：测试护栏、本地开发体验、工具箱闭环、后台轻模块化
 - `docs/DOCS_INDEX.md` 增加第一阶段开发计划入口

@@ -81,3 +81,24 @@ def test_toolbox_invalid_status_transition(client, admin_headers):
     )
     assert invalid2.status_code == 400, invalid2.text
     assert invalid2.json()["code"] == "TASK_STATUS_INVALID"
+
+
+def test_toolbox_capture_analyze(client, admin_headers):
+    resp = client.post(
+        "/api/v1/toolbox/capture/analyze",
+        headers=admin_headers,
+        json={
+            "title": "抓包结果分析",
+            "content": "10:00:01 upstream connect timeout while TLS handshake\n10:00:03 read timeout from gateway",
+            "severity": "medium",
+            "source": "tcpdump_excerpt",
+            "note": "登录接口偶发超时",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["title"] == "抓包结果分析"
+    assert body["mode"] in {"rule_fallback", "openclaw", "offline_ollama"}
+    assert body["severity"] in {"medium", "high"}
+    assert isinstance(body["suggestions"], list)
+    assert "timeout" in body["excerpt"].lower()

@@ -9,5 +9,7 @@ pkill -f "uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT}" || true
 pkill -f "uvicorn app.main:app --reload --host 0.0.0.0 --port ${BACKEND_PORT}" || true
 pkill -f "python3 -m http.server ${MOBILE_PORT}" || true
 pkill -f "python3 -m http.server ${ADMIN_PORT}" || true
+pkill -f "serve_https.py --host 0.0.0.0 --port ${MOBILE_PORT}" || true
+pkill -f "serve_https.py --host 0.0.0.0 --port ${ADMIN_PORT}" || true
 
 echo "🛑 Aegis local dev processes stopped (if they were running)."

@@ -13,10 +13,18 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.tool_task import ToolTask
 from app.models.user import User
+from app.schemas.capture import CaptureAnalyzeRequest
 from app.schemas.toolbox import PingRequest, PortCheckRequest, RestartTaskRequest, TaskStatusUpdateRequest
+from app.schemas.offline_ai import OfflineAnalyzeRequest
+from app.services.ai_provider import run_offline_analyze
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/toolbox", tags=["toolbox"])
+
+
+def _extract_capture_excerpt(content: str, limit: int = 120) -> str:
+    lines = [ln.strip() for ln in content.splitlines() if ln.strip()]
+    return "\n".join(lines[:limit])
 
 
 def _read_error_logs(hours: int, lines: int) -> Tuple[str, str]:
@@ -302,4 +310,45 @@ def update_task_status(
         "started_at": task.started_at,
         "finished_at": task.finished_at,
         "result": result,
+    }
+
+
+@router.post("/capture/analyze")
+def analyze_capture_result(
+    payload: CaptureAnalyzeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    detail_parts = [f"来源：{payload.source}"]
+    if payload.note:
+        detail_parts.append(f"备注：{payload.note}")
+    detail_parts.append("抓包结果摘录：\n" + _extract_capture_excerpt(payload.content))
+
+    result = run_offline_analyze(
+        OfflineAnalyzeRequest(
+            title=payload.title,
+            detail="\n\n".join(detail_parts),
+            severity=payload.severity,
+            source_type="capture_result",
+            source_ref=payload.source,
+        )
+    )
+
+    log_action(
+        db,
+        "toolbox_capture_analyze",
+        "toolbox",
+        current_user,
+        {"source": payload.source, "severity": payload.severity, "mode": result.get("mode")},
+    )
+    return {
+        "title": payload.title,
+        "mode": result.get("mode", "rule_fallback"),
+        "severity": result.get("severity", payload.severity),
+        "summary": result.get("summary", ""),
+        "matched_rules": result.get("matched_rules", []),
+        "suggestions": result.get("suggestions", []),
+        "excerpt": result.get("excerpt", ""),
+        "elapsed_ms": result.get("elapsed_ms", 0),
+        "fallback_reason": result.get("fallback_reason"),
     }
