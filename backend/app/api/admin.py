@@ -24,6 +24,19 @@ from app.schemas.admin import (
     ThreatIntelQueryRequest,
     ThreatIntelQuickInputRequest,
 )
+from app.schemas.emergency_config import (
+    EmergencyDbActionSaveRequest,
+    EmergencyProcessActionSaveRequest,
+    EmergencyServerActionSaveRequest,
+    EmergencySshHostSaveRequest,
+)
+from app.services.emergency_config import (
+    list_public_config,
+    upsert_db_action,
+    upsert_process_action,
+    upsert_server_action,
+    upsert_ssh_host,
+)
 from app.services.threatbook import ThreatbookError, batch_query_ip_reputation
 from app.schemas.system import SystemCreate
 from app.services.audit import log_action
@@ -439,6 +452,57 @@ async def query_ip_reputation_excel(
         },
     )
     return result
+
+
+@router.get("/emergency-config")
+def get_emergency_config(
+    _: User = Depends(require_roles("super_admin")),
+):
+    return list_public_config()
+
+
+@router.post("/emergency-config/ssh-hosts")
+def save_emergency_ssh_host(
+    payload: EmergencySshHostSaveRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+):
+    item = upsert_ssh_host(payload)
+    log_action(db, "save_emergency_ssh_host", "emergency_config", current_user, {"host_code": payload.host_code})
+    return item
+
+
+@router.post("/emergency-config/server-actions")
+def save_emergency_server_action(
+    payload: EmergencyServerActionSaveRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+):
+    item = upsert_server_action(payload)
+    log_action(db, "save_emergency_server_action", "emergency_config", current_user, {"action_code": payload.action_code})
+    return item
+
+
+@router.post("/emergency-config/database-actions")
+def save_emergency_db_action(
+    payload: EmergencyDbActionSaveRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+):
+    item = upsert_db_action(payload)
+    log_action(db, "save_emergency_db_action", "emergency_config", current_user, {"action_code": payload.action_code})
+    return item
+
+
+@router.post("/emergency-config/process-actions")
+def save_emergency_process_action(
+    payload: EmergencyProcessActionSaveRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+):
+    item = upsert_process_action(payload)
+    log_action(db, "save_emergency_process_action", "emergency_config", current_user, {"action_code": payload.action_code})
+    return item
 
 
 @router.post("/threat-intel/block-ip")

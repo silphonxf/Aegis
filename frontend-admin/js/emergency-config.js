@@ -10,33 +10,19 @@ window.AegisAdmin = window.AegisAdmin || {};
       .replaceAll("'", '&#39;');
   }
 
-  const mockData = {
-    sshHosts: [
-      { host_code: 'foc-app-01', host_name: '航信应用服务器-01', host_ip: '10.10.1.21', port: 22, auth_type: 'password', enabled: true },
-      { host_code: 'foc-app-02', host_name: '离港服务服务器-02', host_ip: '10.10.1.35', port: 22, auth_type: 'private_key', enabled: true },
-    ],
-    serverActions: [
-      { action_code: 'reboot-foc-app-01', action_name: '服务器重启', target_host_code: 'foc-app-01', script_type: 'shell', enabled: true },
-      { action_code: 'reboot-foc-app-02', action_name: '服务器重启', target_host_code: 'foc-app-02', script_type: 'shell', enabled: true },
-    ],
-    dbActions: [
-      { action_code: 'foc-password-query', action_name: 'FOC 密码查询', db_type: 'oracle', params: 'system_code, employee_id', enabled: true },
-      { action_code: 'foc-deadlock-handle', action_name: 'FOC 死锁处理', db_type: 'oracle', params: '-', enabled: true },
-    ],
-    processActions: [
-      { action_code: 'restart-foc-gateway', process_name: 'foc-gateway', target_host_code: 'foc-app-01', pid_source: 'runtime_detect', enabled: true },
-      { action_code: 'restart-dispatch-worker', process_name: 'dispatch-sync-worker', target_host_code: 'foc-app-02', pid_source: 'fixed', enabled: true },
-    ],
-  };
-
   function renderRows(tbodyId, rowsHtml, emptyColspan, emptyText) {
     const tbody = document.getElementById(tbodyId);
     if (!tbody) return;
     tbody.innerHTML = rowsHtml || `<tr><td colspan="${emptyColspan}">${emptyText}</td></tr>`;
   }
 
-  function listSshHosts() {
-    const rows = mockData.sshHosts.map((item) => `
+  async function loadAll() {
+    return ns.api.request('/api/v1/admin/emergency-config', { headers: ns.api.headers() });
+  }
+
+  async function listSshHosts() {
+    const data = await loadAll();
+    const rows = (data.ssh_hosts || []).map((item) => `
       <tr>
         <td>${escapeHtml(item.host_code)}</td>
         <td>${escapeHtml(item.host_name)}</td>
@@ -48,23 +34,37 @@ window.AegisAdmin = window.AegisAdmin || {};
     `).join('');
     renderRows('emgSshTbody', rows, 6, '暂无 SSH 主机配置');
     const result = document.getElementById('emgSshResult');
-    if (result) result.textContent = '当前为管理端前端骨架演示，后续这里将读取真实 SSH 主机配置（敏感字段加密存储）。';
+    if (result) result.textContent = `已读取 ${data.ssh_hosts?.length || 0} 条 SSH 主机配置。敏感字段已做脱敏展示。`;
   }
 
-  function saveSshHostMock() {
+  async function saveSshHostMock() {
+    const payload = {
+      host_code: document.getElementById('emgSshHostCode')?.value.trim(),
+      host_name: document.getElementById('emgSshHostName')?.value.trim(),
+      host_ip: document.getElementById('emgSshHostIp')?.value.trim(),
+      port: Number(document.getElementById('emgSshPort')?.value || 22),
+      username: document.getElementById('emgSshUser')?.value.trim(),
+      auth_type: document.getElementById('emgSshAuthType')?.value || 'password',
+      connect_timeout_ms: 5000,
+      enabled: true,
+      remark: document.getElementById('emgSshRemark')?.value.trim() || null,
+    };
+    const secret = document.getElementById('emgSshSecret')?.value || '';
+    if (payload.auth_type === 'password') payload.password_plaintext = secret;
+    else payload.private_key_plaintext = secret;
+    await ns.api.request('/api/v1/admin/emergency-config/ssh-hosts', {
+      method: 'POST',
+      headers: ns.api.headers(),
+      body: JSON.stringify(payload),
+    });
     const result = document.getElementById('emgSshResult');
-    if (result) result.textContent = [
-      '已触发【SSH 主机配置】前端占位保存。',
-      '后续真实实现要点：',
-      '1. 密码/私钥/私钥口令必须加密存储',
-      '2. 管理端默认不回显敏感字段',
-      '3. 主密钥从环境变量读取',
-    ].join('\n');
-    listSshHosts();
+    if (result) result.textContent = `SSH 主机配置已保存：${payload.host_code}`;
+    await listSshHosts();
   }
 
-  function listServerActions() {
-    const rows = mockData.serverActions.map((item) => `
+  async function listServerActions() {
+    const data = await loadAll();
+    const rows = (data.server_actions || []).map((item) => `
       <tr>
         <td>${escapeHtml(item.action_code)}</td>
         <td>${escapeHtml(item.action_name)}</td>
@@ -75,58 +75,123 @@ window.AegisAdmin = window.AegisAdmin || {};
     `).join('');
     renderRows('emgServerTbody', rows, 5, '暂无服务器动作配置');
     const result = document.getElementById('emgServerResult');
-    if (result) result.textContent = '服务器动作当前以“服务器重启”为主，后续按 host_code + action_code 绑定脚本模板执行。';
+    if (result) result.textContent = `已读取 ${data.server_actions?.length || 0} 条服务器动作配置。`;
   }
 
-  function saveServerActionMock() {
+  async function saveServerActionMock() {
+    const payload = {
+      action_code: document.getElementById('emgServerActionCode')?.value.trim(),
+      action_name: document.getElementById('emgServerActionName')?.value.trim(),
+      target_host_code: document.getElementById('emgServerHostCode')?.value.trim(),
+      module_type: 'server',
+      script_type: 'shell',
+      script_body: document.getElementById('emgServerScript')?.value || '',
+      confirm_text: document.getElementById('emgServerConfirmText')?.value.trim() || null,
+      enabled: true,
+      remark: null,
+    };
+    await ns.api.request('/api/v1/admin/emergency-config/server-actions', {
+      method: 'POST',
+      headers: ns.api.headers(),
+      body: JSON.stringify(payload),
+    });
     const result = document.getElementById('emgServerResult');
-    if (result) result.textContent = '已触发【服务器动作配置】前端占位保存。后续这里会保存 shell 脚本模板和确认文案。';
-    listServerActions();
+    if (result) result.textContent = `服务器动作配置已保存：${payload.action_code}`;
+    await listServerActions();
   }
 
-  function listDbActions() {
-    const rows = mockData.dbActions.map((item) => `
+  async function listDbActions() {
+    const data = await loadAll();
+    const rows = (data.database_actions || []).map((item) => `
       <tr>
         <td>${escapeHtml(item.action_code)}</td>
         <td>${escapeHtml(item.action_name)}</td>
         <td>${escapeHtml(item.db_type)}</td>
-        <td>${escapeHtml(item.params)}</td>
+        <td>${escapeHtml((item.param_schema || []).join(', ') || '-')}</td>
         <td>${item.enabled ? 'enabled' : 'disabled'}</td>
       </tr>
     `).join('');
     renderRows('emgDbTbody', rows, 5, '暂无数据库动作配置');
     const result = document.getElementById('emgDbResult');
-    if (result) result.textContent = '数据库动作模板建议支持参数占位符，如 {{system_code}} / {{employee_id}}。';
+    if (result) result.textContent = `已读取 ${data.database_actions?.length || 0} 条数据库动作配置。`;
   }
 
-  function saveDbActionMock() {
+  async function saveDbActionMock() {
+    let params = [];
+    const raw = document.getElementById('emgDbParamSchema')?.value.trim() || '';
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        params = Array.isArray(parsed) ? parsed.map((x) => typeof x === 'string' ? x : x?.name).filter(Boolean) : [];
+      } catch {
+        params = raw.split(',').map((x) => x.trim()).filter(Boolean);
+      }
+    }
+    const payload = {
+      action_code: document.getElementById('emgDbActionCode')?.value.trim(),
+      action_name: document.getElementById('emgDbActionName')?.value.trim(),
+      module_type: 'database',
+      db_type: document.getElementById('emgDbType')?.value || 'oracle',
+      target_host_code: document.getElementById('emgDbHostCode')?.value.trim() || null,
+      script_type: 'sql',
+      script_body: document.getElementById('emgDbScript')?.value || '',
+      param_schema: params,
+      result_mode: 'text',
+      enabled: true,
+      remark: null,
+    };
+    await ns.api.request('/api/v1/admin/emergency-config/database-actions', {
+      method: 'POST',
+      headers: ns.api.headers(),
+      body: JSON.stringify(payload),
+    });
     const result = document.getElementById('emgDbResult');
-    if (result) result.textContent = '已触发【数据库动作配置】前端占位保存。后续这里会保存 SQL / shell 模板及参数定义。';
-    listDbActions();
+    if (result) result.textContent = `数据库动作配置已保存：${payload.action_code}`;
+    await listDbActions();
   }
 
-  function listProcessActions() {
-    const rows = mockData.processActions.map((item) => `
+  async function listProcessActions() {
+    const data = await loadAll();
+    const rows = (data.process_actions || []).map((item) => `
       <tr>
         <td>${escapeHtml(item.action_code)}</td>
         <td>${escapeHtml(item.process_name)}</td>
         <td>${escapeHtml(item.target_host_code)}</td>
-        <td>${escapeHtml(item.pid_source)}</td>
+        <td>${escapeHtml(item.process_id_source)}</td>
         <td>${item.enabled ? 'enabled' : 'disabled'}</td>
       </tr>
     `).join('');
     renderRows('emgProcTbody', rows, 5, '暂无进程动作配置');
     const result = document.getElementById('emgProcResult');
-    if (result) result.textContent = '进程动作建议优先用脚本运行时解析 PID，不要强依赖前端传入 PID 直接 kill。';
+    if (result) result.textContent = `已读取 ${data.process_actions?.length || 0} 条进程动作配置。`;
   }
 
-  function saveProcessActionMock() {
+  async function saveProcessActionMock() {
+    const payload = {
+      action_code: document.getElementById('emgProcActionCode')?.value.trim(),
+      action_name: document.getElementById('emgProcActionName')?.value.trim(),
+      module_type: 'process',
+      target_host_code: document.getElementById('emgProcHostCode')?.value.trim(),
+      process_name: document.getElementById('emgProcName')?.value.trim(),
+      process_id_source: document.getElementById('emgProcIdSource')?.value || 'runtime_detect',
+      default_process_id: document.getElementById('emgProcDefaultPid')?.value.trim() || null,
+      script_type: 'shell',
+      script_body: document.getElementById('emgProcScript')?.value || '',
+      enabled: true,
+      remark: document.getElementById('emgProcRemark')?.value.trim() || null,
+    };
+    await ns.api.request('/api/v1/admin/emergency-config/process-actions', {
+      method: 'POST',
+      headers: ns.api.headers(),
+      body: JSON.stringify(payload),
+    });
     const result = document.getElementById('emgProcResult');
-    if (result) result.textContent = '已触发【进程动作配置】前端占位保存。后续这里会保存重启 / 关闭脚本模板。';
-    listProcessActions();
+    if (result) result.textContent = `进程动作配置已保存：${payload.action_code}`;
+    await listProcessActions();
   }
 
   ns.emergencyConfig = {
+    loadAll,
     listSshHosts,
     saveSshHostMock,
     listServerActions,

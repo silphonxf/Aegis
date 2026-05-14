@@ -1,0 +1,33 @@
+{
+  "ssh_hosts": [
+    {
+      "host_code": "foc-app-01",
+      "host_name": "航信应用服务器-01",
+      "host_ip": "10.10.1.21",
+      "port": 22,
+      "username": "ops",
+      "auth_type": "password",
+      "password_ciphertext": "ENC:dGVzdC1tYXN0ZXIta2V5OnNlY3JldC0xMjM=",
+      "private_key_ciphertext": null,
+      "private_key_passphrase_ciphertext": null,
+      "connect_timeout_ms": 5000,
+      "enabled": true,
+      "remark": "test"
+    }
+  ],
+  "server_actions": [
+    {
+      "action_code": "reboot-server",
+      "action_name": "服务器重启",
+      "target_host_code": "foc-app-01",
+      "module_type": "server",
+      "script_type": "shell",
+      "script_body": "sudo reboot",
+      "confirm_text": "确认重启？",
+      "enabled": true,
+      "remark": "test"
+    }
+  ],
+  "database_actions": [],
+  "process_actions": []
+}
