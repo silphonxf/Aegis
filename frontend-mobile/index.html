@@ -489,28 +489,22 @@
                 <h3>服务器操作</h3>
                 <span class="section-meta">管理端配置 SSH 与脚本</span>
               </div>
-              <div class="emergency-list" id="serverEmergencyList">
-                <div class="emergency-row">
-                  <div>
-                    <strong>航信应用服务器-01</strong>
-                    <span>10.10.1.21 · 生产</span>
-                  </div>
-                  <button class="warn-action" data-server-restart="航信应用服务器-01">重启</button>
-                </div>
-                <div class="emergency-row">
-                  <div>
-                    <strong>离港服务服务器-02</strong>
-                    <span>10.10.1.35 · 生产</span>
-                  </div>
-                  <button class="warn-action" data-server-restart="离港服务服务器-02">重启</button>
-                </div>
-                <div class="emergency-row">
-                  <div>
-                    <strong>测试中间件服务器-03</strong>
-                    <span>10.10.9.11 · 测试</span>
-                  </div>
-                  <button class="warn-action" data-server-restart="测试中间件服务器-03">重启</button>
-                </div>
+              <div class="emergency-table" id="serverEmergencyList">
+                <div class="emergency-table-head">主机名</div>
+                <div class="emergency-table-head">IP</div>
+                <div class="emergency-table-head">操作</div>
+
+                <div class="emergency-table-cell emergency-name-cell">航信应用服务器-01</div>
+                <div class="emergency-table-cell emergency-ip-cell">10.10.1.21</div>
+                <button class="warn-action emergency-table-btn" data-server-restart="航信应用服务器-01">重启</button>
+
+                <div class="emergency-table-cell emergency-name-cell">离港服务服务器-02</div>
+                <div class="emergency-table-cell emergency-ip-cell">10.10.1.35</div>
+                <button class="warn-action emergency-table-btn" data-server-restart="离港服务服务器-02">重启</button>
+
+                <div class="emergency-table-cell emergency-name-cell">测试中间件服务器-03</div>
+                <div class="emergency-table-cell emergency-ip-cell">10.10.9.11</div>
+                <button class="warn-action emergency-table-btn" data-server-restart="测试中间件服务器-03">重启</button>
               </div>
               <pre id="serverEmergencyResult"></pre>
             </section>
@@ -592,37 +586,26 @@
                 <h3>进程操作</h3>
                 <span class="section-meta">管理端配置进程命令</span>
               </div>
-              <div class="emergency-list" id="processEmergencyList">
-                <div class="emergency-row process-row">
-                  <div>
-                    <strong>foc-gateway</strong>
-                    <span>宿主机：航信应用服务器-01 · PID 18231</span>
-                  </div>
-                  <div class="row-actions">
-                    <button class="secondary" data-process-restart="foc-gateway">重启</button>
-                    <button class="warn-action" data-process-stop="foc-gateway">关闭</button>
-                  </div>
-                </div>
-                <div class="emergency-row process-row">
-                  <div>
-                    <strong>dispatch-sync-worker</strong>
-                    <span>宿主机：离港服务服务器-02 · PID 21455</span>
-                  </div>
-                  <div class="row-actions">
-                    <button class="secondary" data-process-restart="dispatch-sync-worker">重启</button>
-                    <button class="warn-action" data-process-stop="dispatch-sync-worker">关闭</button>
-                  </div>
-                </div>
-                <div class="emergency-row process-row">
-                  <div>
-                    <strong>crew-bridge-daemon</strong>
-                    <span>宿主机：测试中间件服务器-03 · PID 9311</span>
-                  </div>
-                  <div class="row-actions">
-                    <button class="secondary" data-process-restart="crew-bridge-daemon">重启</button>
-                    <button class="warn-action" data-process-stop="crew-bridge-daemon">关闭</button>
-                  </div>
-                </div>
+              <div class="emergency-table process-table" id="processEmergencyList">
+                <div class="emergency-table-head">进程名</div>
+                <div class="emergency-table-head">进程 ID</div>
+                <div class="emergency-table-head">重启</div>
+                <div class="emergency-table-head">关闭</div>
+
+                <div class="emergency-table-cell emergency-name-cell">foc-gateway</div>
+                <div class="emergency-table-cell emergency-id-cell">18231</div>
+                <button class="secondary emergency-table-btn" data-process-restart="foc-gateway">重启</button>
+                <button class="warn-action emergency-table-btn" data-process-stop="foc-gateway">关闭</button>
+
+                <div class="emergency-table-cell emergency-name-cell">dispatch-sync-worker</div>
+                <div class="emergency-table-cell emergency-id-cell">21455</div>
+                <button class="secondary emergency-table-btn" data-process-restart="dispatch-sync-worker">重启</button>
+                <button class="warn-action emergency-table-btn" data-process-stop="dispatch-sync-worker">关闭</button>
+
+                <div class="emergency-table-cell emergency-name-cell">crew-bridge-daemon</div>
+                <div class="emergency-table-cell emergency-id-cell">9311</div>
+                <button class="secondary emergency-table-btn" data-process-restart="crew-bridge-daemon">重启</button>
+                <button class="warn-action emergency-table-btn" data-process-stop="crew-bridge-daemon">关闭</button>
               </div>
               <pre id="processEmergencyResult"></pre>
             </section>
