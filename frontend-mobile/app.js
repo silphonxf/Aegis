@@ -299,6 +299,7 @@ const DETAIL_PAGE_META = {
   'page-tool-aiqa': 'AI 问答',
   'page-tool-ping': 'Ping 工具',
   'page-tool-capture': '抓包分析',
+  'page-tool-emergency': '应急处置',
   'page-tool-tasks': '工具任务',
 };
 
@@ -750,6 +751,12 @@ function initSubNavigation() {
         $('captureResult').textContent = '输入 URL 后点击“抓取 URL”，再点“AI 分析抓包内容”即可。';
       }
 
+      if (pageId === 'page-tool-emergency') {
+        $('serverEmergencyResult').textContent = '服务器重启、数据库脚本和进程操作将通过管理端配置命令模板执行。';
+        $('dbEmergencyResult').textContent = '数据库动作已预留前端入口，等待管理端配置真实命令。';
+        $('processEmergencyResult').textContent = '进程重启 / 关闭入口已预留，等待管理端配置真实命令。';
+      }
+
       if (pageId === 'page-tool-tasks') {
         $('toolTaskResult').textContent = '正在加载最近工具任务...';
         $('btnRefreshToolTasks')?.click();
@@ -763,6 +770,67 @@ function initSubNavigation() {
       stopStatusLoop();
       stopQrScanner();
       stopNfcScanner();
+    });
+  });
+}
+
+function bindEmergencyToolActions() {
+  onClick('btnOpenFocPasswordQuery', () => {
+    $('focPasswordQueryPanel')?.classList.toggle('hidden');
+    $('dbEmergencyHint').textContent = $('focPasswordQueryPanel')?.classList.contains('hidden')
+      ? '数据库动作后续通过管理端配置 SQL / SSH 命令模板执行。'
+      : '请按系统 + 工号发起查询，当前先展示前端流程与弹窗结果。';
+  });
+
+  onClick('btnFocDeadlockHandle', () => {
+    show('dbEmergencyResult', '已触发【FOC 死锁处理】前端占位流程。后续这里会调用管理端配置的死锁处理脚本。');
+    showToast('FOC 死锁处理流程已预留。');
+  });
+
+  onClick('btnFocFlashback', () => {
+    show('dbEmergencyResult', '已触发【FOC 数据库闪回】前端占位流程。后续这里会调用管理端配置的闪回脚本。');
+    showToast('FOC 数据库闪回流程已预留。');
+  });
+
+  onClick('btnDbTablespace', () => {
+    show('dbEmergencyResult', '已触发【数据库表空间】前端占位流程。后续这里会调用管理端配置的表空间查询命令。');
+    showToast('数据库表空间流程已预留。');
+  });
+
+  document.querySelectorAll('[data-server-restart]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.serverRestart || '目标服务器';
+      show('serverEmergencyResult', `已选择服务器【${name}】执行重启。当前为前端演示流程，后续将通过管理端配置 SSH 命令执行。`);
+      showToast(`已发起 ${name} 重启流程`, 'success');
+    });
+  });
+
+  document.querySelectorAll('[data-process-restart]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.processRestart || '目标进程';
+      show('processEmergencyResult', `已选择进程【${name}】执行重启。当前为前端演示流程，后续将通过管理端配置命令执行。`);
+      showToast(`已发起 ${name} 重启流程`, 'success');
+    });
+  });
+
+  document.querySelectorAll('[data-process-stop]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.processStop || '目标进程';
+      show('processEmergencyResult', `已选择进程【${name}】执行关闭。当前为前端演示流程，后续将通过管理端配置命令执行。`);
+      showToast(`已发起 ${name} 关闭流程`);
+    });
+  });
+
+  document.querySelectorAll('[data-foc-query]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = btn.dataset.focQuery;
+      const system = $(`focSystem${idx}`)?.value || '';
+      const emp = $(`focEmp${idx}`)?.value?.trim() || '';
+      if (!emp) {
+        showToast('请先输入工号', 'error');
+        return;
+      }
+      alert(`查询结果\n系统：${system}\n工号：${emp}\n\n当前为前端演示弹窗。\n后续会通过管理端配置的数据库查询命令返回真实结果。`);
     });
   });
 }
@@ -1535,6 +1603,7 @@ onEvent('aiQuestionInput', 'keydown', (event) => {
 });
 
 initSubNavigation();
+bindEmergencyToolActions();
 bindCaptureToolActions();
 renderAiMessages();
 renderAiAttachmentList();

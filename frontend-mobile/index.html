@@ -105,6 +105,10 @@
                 <span class="entry-title">抓包分析</span>
                 <span class="entry-desc">粘贴摘录并交给 AI</span>
               </button>
+              <button class="entry-card" data-open-page="page-tool-emergency">
+                <span class="entry-title">应急处置</span>
+                <span class="entry-desc">服务器、数据库、进程快速操作</span>
+              </button>
               <button class="entry-card" data-open-page="page-tool-tasks">
                 <span class="entry-title">工具任务</span>
                 <span class="entry-desc">查看最近执行记录</span>
@@ -471,6 +475,157 @@
                 <textarea id="captureContent" rows="10" placeholder="点击“抓取 URL”后自动填入抓取结果，可再直接点 AI 分析" readonly></textarea>
               </label>
             </details>
+          </div>
+        </section>
+
+        <section id="page-tool-emergency" class="detail-screen hidden">
+          <div class="detail-topbar">
+            <button class="ghost small" data-close-page>返回</button>
+            <h2>应急处置</h2>
+          </div>
+          <div class="detail-body tool-layout emergency-layout">
+            <section class="card-inline emergency-card">
+              <div class="section-head compact">
+                <h3>服务器操作</h3>
+                <span class="section-meta">管理端配置 SSH 与脚本</span>
+              </div>
+              <div class="emergency-list" id="serverEmergencyList">
+                <div class="emergency-row">
+                  <div>
+                    <strong>航信应用服务器-01</strong>
+                    <span>10.10.1.21 · 生产</span>
+                  </div>
+                  <button class="warn-action" data-server-restart="航信应用服务器-01">重启</button>
+                </div>
+                <div class="emergency-row">
+                  <div>
+                    <strong>离港服务服务器-02</strong>
+                    <span>10.10.1.35 · 生产</span>
+                  </div>
+                  <button class="warn-action" data-server-restart="离港服务服务器-02">重启</button>
+                </div>
+                <div class="emergency-row">
+                  <div>
+                    <strong>测试中间件服务器-03</strong>
+                    <span>10.10.9.11 · 测试</span>
+                  </div>
+                  <button class="warn-action" data-server-restart="测试中间件服务器-03">重启</button>
+                </div>
+              </div>
+              <pre id="serverEmergencyResult"></pre>
+            </section>
+
+            <section class="card-inline emergency-card">
+              <div class="section-head compact">
+                <h3>数据库操作</h3>
+                <span class="section-meta">预留管理端命令模板</span>
+              </div>
+              <div class="actions emergency-actions-grid">
+                <button id="btnOpenFocPasswordQuery">FOC 密码查询</button>
+                <button id="btnFocDeadlockHandle" class="secondary">FOC 死锁处理</button>
+                <button id="btnFocFlashback" class="secondary">FOC 数据库闪回</button>
+                <button id="btnDbTablespace" class="secondary">数据库表空间</button>
+              </div>
+              <div id="dbEmergencyHint" class="hint">数据库动作后续通过管理端配置 SQL / SSH 命令模板执行。</div>
+              <pre id="dbEmergencyResult"></pre>
+            </section>
+
+            <section id="focPasswordQueryPanel" class="card-inline emergency-card hidden">
+              <div class="section-head compact">
+                <h3>FOC 密码查询</h3>
+                <span class="section-meta">3 × 3 查询表单</span>
+              </div>
+              <div class="foc-query-grid">
+                <div class="foc-query-head">系统</div>
+                <div class="foc-query-head">工号</div>
+                <div class="foc-query-head">操作</div>
+
+                <select id="focSystem1">
+                  <option value="T8002-签派">T8002（签派）</option>
+                  <option value="T8002-地服">T8002（地服）</option>
+                  <option value="T8002-货运">T8002（货运）</option>
+                  <option value="T8002-机务">T8002（机务）</option>
+                  <option value="C8002-飞行">C8002（飞行）</option>
+                  <option value="C8002-客舱">C8002（客舱）</option>
+                  <option value="C8002-空保">C8002（空保）</option>
+                  <option value="C8002-飞管">C8002（飞管）</option>
+                  <option value="T3017-EFB">T3017（EFB）</option>
+                  <option value="T3017-网上准备密码">T3017（网上准备密码）</option>
+                </select>
+                <input id="focEmp1" placeholder="输入工号" />
+                <button class="ghost small" data-foc-query="1">查询</button>
+
+                <select id="focSystem2">
+                  <option value="T8002-签派">T8002（签派）</option>
+                  <option value="T8002-地服">T8002（地服）</option>
+                  <option value="T8002-货运">T8002（货运）</option>
+                  <option value="T8002-机务">T8002（机务）</option>
+                  <option value="C8002-飞行">C8002（飞行）</option>
+                  <option value="C8002-客舱">C8002（客舱）</option>
+                  <option value="C8002-空保">C8002（空保）</option>
+                  <option value="C8002-飞管">C8002（飞管）</option>
+                  <option value="T3017-EFB">T3017（EFB）</option>
+                  <option value="T3017-网上准备密码">T3017（网上准备密码）</option>
+                </select>
+                <input id="focEmp2" placeholder="输入工号" />
+                <button class="ghost small" data-foc-query="2">查询</button>
+
+                <select id="focSystem3">
+                  <option value="T8002-签派">T8002（签派）</option>
+                  <option value="T8002-地服">T8002（地服）</option>
+                  <option value="T8002-货运">T8002（货运）</option>
+                  <option value="T8002-机务">T8002（机务）</option>
+                  <option value="C8002-飞行">C8002（飞行）</option>
+                  <option value="C8002-客舱">C8002（客舱）</option>
+                  <option value="C8002-空保">C8002（空保）</option>
+                  <option value="C8002-飞管">C8002（飞管）</option>
+                  <option value="T3017-EFB">T3017（EFB）</option>
+                  <option value="T3017-网上准备密码">T3017（网上准备密码）</option>
+                </select>
+                <input id="focEmp3" placeholder="输入工号" />
+                <button class="ghost small" data-foc-query="3">查询</button>
+              </div>
+            </section>
+
+            <section class="card-inline emergency-card">
+              <div class="section-head compact">
+                <h3>进程操作</h3>
+                <span class="section-meta">管理端配置进程命令</span>
+              </div>
+              <div class="emergency-list" id="processEmergencyList">
+                <div class="emergency-row process-row">
+                  <div>
+                    <strong>foc-gateway</strong>
+                    <span>宿主机：航信应用服务器-01 · PID 18231</span>
+                  </div>
+                  <div class="row-actions">
+                    <button class="secondary" data-process-restart="foc-gateway">重启</button>
+                    <button class="warn-action" data-process-stop="foc-gateway">关闭</button>
+                  </div>
+                </div>
+                <div class="emergency-row process-row">
+                  <div>
+                    <strong>dispatch-sync-worker</strong>
+                    <span>宿主机：离港服务服务器-02 · PID 21455</span>
+                  </div>
+                  <div class="row-actions">
+                    <button class="secondary" data-process-restart="dispatch-sync-worker">重启</button>
+                    <button class="warn-action" data-process-stop="dispatch-sync-worker">关闭</button>
+                  </div>
+                </div>
+                <div class="emergency-row process-row">
+                  <div>
+                    <strong>crew-bridge-daemon</strong>
+                    <span>宿主机：测试中间件服务器-03 · PID 9311</span>
+                  </div>
+                  <div class="row-actions">
+                    <button class="secondary" data-process-restart="crew-bridge-daemon">重启</button>
+                    <button class="warn-action" data-process-stop="crew-bridge-daemon">关闭</button>
+                  </div>
+                </div>
+              </div>
+              <pre id="processEmergencyResult"></pre>
+            </section>
           </div>
         </section>
 
