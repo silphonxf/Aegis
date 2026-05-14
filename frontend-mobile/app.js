@@ -146,21 +146,6 @@ function formatCaptureAiResult(data) {
   return lines.join('\n');
 }
 
-function buildCaptureLogFromRequests(items, { failedOnly = false } = {}) {
-  const filtered = (items || []).filter((item) => failedOnly ? !item.ok : true).slice(0, 20);
-  return filtered.map((item, idx) => {
-    const responseText = item.response ? JSON.stringify(item.response).slice(0, 300) : '';
-    const bodyText = item.body ? JSON.stringify(item.body).slice(0, 300) : '';
-    return [
-      `#${idx + 1} ${item.method || 'GET'} ${item.url || ''}`,
-      `time=${item.at || ''} status=${item.status ?? 0} ok=${item.ok ? 'true' : 'false'} duration_ms=${item.duration_ms ?? ''}`,
-      item.network_error ? `error=${item.network_error}` : '',
-      bodyText ? `request=${bodyText}` : '',
-      responseText ? `response=${responseText}` : '',
-    ].filter(Boolean).join('\n');
-  }).join('\n\n');
-}
-
 function formatErrorAiResult(data) {
   if (!data || typeof data !== 'object') return '暂无分析结果';
   const lines = [];
@@ -762,7 +747,7 @@ function initSubNavigation() {
       }
 
       if (pageId === 'page-tool-capture') {
-        $('captureResult').textContent = '可粘贴抓包摘录，或导入最近请求日志，再交给 AI 分析。';
+        $('captureResult').textContent = '输入 URL 后点击“抓取 URL”，再点“AI 分析抓包内容”即可。';
       }
 
       if (pageId === 'page-tool-tasks') {
@@ -783,44 +768,37 @@ function initSubNavigation() {
 }
 
 function bindCaptureToolActions() {
-  const btnMock = $('btnCaptureMockFill');
-  const btnRecent = $('btnCaptureUseRecentRequests');
-  const btnFailed = $('btnCaptureUseFailedRequests');
+  const btnFetch = $('btnFetchCaptureUrl');
   const btnAnalyze = $('btnAnalyzeCapture');
 
-  if (btnMock) {
-    btnMock.onclick = () => {
-      $('captureContent').value = `12:00:01.123 IP 10.0.0.10.52314 > 10.0.0.20.443: Flags [S], seq 123456, win 64240\n12:00:04.456 IP 10.0.0.10.52314 > 10.0.0.20.443: Flags [S], retransmission\n12:00:09.999 ERROR upstream connect timeout while TLS handshake`;
-      $('captureNote').value = '登录接口访问异常，怀疑握手超时';
-      $('captureResult').textContent = '已填入示例抓包内容，可直接点 AI 分析。';
-    };
-  }
-
-  if (btnRecent) {
-    btnRecent.onclick = () => {
-      const content = buildCaptureLogFromRequests(state.requestLogs, { failedOnly: false });
-      if (!content) {
-        $('captureAiStatus').textContent = '暂无最近请求记录可导入。';
+  if (btnFetch) {
+    btnFetch.onclick = async () => {
+      const url = $('captureUrl').value.trim();
+      if (!url) {
+        $('captureAiStatus').textContent = '请先输入要抓取的 URL。';
         return;
       }
-      $('captureSource').value = 'browser_console';
-      $('captureContent').value = content;
-      $('captureNote').value = '已导入最近请求日志摘录';
-      $('captureResult').textContent = '已导入最近请求日志，可直接点 AI 分析。';
-    };
-  }
-
-  if (btnFailed) {
-    btnFailed.onclick = () => {
-      const content = buildCaptureLogFromRequests(state.requestLogs, { failedOnly: true });
-      if (!content) {
-        $('captureAiStatus').textContent = '暂无失败请求记录可导入。';
-        return;
+      setButtonLoading('btnFetchCaptureUrl', true, '抓取中...');
+      $('captureAiStatus').textContent = '正在抓取 URL，请稍等...';
+      try {
+        const data = await api('/api/v1/toolbox/capture/fetch', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({
+            url,
+            note: $('captureNote').value.trim(),
+          }),
+          timeoutMs: 20000,
+        });
+        $('captureContent').value = data.content || '';
+        $('captureResult').textContent = `抓取完成：HTTP ${data.status_code || '-'} · ${data.elapsed_ms || 0}ms`;
+        $('captureAiStatus').textContent = 'URL 抓取完成，可直接点 AI 分析。';
+      } catch (e) {
+        $('captureResult').textContent = explainActionError(e, 'URL 抓取', 'admin / super_admin');
+        $('captureAiStatus').textContent = 'URL 抓取失败，请检查地址后重试。';
+      } finally {
+        setButtonLoading('btnFetchCaptureUrl', false);
       }
-      $('captureSource').value = 'browser_console';
-      $('captureContent').value = content;
-      $('captureNote').value = '已导入失败请求日志摘录';
-      $('captureResult').textContent = '已导入失败请求日志，可直接点 AI 分析。';
     };
   }
 
@@ -829,12 +807,12 @@ function bindCaptureToolActions() {
       if (state.isAnalyzingCapture) return;
       const content = $('captureContent').value.trim();
       if (!content) {
-        $('captureAiStatus').textContent = '请先粘贴抓包结果或网络日志摘录。';
+        $('captureAiStatus').textContent = '请先抓取 URL，生成抓取结果。';
         return;
       }
       state.isAnalyzingCapture = true;
       setButtonLoading('btnAnalyzeCapture', true, 'AI 分析中...');
-      $('captureAiStatus').textContent = 'AI 正在分析抓包结果，请稍等...';
+      $('captureAiStatus').textContent = 'AI 正在分析抓包内容，请稍等...';
       try {
         const data = await api('/api/v1/toolbox/capture/analyze', {
           method: 'POST',
@@ -843,8 +821,8 @@ function bindCaptureToolActions() {
             title: '抓包结果分析',
             content,
             severity: $('captureAiSeverity').value,
-            source: $('captureSource').value,
-            note: $('captureNote').value.trim(),
+            source: 'url_fetch',
+            note: $('captureNote').value.trim() || $('captureUrl').value.trim(),
           }),
           timeoutMs: 45000,
         });

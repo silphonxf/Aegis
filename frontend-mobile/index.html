@@ -436,12 +436,8 @@
             <h2>抓包分析</h2>
           </div>
           <div class="detail-body tool-layout">
-            <label>抓包来源
-              <select id="captureSource">
-                <option value="manual_capture" selected>手工粘贴结果</option>
-                <option value="browser_console">浏览器控制台</option>
-                <option value="tcpdump_excerpt">tcpdump 摘录</option>
-              </select>
+            <label class="full">目标 URL
+              <input id="captureUrl" placeholder="输入要抓取的 URL，例如 https://example.com/api/login" />
             </label>
             <label>严重级别
               <select id="captureAiSeverity">
@@ -451,18 +447,16 @@
               </select>
             </label>
             <label class="full">备注
-              <input id="captureNote" placeholder="可选，例如：登录接口超时、某域名握手失败" />
+              <input id="captureNote" placeholder="可选，例如：登录接口超时、页面白屏、接口返回异常" />
             </label>
-            <label class="full">抓包结果 / 摘录
-              <textarea id="captureContent" rows="10" placeholder="粘贴抓包结果、控制台网络日志、tcpdump/wireshark 摘录等内容"></textarea>
+            <label class="full">抓取结果
+              <textarea id="captureContent" rows="10" placeholder="点击“抓取 URL”后自动填入抓取结果，可再直接点 AI 分析" readonly></textarea>
             </label>
             <div class="actions">
-              <button id="btnCaptureMockFill">填入示例</button>
-              <button id="btnCaptureUseRecentRequests">导入最近请求</button>
-              <button id="btnCaptureUseFailedRequests">导入失败请求</button>
-              <button id="btnAnalyzeCapture">AI 分析抓包结果</button>
+              <button id="btnFetchCaptureUrl">抓取 URL</button>
+              <button id="btnAnalyzeCapture">AI 分析抓包内容</button>
             </div>
-            <div id="captureAiStatus" class="hint">建议先粘贴关键摘录，再交给 AI 分析，避免一次性贴太长内容。</div>
+            <div id="captureAiStatus" class="hint">输入 URL 后直接抓取，再交给 AI 分析即可。</div>
             <pre id="captureResult"></pre>
           </div>
         </section>

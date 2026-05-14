@@ -83,6 +83,15 @@ def test_toolbox_invalid_status_transition(client, admin_headers):
     assert invalid2.json()["code"] == "TASK_STATUS_INVALID"
 
 
+def test_toolbox_capture_fetch_invalid_url(client, admin_headers):
+    resp = client.post(
+        "/api/v1/toolbox/capture/fetch",
+        headers=admin_headers,
+        json={"url": "not a valid url"},
+    )
+    assert resp.status_code == 400, resp.text
+
+
 def test_toolbox_capture_analyze(client, admin_headers):
     resp = client.post(
         "/api/v1/toolbox/capture/analyze",

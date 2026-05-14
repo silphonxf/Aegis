@@ -4,7 +4,10 @@ import os
 import socket
 import subprocess
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -13,7 +16,7 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.tool_task import ToolTask
 from app.models.user import User
-from app.schemas.capture import CaptureAnalyzeRequest
+from app.schemas.capture import CaptureAnalyzeRequest, CaptureFetchRequest
 from app.schemas.toolbox import PingRequest, PortCheckRequest, RestartTaskRequest, TaskStatusUpdateRequest
 from app.schemas.offline_ai import OfflineAnalyzeRequest
 from app.services.ai_provider import run_offline_analyze
@@ -25,6 +28,68 @@ router = APIRouter(prefix="/toolbox", tags=["toolbox"])
 def _extract_capture_excerpt(content: str, limit: int = 120) -> str:
     lines = [ln.strip() for ln in content.splitlines() if ln.strip()]
     return "\n".join(lines[:limit])
+
+
+def _normalize_capture_url(raw: str) -> str:
+    value = (raw or "").strip()
+    if not value:
+        raise HTTPException(status_code=400, detail={"code": "CAPTURE_URL_REQUIRED", "message": "请先输入要抓取的 URL"})
+    if not value.startswith(("http://", "https://")):
+        value = f"https://{value}"
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(status_code=400, detail={"code": "CAPTURE_URL_INVALID", "message": "URL 格式不正确"})
+    return value
+
+
+def _fetch_url_capture(url: str) -> Dict[str, Any]:
+    started = time.time()
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "AegisCaptureBot/1.0",
+            "Accept": "text/html,application/json,text/plain,*/*",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            status_code = getattr(resp, "status", 200)
+            body_bytes = resp.read(12000)
+            headers = dict(resp.headers.items())
+            elapsed_ms = int((time.time() - started) * 1000)
+            body_text = body_bytes.decode(resp.headers.get_content_charset() or "utf-8", errors="replace")
+            capture_lines = [
+                f"URL: {url}",
+                f"HTTP_STATUS: {status_code}",
+                f"ELAPSED_MS: {elapsed_ms}",
+                "RESPONSE_HEADERS:",
+            ]
+            for key, value in list(headers.items())[:20]:
+                capture_lines.append(f"{key}: {value}")
+            capture_lines.extend([
+                "",
+                "RESPONSE_BODY_EXCERPT:",
+                body_text[:8000],
+            ])
+            return {
+                "url": url,
+                "status_code": status_code,
+                "elapsed_ms": elapsed_ms,
+                "content_type": headers.get("Content-Type", ""),
+                "content": "\n".join(capture_lines).strip(),
+            }
+    except urllib.error.HTTPError as e:
+        body_text = e.read(8000).decode("utf-8", errors="replace") if hasattr(e, "read") else ""
+        raise HTTPException(status_code=400, detail={
+            "code": "CAPTURE_FETCH_FAILED",
+            "message": f"抓取失败：HTTP {e.code}",
+            "extra": body_text[:500],
+        })
+    except urllib.error.URLError as e:
+        raise HTTPException(status_code=400, detail={"code": "CAPTURE_FETCH_FAILED", "message": f"抓取失败：{e.reason}"})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail={"code": "CAPTURE_FETCH_FAILED", "message": f"抓取失败：{e}"})
 
 
 def _read_error_logs(hours: int, lines: int) -> Tuple[str, str]:
@@ -311,6 +376,24 @@ def update_task_status(
         "finished_at": task.finished_at,
         "result": result,
     }
+
+
+@router.post("/capture/fetch")
+def fetch_capture_from_url(
+    payload: CaptureFetchRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    url = _normalize_capture_url(payload.url)
+    result = _fetch_url_capture(url)
+    log_action(
+        db,
+        "toolbox_capture_fetch",
+        "toolbox",
+        current_user,
+        {"url": url, "status_code": result.get("status_code"), "elapsed_ms": result.get("elapsed_ms")},
+    )
+    return result
 
 
 @router.post("/capture/analyze")
