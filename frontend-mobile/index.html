@@ -371,16 +371,47 @@
             <h2>错误日志分析</h2>
           </div>
           <div class="detail-body tool-layout">
-            <label>时间范围
-              <select id="errorRange"><option value="1">最近1小时</option><option value="6">最近6小时</option><option value="24" selected>最近24小时</option></select>
-            </label>
-            <label>严重级别
-              <select id="errorAiSeverity"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option></select>
-            </label>
-            <div class="actions">
-              <button id="btnLoadErrors">提取错误日志</button>
-              <button id="btnAnalyzeErrors">AI 分析</button>
-            </div>
+            <section class="card-inline log-filter-card">
+              <label>日志来源
+                <select id="errorSource">
+                  <option value="aegis" selected>Aegis 日志</option>
+                  <option value="system">系统日志</option>
+                </select>
+              </label>
+              <label>日志文件名
+                <select id="errorFileName">
+                  <option value="backend.log" selected>backend.log</option>
+                  <option value="backend-https.log">backend-https.log</option>
+                  <option value="frontend-mobile.log">frontend-mobile.log</option>
+                  <option value="frontend-admin.log">frontend-admin.log</option>
+                  <option value="syslog">syslog</option>
+                  <option value="messages">messages</option>
+                </select>
+              </label>
+              <div class="quick-range-row">
+                <span class="range-label">快捷时间</span>
+                <div class="quick-range-group">
+                  <button type="button" class="quick-range-btn active" data-range="1h">1h</button>
+                  <button type="button" class="quick-range-btn" data-range="3h">3h</button>
+                  <button type="button" class="quick-range-btn" data-range="6h">6h</button>
+                </div>
+              </div>
+              <div class="grid two">
+                <label>开始时间
+                  <input id="errorStartAt" type="datetime-local" />
+                </label>
+                <label>结束时间
+                  <input id="errorEndAt" type="datetime-local" />
+                </label>
+              </div>
+              <label>日志级别
+                <select id="errorLogLevel"><option value="info">info</option><option value="warning" selected>warning</option><option value="error">error</option></select>
+              </label>
+              <div class="actions">
+                <button id="btnLoadErrors">提取错误日志</button>
+                <button id="btnAnalyzeErrors">AI 分析</button>
+              </div>
+            </section>
             <div id="errorAiStatus" class="hint">点击“AI 分析”后，将结合当前日志生成结论与建议。</div>
             <pre id="errorLogsView"></pre>
             <pre id="errorAiView"></pre>

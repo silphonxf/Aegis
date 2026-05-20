@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
+from app.core.logging import get_logger
 from app.db.session import get_db
 from app.models.inspection import InspectionPoint, InspectionRecord
 from app.models.system import System
@@ -13,17 +14,20 @@ from app.schemas.inspection import InspectionCreate
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/inspections", tags=["inspections"])
+logger = get_logger("inspections")
 
 
 @router.get("/points/resolve")
 def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     qr_text = (qr_content or "").strip()
+    logger.info("解析巡检点: qr_content=%s", qr_text)
 
     # 新逻辑：二维码为系统ID（纯数字）时，按 system_id 定位系统与巡检点
     if qr_text.isdigit():
         system_id = int(qr_text)
         system = db.query(System).filter(System.id == system_id).first()
         if not system:
+            logger.warning("解析巡检点失败: system_id=%s 未找到系统", system_id)
             raise HTTPException(status_code=404, detail="找不到巡检点")
 
         point = (
@@ -33,6 +37,7 @@ def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User 
             .first()
         )
         if not point:
+            logger.warning("解析巡检点失败: system_id=%s 未找到巡检点", system_id)
             raise HTTPException(status_code=404, detail="找不到巡检点")
 
         point_name = point.location or point.point_code
@@ -48,10 +53,12 @@ def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User 
     # 兼容旧逻辑：二维码为完整 qr_content
     point = db.query(InspectionPoint).filter(InspectionPoint.qr_content == qr_text).first()
     if not point:
+        logger.warning("解析巡检点失败: qr_content=%s 未命中", qr_text)
         raise HTTPException(status_code=404, detail="未找到对应巡检点")
 
     system = db.query(System).filter(System.id == point.system_id).first()
     point_name = point.location or point.point_code
+    logger.info("解析巡检点成功: point_id=%s system_id=%s", point.id, point.system_id)
     return {
         "point_id": point.id,
         "system_id": point.system_id,
@@ -68,6 +75,7 @@ def create_record(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("inspector", "admin", "super_admin")),
 ):
+    logger.info("创建巡检记录: user=%s system_id=%s point_id=%s result=%s", current_user.username, payload.system_id, payload.point_id, payload.result)
     rec = InspectionRecord(
         system_id=payload.system_id,
         point_id=payload.point_id,
@@ -79,6 +87,7 @@ def create_record(
     db.add(rec)
     db.commit()
     db.refresh(rec)
+    logger.info("创建巡检记录成功: record_id=%s", rec.id)
     log_action(db, "create_inspection_record", "inspection_record", current_user, {"record_id": rec.id})
     return {"id": rec.id}
 
@@ -94,6 +103,7 @@ def list_records(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
+    logger.info("查询巡检记录: system_id=%s result=%s page=%s size=%s", system_id, result, page, size)
     page = max(page, 1)
     size = min(max(size, 1), 100)
 
@@ -109,6 +119,7 @@ def list_records(
 
     total = q.count()
     items = q.order_by(InspectionRecord.inspected_at.desc()).offset((page - 1) * size).limit(size).all()
+    logger.info("查询巡检记录完成: total=%s returned=%s", total, len(items))
     return {
         "page": page,
         "size": size,

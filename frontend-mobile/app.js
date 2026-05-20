@@ -57,6 +57,7 @@ function mapConversationMessagesToUi(messages) {
 const state = {
   token: '',
   requestLogs: JSON.parse(localStorage.getItem('aegis_request_logs') || '[]'),
+  selectedQuickRange: '1h',
   metricSeries: { cpu: [], mem: [], disk: [] },
   chartTimer: null,
   extractedErrors: [],
@@ -732,7 +733,7 @@ function initSubNavigation() {
       }
 
       if (pageId === 'page-selfcheck-errors') {
-        $('errorAiView').textContent = '先加载错误日志，再点击“AI 分析”生成结论与建议。';
+        $('errorAiView').textContent = '先加载 Aegis 日志，再点击“AI 分析”生成结论与建议。';
       }
 
       if (pageId === 'page-tool-aiqa') {
@@ -1484,14 +1485,98 @@ onClick('btnCreateSelfcheck', async () => {
   } catch (e) { show('selfcheckResult', e.message); }
 });
 
+function formatDateTimeLocalValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function syncLogFileOptions() {
+  const source = $('errorSource')?.value || 'aegis';
+  const select = $('errorFileName');
+  if (!select) return;
+
+  const options = source === 'system'
+    ? [
+        { value: 'syslog', label: 'syslog' },
+        { value: 'messages', label: 'messages' },
+      ]
+    : [
+        { value: 'backend.log', label: 'backend.log' },
+        { value: 'backend-https.log', label: 'backend-https.log' },
+        { value: 'frontend-mobile.log', label: 'frontend-mobile.log' },
+        { value: 'frontend-mobile-https.log', label: 'frontend-mobile-https.log' },
+        { value: 'frontend-admin.log', label: 'frontend-admin.log' },
+        { value: 'frontend-admin-https.log', label: 'frontend-admin-https.log' },
+      ];
+
+  select.innerHTML = options.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
+}
+
+function syncQuickRangeInputs(rangeValue) {
+  const mapping = { '1h': 1, '3h': 3, '6h': 6 };
+  const hours = mapping[rangeValue] || 1;
+  const end = new Date();
+  const start = new Date(end.getTime() - hours * 60 * 60 * 1000);
+  if ($('errorStartAt')) $('errorStartAt').value = formatDateTimeLocalValue(start);
+  if ($('errorEndAt')) $('errorEndAt').value = formatDateTimeLocalValue(end);
+}
+
+document.querySelectorAll('.quick-range-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    state.selectedQuickRange = btn.dataset.range || '1h';
+    document.querySelectorAll('.quick-range-btn').forEach((item) => item.classList.toggle('active', item === btn));
+    syncQuickRangeInputs(state.selectedQuickRange);
+  });
+});
+
+if ($('errorStartAt') && $('errorEndAt')) {
+  $('errorStartAt').addEventListener('change', () => {
+    document.querySelectorAll('.quick-range-btn').forEach((item) => item.classList.remove('active'));
+  });
+  $('errorEndAt').addEventListener('change', () => {
+    document.querySelectorAll('.quick-range-btn').forEach((item) => item.classList.remove('active'));
+  });
+  syncQuickRangeInputs(state.selectedQuickRange || '1h');
+}
+
+if ($('errorSource')) {
+  $('errorSource').addEventListener('change', () => {
+    syncLogFileOptions();
+  });
+  syncLogFileOptions();
+}
+
 onClick('btnLoadErrors', async () => {
   try {
-    const hours = Number($('errorRange').value || 24);
-    const data = await api(`/api/v1/toolbox/error-logs?hours=${hours}&lines=5000`, { headers: authHeaders() });
+    const source = $('errorSource').value;
+    const fileName = $('errorFileName').value;
+    const level = $('errorLogLevel').value;
+    const startAt = $('errorStartAt').value;
+    const endAt = $('errorEndAt').value;
+    const quickRange = state.selectedQuickRange || '1h';
+    $('errorAiStatus').textContent = `正在提取${source === 'aegis' ? ' Aegis ' : ''}日志，请稍等...`;
+    const query = new URLSearchParams({
+      source,
+      file_name: fileName,
+      quick_range: quickRange,
+      level,
+      lines: '5000',
+    });
+    if (startAt && endAt) {
+      query.set('start_at', startAt.replace('T', ' '));
+      query.set('end_at', endAt.replace('T', ' '));
+    }
+    const data = await api(`/api/v1/toolbox/error-logs?${query.toString()}`, { headers: authHeaders() });
     state.extractedErrors = String(data.content || '').split('\n').filter(Boolean).slice(0, 5000).map((line) => ({ line }));
-    show('errorLogsView', data.content || '未读取到错误日志内容。');
+    show('errorLogsView', data.content || '未读取到日志内容。');
+    $('errorAiStatus').textContent = `已提取 ${data.line_count || state.extractedErrors.length} 行日志，可继续 AI 分析。`;
   } catch (e) {
-    show('errorLogsView', `读取系统日志失败：${e.message}`);
+    $('errorAiStatus').textContent = '日志提取失败，请稍后重试。';
+    show('errorLogsView', `读取日志失败：${e.message}`);
   }
 });
 
@@ -1504,8 +1589,8 @@ onClick('btnAnalyzeErrors', async () => {
   try {
     const detail = state.extractedErrors.length
       ? state.extractedErrors.map((e) => e.line || `${e.at} ${e.method || ''} ${e.url || ''} status=${e.status || 0} err=${e.network_error || ''}`).join('\n').slice(0, 1800)
-      : '暂无错误日志，建议先执行“提取错误日志”。';
-    const payload = { title: '错误日志分析', detail, severity: $('errorAiSeverity').value };
+      : '暂无 Aegis 日志，建议先执行“提取错误日志”。';
+    const payload = { title: 'Aegis 日志分析', detail, severity: $('errorLogLevel').value === 'error' ? 'high' : $('errorLogLevel').value === 'warning' ? 'medium' : 'low' };
     const result = await api('/api/v1/ai/diagnose', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
     $('errorAiStatus').textContent = 'AI 分析完成。';
     show('errorAiView', formatErrorAiResult(result));

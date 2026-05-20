@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.core.logging import get_logger
 from app.db.session import get_db
 from app.models.ai_chat_file import AIChatFile
 from app.models.ai_chat_message import AIChatMessage
@@ -19,6 +20,7 @@ from app.services.ai_provider import run_chat, run_diagnose, run_offline_analyze
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+logger = get_logger("ai")
 
 
 def _build_chat_attachment_notes(attachments: list[dict]) -> list[str]:
@@ -88,7 +90,9 @@ def chat_with_ai(
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
     message = (payload.message or "").strip()
+    logger.info("AI 对话请求: user=%s conversation_id=%s attachment_count=%s", current_user.username, payload.conversation_id, len(payload.attachments))
     if not message and not payload.attachments:
+        logger.warning("AI 对话请求被拒绝: 消息与附件均为空")
         raise HTTPException(status_code=400, detail={"code": "EMPTY_CHAT", "message": "消息和附件不能同时为空"})
 
     history = _load_conversation_history(db, payload.conversation_id)
@@ -112,6 +116,7 @@ def chat_with_ai(
     db.commit()
     db.refresh(row)
 
+    logger.info("AI 对话完成: mode=%s severity=%s elapsed_ms=%s", result.get("mode"), result.get("severity", "medium"), result.get("elapsed_ms"))
     log_action(
         db,
         "ai_chat",
@@ -146,10 +151,12 @@ def chat_with_ai_v2(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("AI 对话v2请求: user=%s conversation_id=%s file_ref_count=%s", current_user.username, payload.conversation_id, len(payload.attachments))
     message = (payload.message or "").strip()
     file_refs = [item.dict() for item in payload.attachments]
     attachments = _load_chat_files(db, file_refs)
     if not message and not attachments:
+        logger.warning("AI 对话v2请求被拒绝: 消息与已解析附件均为空")
         raise HTTPException(status_code=400, detail={"code": "EMPTY_CHAT", "message": "消息和附件不能同时为空"})
 
     enriched_message = message
@@ -190,6 +197,7 @@ def chat_with_ai_v2(
     db.commit()
     db.refresh(row)
 
+    logger.info("AI 对话v2完成: mode=%s severity=%s elapsed_ms=%s attachment_count=%s", result.get("mode"), result.get("severity", "medium"), result.get("elapsed_ms"), len(attachments))
     log_action(
         db,
         "ai_chat_v2",
@@ -224,6 +232,7 @@ def diagnose(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("AI 诊断请求: user=%s severity=%s title=%s", current_user.username, payload.severity, payload.title[:60])
     result = run_diagnose(payload.title, payload.detail, payload.severity)
 
     row = AIDiagnosis(
@@ -236,6 +245,7 @@ def diagnose(
     db.commit()
     db.refresh(row)
 
+    logger.info("AI 诊断完成: diagnosis_id=%s mode=%s severity=%s elapsed_ms=%s", row.id, result.get("mode"), result.get("severity", payload.severity), result.get("elapsed_ms"))
     log_action(
         db,
         "ai_diagnose",
@@ -269,6 +279,7 @@ def list_diagnoses(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("查询AI诊断记录: severity=%s page=%s size=%s", severity, page, size)
     page = max(page, 1)
     size = min(max(size, 1), 100)
 
@@ -278,6 +289,7 @@ def list_diagnoses(
 
     total = q.count()
     items = q.order_by(AIDiagnosis.created_at.desc()).offset((page - 1) * size).limit(size).all()
+    logger.info("查询AI诊断记录完成: total=%s returned=%s", total, len(items))
 
     return {
         "page": page,
@@ -304,6 +316,7 @@ def offline_analyze(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("离线分析请求: user=%s severity=%s source_type=%s title=%s", current_user.username, payload.severity, payload.source_type, payload.title[:60])
     result = run_offline_analyze(payload)
 
     task = OfflineAnalysisTask(
@@ -327,6 +340,7 @@ def offline_analyze(
     db.add(analysis_result)
     db.commit()
 
+    logger.info("离线分析完成: task_id=%s mode=%s severity=%s elapsed_ms=%s", task.id, result.get("mode"), result.get("severity", payload.severity), result.get("elapsed_ms"))
     log_action(
         db,
         "ai_offline_analyze",
@@ -361,6 +375,7 @@ def list_offline_tasks(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("查询离线分析任务: severity=%s page=%s size=%s", severity, page, size)
     page = max(page, 1)
     size = min(max(size, 1), 100)
 
@@ -370,6 +385,7 @@ def list_offline_tasks(
 
     total = q.count()
     items = q.order_by(OfflineAnalysisTask.created_at.desc()).offset((page - 1) * size).limit(size).all()
+    logger.info("查询离线分析任务完成: total=%s returned=%s", total, len(items))
     return {
         "page": page,
         "size": size,
@@ -397,8 +413,10 @@ def get_offline_task(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("查询离线分析任务详情: task_id=%s", task_id)
     task = db.query(OfflineAnalysisTask).filter(OfflineAnalysisTask.id == task_id).first()
     if not task:
+        logger.warning("查询离线分析任务失败: task_id=%s 不存在", task_id)
         raise HTTPException(status_code=404, detail={"code": "TASK_NOT_FOUND", "message": "任务不存在"})
 
     result = db.query(OfflineAnalysisResult).filter(OfflineAnalysisResult.task_id == task_id).order_by(OfflineAnalysisResult.id.desc()).first()

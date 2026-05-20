@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.logging import get_logger
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.db.session import get_db
 from app.models.user import User
@@ -9,12 +10,15 @@ from app.schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse,
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = get_logger("auth")
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    logger.info("收到登录请求: username=%s", data.username)
     user = db.query(User).filter(User.username == data.username, User.is_active == True).first()
     if not user or not verify_password(data.password, user.password_hash):
+        logger.warning("登录失败: username=%s client=%s", data.username, request.client.host if request.client else "-")
         log_action(
             db,
             "login_failed",
@@ -25,6 +29,7 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail={"code": "AUTH_INVALID", "message": "用户名或密码错误"})
 
     token = create_access_token(user.username)
+    logger.info("登录成功: user=%s", user.username)
     log_action(
         db,
         "login_success",
@@ -53,6 +58,7 @@ def update_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    logger.info("更新账号信息: user=%s", current_user.username)
     current_user.nickname = payload.nickname
     current_user.avatar_url = payload.avatar_url
     db.add(current_user)
@@ -73,6 +79,7 @@ def change_password(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    logger.info("修改密码: user=%s", current_user.username)
     if not verify_password(payload.old_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail={"code": "PASSWORD_OLD_INVALID", "message": "旧密码不正确"})
 

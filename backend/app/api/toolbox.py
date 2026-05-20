@@ -1,28 +1,31 @@
 from typing import Any, Dict, List, Optional, Set, Tuple
 import json
 import os
+import re
 import socket
 import subprocess
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.core.logging import get_logger
 from app.db.session import get_db
 from app.models.tool_task import ToolTask
 from app.models.user import User
 from app.schemas.capture import CaptureAnalyzeRequest, CaptureFetchRequest
-from app.schemas.toolbox import PingRequest, PortCheckRequest, RestartTaskRequest, TaskStatusUpdateRequest
+from app.schemas.toolbox import ErrorLogSourceRequest, PingRequest, PortCheckRequest, RestartTaskRequest, TaskStatusUpdateRequest
 from app.schemas.offline_ai import OfflineAnalyzeRequest
 from app.services.ai_provider import run_offline_analyze
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/toolbox", tags=["toolbox"])
+logger = get_logger("toolbox")
 
 
 def _extract_capture_excerpt(content: str, limit: int = 120) -> str:
@@ -92,41 +95,142 @@ def _fetch_url_capture(url: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail={"code": "CAPTURE_FETCH_FAILED", "message": f"抓取失败：{e}"})
 
 
-def _read_error_logs(hours: int, lines: int) -> Tuple[str, str]:
-    """读取系统 error 日志，优先 journalctl，其次 syslog/messages。"""
-    commands = [
-        [
-            "journalctl",
-            "--since",
-            f"-{hours} hour",
-            "-p",
-            "err",
-            "--no-pager",
-            "-n",
-            str(lines),
-            "-o",
-            "short-iso",
-        ],
+def _parse_datetime_input(value: Optional[str]) -> Optional[datetime]:
+    text = (value or "").strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    raise HTTPException(status_code=400, detail={"code": "INVALID_DATETIME", "message": f"时间格式不正确：{text}"})
+
+
+def _resolve_time_range(quick_range: Optional[str], start_at: Optional[str], end_at: Optional[str]) -> Tuple[Optional[datetime], Optional[datetime], str]:
+    start_dt = _parse_datetime_input(start_at)
+    end_dt = _parse_datetime_input(end_at)
+    if start_dt or end_dt:
+        if not (start_dt and end_dt):
+            raise HTTPException(status_code=400, detail={"code": "TIME_RANGE_INCOMPLETE", "message": "开始时间和结束时间需要同时选择"})
+        if start_dt > end_dt:
+            raise HTTPException(status_code=400, detail={"code": "TIME_RANGE_INVALID", "message": "开始时间不能晚于结束时间"})
+        return start_dt, end_dt, "calendar"
+
+    mapping = {"1h": 1, "3h": 3, "6h": 6}
+    hours = mapping.get((quick_range or "1h").strip(), 1)
+    end_dt = datetime.now()
+    start_dt = end_dt - timedelta(hours=hours)
+    return start_dt, end_dt, quick_range or "1h"
+
+
+def _level_keyword_pattern(level: str) -> str:
+    level = (level or "warning").lower()
+    if level == "info":
+        return r"INFO|WARNING|ERROR|CRITICAL|Exception|Traceback|\\[req:"
+    if level == "error":
+        return r"ERROR|CRITICAL|Exception|Traceback"
+    return r"WARNING|ERROR|CRITICAL|Exception|Traceback"
+
+
+def _matches_time_range(line: str, start_dt: Optional[datetime], end_dt: Optional[datetime]) -> bool:
+    if not (start_dt and end_dt):
+        return True
+    if len(line) < 16:
+        return True
+    prefix = line[:19]
+    parsed = None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            parsed = datetime.strptime(prefix[:len(fmt.replace('%Y','0000').replace('%m','00').replace('%d','00').replace('%H','00').replace('%M','00').replace('%S','00'))], fmt)
+            break
+        except ValueError:
+            continue
+    if not parsed:
+        return True
+    return start_dt <= parsed <= end_dt
+
+
+def _collect_log_files(source: str) -> list[str]:
+    if source == "system":
+        candidates = ["/var/log/syslog", "/var/log/messages"]
+        return [path for path in candidates if os.path.exists(path)]
+
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    logs_dir = os.path.join(repo_root, ".logs")
+    return [
+        os.path.join(logs_dir, name)
+        for name in [
+            "backend.log",
+            "backend-https.log",
+            "frontend-mobile.log",
+            "frontend-mobile-https.log",
+            "frontend-admin.log",
+            "frontend-admin-https.log",
+        ]
+        if os.path.exists(os.path.join(logs_dir, name))
     ]
 
-    syslog_path = "/var/log/syslog"
-    messages_path = "/var/log/messages"
-    if os.path.exists(syslog_path):
-        commands.append(["bash", "-lc", f"tail -n 20000 {syslog_path} | grep -Ei 'error|exception|fatal|traceback' | tail -n {lines}"])
-    if os.path.exists(messages_path):
-        commands.append(["bash", "-lc", f"tail -n 20000 {messages_path} | grep -Ei 'error|exception|fatal|traceback' | tail -n {lines}"])
 
-    last_err = ""
-    for cmd in commands:
+def _read_selected_logs(source: str, file_name: Optional[str], level: str, start_dt: Optional[datetime], end_dt: Optional[datetime], lines: int) -> Tuple[str, str]:
+    candidates = _collect_log_files(source)
+    if not candidates:
+        return "", "未找到可用日志文件"
+
+    if file_name:
+        selected = [path for path in candidates if os.path.basename(path) == file_name]
+        if not selected:
+            raise HTTPException(status_code=400, detail={"code": "LOG_FILE_NOT_FOUND", "message": f"未找到日志文件：{file_name}"})
+        candidates = selected
+
+    pattern = re.compile(_level_keyword_pattern(level), re.IGNORECASE)
+    chunks = []
+    used_sources = []
+    for path in candidates:
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
-            if proc.returncode == 0 and (proc.stdout or "").strip():
-                return proc.stdout[-120000:], " ".join(cmd)
-            last_err = (proc.stderr or proc.stdout or "").strip()
-        except Exception as e:
-            last_err = str(e)
+            with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+                lines_buf = fh.readlines()[-20000:]
+        except OSError:
+            continue
 
-    return "", last_err
+        matched = []
+        for raw in lines_buf:
+            line = raw.rstrip("\n")
+            if not line.strip():
+                continue
+            if not _matches_time_range(line, start_dt, end_dt):
+                continue
+            if pattern.search(line):
+                matched.append(line)
+        if matched:
+            chunks.append(f"===== {os.path.basename(path)} =====\n" + "\n".join(matched[-lines:]))
+            used_sources.append(path)
+
+    if chunks:
+        return "\n\n".join(chunks)[-120000:], ", ".join(used_sources)
+
+    for path in candidates:
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+                lines_buf = fh.readlines()[-20000:]
+        except OSError:
+            continue
+        matched = []
+        for raw in lines_buf:
+            line = raw.rstrip("\n")
+            if not line.strip():
+                continue
+            if not _matches_time_range(line, start_dt, end_dt):
+                continue
+            matched.append(line)
+        if matched:
+            chunks.append(f"===== {os.path.basename(path)} =====\n" + "\n".join(matched[-lines:]))
+            used_sources.append(path)
+
+    if chunks:
+        return "\n\n".join(chunks)[-120000:], ", ".join(used_sources)
+
+    return "", "未命中符合筛选条件的日志"
 
 
 def _load_task_result(task: ToolTask) -> dict:
@@ -162,6 +266,7 @@ def ping_host(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("Ping检测请求: user=%s host=%s count=%s", current_user.username, payload.host, payload.count)
     cmd = ["ping", "-c", str(payload.count), "-W", "1", payload.host]
     started = time.time()
     proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -174,6 +279,7 @@ def ping_host(
         "latency_ms": elapsed_ms,
         "output": (proc.stdout or proc.stderr)[-500:],
     }
+    logger.info("Ping检测完成: host=%s ok=%s latency_ms=%s", payload.host, ok, elapsed_ms)
     log_action(db, "toolbox_ping", "toolbox", current_user, {"host": payload.host, "ok": ok})
     return result
 
@@ -184,6 +290,7 @@ def port_check(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("端口检测请求: user=%s host=%s port=%s timeout_ms=%s", current_user.username, payload.host, payload.port, payload.timeout_ms)
     started = time.time()
     ok = False
     err = None
@@ -194,6 +301,7 @@ def port_check(
         err = str(e)
 
     elapsed_ms = int((time.time() - started) * 1000)
+    logger.info("端口检测完成: host=%s port=%s ok=%s latency_ms=%s", payload.host, payload.port, ok, elapsed_ms)
     log_action(db, "toolbox_port_check", "toolbox", current_user, {"host": payload.host, "port": payload.port, "ok": ok})
     return {
         "host": payload.host,
@@ -206,37 +314,88 @@ def port_check(
 
 @router.get("/error-logs")
 def read_error_logs(
-    hours: int = 24,
+    source: str = "aegis",
+    file_name: Optional[str] = None,
+    quick_range: Optional[str] = "1h",
+    start_at: Optional[str] = None,
+    end_at: Optional[str] = None,
+    level: str = "warning",
     lines: int = 5000,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
-    hours = min(max(hours, 1), 168)
-    lines = min(max(lines, 100), 5000)
+    payload = ErrorLogSourceRequest(
+        source=source,
+        file_name=file_name,
+        quick_range=quick_range,
+        start_at=start_at,
+        end_at=end_at,
+        level=level,
+        lines=lines,
+    )
+    start_dt, end_dt, range_mode = _resolve_time_range(payload.quick_range, payload.start_at, payload.end_at)
+    logger.info(
+        "读取错误日志请求: user=%s source=%s file_name=%s level=%s range_mode=%s lines=%s",
+        current_user.username,
+        payload.source,
+        payload.file_name,
+        payload.level,
+        range_mode,
+        payload.lines,
+    )
 
-    content, source = _read_error_logs(hours=hours, lines=lines)
+    content, source_detail = _read_selected_logs(
+        source=payload.source,
+        file_name=payload.file_name,
+        level=payload.level,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        lines=payload.lines,
+    )
+    if payload.source == "system":
+        empty_message = "未读取到系统日志，请确认系统日志文件存在且筛选条件合理。"
+    else:
+        empty_message = "未读取到 Aegis 应用日志，请确认日志文件已生成，或放宽时间范围/日志级别筛选。"
+
     if not content:
-        content = "未读取到 error 日志，请确认系统日志权限（journalctl/syslog）。"
+        logger.warning("读取错误日志结果为空: source=%s detail=%s", payload.source, source_detail)
+        content = empty_message
 
     log_action(
         db,
         "toolbox_read_error_logs",
         "toolbox",
         current_user,
-        {"hours": hours, "lines": lines, "source": source[:200]},
+        {
+            "source": payload.source,
+            "file_name": payload.file_name,
+            "quick_range": payload.quick_range,
+            "start_at": payload.start_at,
+            "end_at": payload.end_at,
+            "level": payload.level,
+            "lines": payload.lines,
+            "source_detail": source_detail[:200],
+        },
     )
 
     excerpt_lines = [ln for ln in content.splitlines() if ln.strip()]
-    keywords = [kw for kw in ["error", "exception", "fatal", "traceback", "timeout"] if kw in content.lower()]
+    keywords = [kw for kw in ["info", "warning", "error", "exception", "fatal", "traceback", "timeout"] if kw in content.lower()]
+    logger.info("读取错误日志完成: source=%s detail=%s line_count=%s matched_keywords=%s", payload.source, source_detail, len(excerpt_lines), ",".join(keywords) or "-")
     return {
-        "hours": hours,
-        "lines": lines,
-        "source": source,
+        "source": payload.source,
+        "file_name": payload.file_name,
+        "quick_range": payload.quick_range,
+        "start_at": payload.start_at,
+        "end_at": payload.end_at,
+        "level": payload.level,
+        "range_mode": range_mode,
+        "source_detail": source_detail,
         "content": content,
         "excerpt": "\n".join(excerpt_lines[:50]),
         "line_count": len(excerpt_lines),
         "truncated": len(content) >= 120000,
         "matched_keywords": keywords,
+        "available_files": [os.path.basename(path) for path in _collect_log_files(payload.source)],
     }
 
 
@@ -246,6 +405,7 @@ def create_restart_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("创建重启审批任务: user=%s target=%s", current_user.username, payload.target)
     task = ToolTask(
         action="restart",
         target=payload.target,
@@ -266,6 +426,7 @@ def create_restart_task(
     db.add(task)
     db.commit()
     db.refresh(task)
+    logger.info("创建重启审批任务成功: task_id=%s status=%s", task.id, task.status)
     log_action(db, "toolbox_create_restart_task", "tool_task", current_user, {"task_id": task.id, "target": task.target})
     return {
         "id": task.id,
@@ -284,6 +445,7 @@ def list_tasks(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("查询工具任务: status=%s page=%s size=%s", status, page, size)
     page = max(page, 1)
     size = min(max(size, 1), 100)
     q = db.query(ToolTask)
@@ -291,6 +453,7 @@ def list_tasks(
         q = q.filter(ToolTask.status == status)
     total = q.count()
     items = q.order_by(ToolTask.created_at.desc()).offset((page - 1) * size).limit(size).all()
+    logger.info("查询工具任务完成: total=%s returned=%s", total, len(items))
     return {
         "page": page,
         "size": size,
@@ -320,8 +483,10 @@ def update_task_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("super_admin")),
 ):
+    logger.info("更新工具任务状态: user=%s task_id=%s target_status=%s", current_user.username, task_id, payload.status)
     task = db.query(ToolTask).filter(ToolTask.id == task_id).first()
     if not task:
+        logger.warning("更新工具任务状态失败: task_id=%s 不存在", task_id)
         raise HTTPException(status_code=404, detail={"code": "TASK_NOT_FOUND", "message": "任务不存在"})
 
     current = task.status
@@ -336,6 +501,7 @@ def update_task_status(
         "cancelled": set(),
     }
     if target not in allowed.get(current, set()):
+        logger.warning("更新工具任务状态失败: task_id=%s from=%s to=%s 不合法", task_id, current, target)
         raise HTTPException(status_code=400, detail={"code": "TASK_STATUS_INVALID", "message": f"不允许从 {current} 变更到 {target}"})
 
     task.status = target
@@ -361,6 +527,7 @@ def update_task_status(
     db.commit()
     db.refresh(task)
 
+    logger.info("更新工具任务状态完成: task_id=%s from=%s to=%s executor=%s", task.id, current, target, executor)
     log_action(
         db,
         "toolbox_update_task_status",
@@ -385,7 +552,9 @@ def fetch_capture_from_url(
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
     url = _normalize_capture_url(payload.url)
+    logger.info("抓取URL请求: user=%s url=%s", current_user.username, url)
     result = _fetch_url_capture(url)
+    logger.info("抓取URL完成: url=%s status_code=%s elapsed_ms=%s", url, result.get("status_code"), result.get("elapsed_ms"))
     log_action(
         db,
         "toolbox_capture_fetch",
@@ -402,6 +571,7 @@ def analyze_capture_result(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("抓包分析请求: user=%s source=%s severity=%s", current_user.username, payload.source, payload.severity)
     detail_parts = [f"来源：{payload.source}"]
     if payload.note:
         detail_parts.append(f"备注：{payload.note}")
@@ -417,6 +587,7 @@ def analyze_capture_result(
         )
     )
 
+    logger.info("抓包分析完成: source=%s mode=%s severity=%s elapsed_ms=%s", payload.source, result.get("mode"), result.get("severity", payload.severity), result.get("elapsed_ms"))
     log_action(
         db,
         "toolbox_capture_analyze",

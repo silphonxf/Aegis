@@ -10,6 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.core.logging import get_logger
 from app.core.security import get_password_hash
 from app.db.session import get_db
 from app.models.asset import Asset
@@ -42,6 +43,7 @@ from app.schemas.system import SystemCreate
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+logger = get_logger("admin")
 
 
 IP_HEADER_CANDIDATES = {"ip", "ip地址", "ip_address", "地址", "目标ip", "ipv4", "ipv6"}
@@ -79,11 +81,13 @@ def list_users(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("super_admin")),
 ):
+    logger.info("查询用户列表: page=%s size=%s", page, size)
     page = max(page, 1)
     size = min(max(size, 1), 100)
     q = db.query(User)
     total = q.count()
     users = q.offset((page - 1) * size).limit(size).all()
+    logger.info("查询用户列表完成: total=%s returned=%s", total, len(users))
     return {
         "page": page,
         "size": size,
@@ -101,15 +105,18 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("super_admin")),
 ):
+    logger.info("创建用户请求: operator=%s username=%s role_code=%s", current_user.username, payload.username, payload.role_code)
     if db.query(User).filter(User.username == payload.username).first():
         raise HTTPException(status_code=400, detail={"code": "USER_EXISTS", "message": "用户名已存在"})
     role = db.query(Role).filter(Role.code == payload.role_code).first()
     if not role:
+        logger.warning("创建用户失败: role_code=%s 不存在", payload.role_code)
         raise HTTPException(status_code=400, detail={"code": "ROLE_NOT_FOUND", "message": "角色不存在"})
     user = User(username=payload.username, password_hash=get_password_hash(payload.password), role_id=role.id)
     db.add(user)
     db.commit()
     db.refresh(user)
+    logger.info("创建用户成功: user_id=%s username=%s", user.id, user.username)
     log_action(db, "create_user", "user", current_user, {"new_user_id": user.id, "username": user.username})
     return {"id": user.id}
 
@@ -121,11 +128,13 @@ def list_systems(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("查询系统列表: page=%s size=%s", page, size)
     page = max(page, 1)
     size = min(max(size, 1), 100)
     q = db.query(System)
     total = q.count()
     items = q.offset((page - 1) * size).limit(size).all()
+    logger.info("查询系统列表完成: total=%s returned=%s", total, len(items))
     return {
         "page": page,
         "size": size,
@@ -140,6 +149,7 @@ def create_system(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("创建系统请求: operator=%s system_code=%s", current_user.username, payload.system_code)
     if db.query(System).filter(System.system_code == payload.system_code).first():
         raise HTTPException(status_code=409, detail={"code": "SYSTEM_CODE_EXISTS", "message": "系统编号已存在"})
 
@@ -152,6 +162,7 @@ def create_system(
     db.add(system)
     db.commit()
     db.refresh(system)
+    logger.info("创建系统成功: system_id=%s system_code=%s", system.id, system.system_code)
     log_action(db, "create_system", "system", current_user, {"system_id": system.id, "system_code": system.system_code})
     return {"id": system.id}
 
@@ -169,6 +180,7 @@ def list_audit_logs(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("super_admin")),
 ):
+    logger.info("查询审计日志: action=%s username=%s resource=%s page=%s size=%s", action, username, resource, page, size)
     page = max(page, 1)
     size = min(max(size, 1), 100)
     q = db.query(AuditLog)
@@ -188,6 +200,7 @@ def list_audit_logs(
 
     total = q.count()
     items = q.order_by(AuditLog.created_at.desc()).offset((page - 1) * size).limit(size).all()
+    logger.info("查询审计日志完成: total=%s returned=%s", total, len(items))
     return {
         "page": page,
         "size": size,
@@ -239,12 +252,14 @@ def list_assets(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("查询资产列表: system_id=%s category=%s status=%s keyword=%s page=%s size=%s", system_id, category, status, keyword, page, size)
     page = max(page, 1)
     size = min(max(size, 1), 100)
 
     q = _asset_query(db, system_id, category, status, keyword)
     total = q.count()
     items = q.order_by(Asset.id.desc()).offset((page - 1) * size).limit(size).all()
+    logger.info("查询资产列表完成: total=%s returned=%s", total, len(items))
     return {
         "page": page,
         "size": size,
@@ -311,6 +326,7 @@ def create_asset(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("创建资产请求: operator=%s asset_code=%s", current_user.username, payload.asset_code)
     if db.query(Asset).filter(Asset.asset_code == payload.asset_code).first():
         raise HTTPException(status_code=400, detail={"code": "ASSET_EXISTS", "message": "资产编码已存在"})
 
@@ -318,6 +334,7 @@ def create_asset(
     db.add(asset)
     db.commit()
     db.refresh(asset)
+    logger.info("创建资产成功: asset_id=%s asset_code=%s", asset.id, asset.asset_code)
     log_action(db, "create_asset", "asset", current_user, {"asset_id": asset.id, "asset_code": asset.asset_code})
     return {"id": asset.id}
 
@@ -328,6 +345,7 @@ def batch_create_assets(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("批量创建资产请求: operator=%s item_count=%s", current_user.username, len(payload.items))
     created = []
     skipped = []
 
@@ -358,6 +376,7 @@ def batch_create_assets(
         created.append({"id": asset.id, "asset_code": asset.asset_code})
 
     db.commit()
+    logger.info("批量创建资产完成: created=%s skipped=%s", len(created), len(skipped))
     log_action(
         db,
         "batch_create_assets",
@@ -374,11 +393,14 @@ def query_ip_reputation(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
+    logger.info("威胁情报批量查询请求: operator=%s count=%s", current_user.username, len(payload.ips))
     try:
         result = batch_query_ip_reputation(payload.ips, lang=payload.lang, realtime_verdict=payload.realtime_verdict)
     except ThreatbookError as exc:
+        logger.warning("威胁情报批量查询失败: %s", str(exc))
         raise HTTPException(status_code=400, detail={"code": "THREATBOOK_QUERY_FAILED", "message": str(exc)})
 
+    logger.info("威胁情报批量查询完成: total=%s high_risk=%s", result["summary"]["total"], result["summary"]["high_risk"])
     log_action(
         db,
         "query_ip_reputation",

@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "运维助手 Aegis API"
     APP_ENV: str = "dev"
     API_PREFIX: str = "/api/v1"
+    LOG_LEVEL: str = "INFO"
 
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120

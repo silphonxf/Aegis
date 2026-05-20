@@ -44,6 +44,27 @@ alembic upgrade head
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
+## 统一日志格式
+后端现已采用统一工程化文本日志格式：
+
+```text
+2026-05-20 09:35:12 INFO auth [req:abc123def4567890abc123def4567890] 登录成功: user=admin
+```
+
+字段顺序固定为：
+- `时间`：`YYYY-MM-DD HH:mm:ss`
+- `日志级别`：`DEBUG / INFO / WARNING / ERROR / CRITICAL`
+- `模块`：如 `auth` / `access` / `health` / `app`
+- `请求 ID`：`[req:<32位小写十六进制uuid>]`
+- `日志内容`
+
+说明：
+- 每个 HTTP 请求进入后端时都会绑定一个统一格式的 `request_id`
+- 若客户端传入 `X-Request-ID`，只有当它是合法 32 位十六进制字符串（或标准 UUID 去掉连字符后）才会被沿用
+- 否则后端自动生成新的 32 位小写十六进制 UUID
+- 响应头会返回 `X-Request-ID`
+- 常规错误响应体也会附带 `request_id`
+
 ## 启动后的默认行为
 - 后端启动时会自动补齐最小种子数据：
   - 角色（`inspector/admin/super_admin`）
