@@ -21,12 +21,13 @@ class Settings(BaseSettings):
     # 默认数据库连接（开发环境可直接用 SQLite）
     DATABASE_URL: str = "sqlite:///./aegis.db"
 
-    # 达梦连接可拆分配置，便于运维按字段注入
-    DM_HOST: Optional[str] = None
-    DM_PORT: int = 5236
-    DM_NAME: Optional[str] = None
-    DM_USER: Optional[str] = None
-    DM_PASSWORD: Optional[str] = None
+    # MySQL 连接可拆分配置，便于运维按字段注入
+    MYSQL_HOST: Optional[str] = None
+    MYSQL_PORT: int = 3306
+    MYSQL_NAME: Optional[str] = None
+    MYSQL_USER: Optional[str] = None
+    MYSQL_PASSWORD: Optional[str] = None
+    MYSQL_CHARSET: str = "utf8mb4"
 
     INIT_ADMIN_USERNAME: str = "admin"
     INIT_ADMIN_PASSWORD: str
@@ -87,10 +88,13 @@ class Settings(BaseSettings):
 
     @property
     def effective_database_url(self) -> str:
-        """当配置了 DM_* 字段时优先拼接达梦连接；否则使用 DATABASE_URL。"""
-        if self.DM_HOST and self.DM_USER and self.DM_PASSWORD:
-            db_part = f"/{self.DM_NAME}" if self.DM_NAME else ""
-            return f"dm+dmPython://{self.DM_USER}:{self.DM_PASSWORD}@{self.DM_HOST}:{self.DM_PORT}{db_part}"
+        """当配置了 MYSQL_* 字段时优先拼接 MySQL 连接；否则使用 DATABASE_URL。"""
+        if self.MYSQL_HOST and self.MYSQL_USER and self.MYSQL_PASSWORD:
+            db_name = self.MYSQL_NAME or "aegis"
+            return (
+                f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
+                f"@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{db_name}?charset={self.MYSQL_CHARSET}"
+            )
 
         return self.DATABASE_URL or "sqlite:///./aegis.db"
 

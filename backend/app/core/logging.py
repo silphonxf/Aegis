@@ -16,9 +16,16 @@ class RequestIdFilter(logging.Filter):
 
 
 class ModuleFieldFilter(logging.Filter):
+    MODULE_ALIAS = {
+        "uvicorn.error": "server",
+        "uvicorn.access": "access",
+        "uvicorn": "server",
+        "fastapi": "api",
+    }
+
     def filter(self, record: logging.LogRecord) -> bool:
         if not getattr(record, "module_tag", None):
-            record.module_tag = record.name.split(".")[-1]
+            record.module_tag = self.MODULE_ALIAS.get(record.name, record.name.split(".")[-1])
         return True
 
 

@@ -137,17 +137,21 @@ def _matches_time_range(line: str, start_dt: Optional[datetime], end_dt: Optiona
     if not (start_dt and end_dt):
         return True
     if len(line) < 16:
-        return True
-    prefix = line[:19]
+        return False
+
     parsed = None
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
-        try:
-            parsed = datetime.strptime(prefix[:len(fmt.replace('%Y','0000').replace('%m','00').replace('%d','00').replace('%H','00').replace('%M','00').replace('%S','00'))], fmt)
+    for candidate in (line[:19], line[:16]):
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+            try:
+                parsed = datetime.strptime(candidate, fmt)
+                break
+            except ValueError:
+                continue
+        if parsed:
             break
-        except ValueError:
-            continue
+
     if not parsed:
-        return True
+        return False
     return start_dt <= parsed <= end_dt
 
 

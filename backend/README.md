@@ -32,7 +32,8 @@ cp .env.example .env
 至少确认以下变量：
 - `SECRET_KEY`
 - `INIT_ADMIN_PASSWORD`
-- `DATABASE_URL`（本地默认 SQLite）
+- `DATABASE_URL`（可用 SQLite，本次也支持 MySQL）
+- 如使用拆分配置，则设置 `MYSQL_HOST / MYSQL_PORT / MYSQL_NAME / MYSQL_USER / MYSQL_PASSWORD`
 
 #### 3) 数据库初始化（Alembic）
 ```bash
@@ -71,6 +72,11 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
   - 默认管理员 `admin`
   - 示例系统
   - 示例巡检点
+
+## MySQL 配置说明
+- 完整连接串示例：`mysql+pymysql://user:password@127.0.0.1:3306/aegis?charset=utf8mb4`
+- 也可参考 `mysql.env.example` 使用 `MYSQL_*` 拆分配置，后端会自动拼接连接串
+- 本地测试仍默认使用 SQLite；切换 MySQL 后执行 `alembic upgrade head` 初始化表结构
 
 ## 本地默认账号
 - `admin / local_admin_pass_2026`

@@ -22,6 +22,9 @@
             <label>用户名<input id="username" /></label>
             <label>密码<input id="password" type="password" /></label>
           </div>
+          <div class="grid one">
+            <label>后端地址<input id="apiBase" placeholder="例如：http://192.168.0.101:8000" /></label>
+          </div>
           <div class="actions one">
             <button id="btnPing" class="ghost">连通性检查</button>
             <button id="btnLogin">登录并进入主界面</button>
@@ -370,51 +373,83 @@
             <button class="ghost small" data-close-page>返回</button>
             <h2>错误日志分析</h2>
           </div>
-          <div class="detail-body tool-layout">
-            <section class="card-inline log-filter-card">
-              <label>日志来源
-                <select id="errorSource">
-                  <option value="aegis" selected>Aegis 日志</option>
-                  <option value="system">系统日志</option>
-                </select>
-              </label>
-              <label>日志文件名
-                <select id="errorFileName">
-                  <option value="backend.log" selected>backend.log</option>
-                  <option value="backend-https.log">backend-https.log</option>
-                  <option value="frontend-mobile.log">frontend-mobile.log</option>
-                  <option value="frontend-admin.log">frontend-admin.log</option>
-                  <option value="syslog">syslog</option>
-                  <option value="messages">messages</option>
-                </select>
-              </label>
-              <div class="quick-range-row">
-                <span class="range-label">快捷时间</span>
-                <div class="quick-range-group">
-                  <button type="button" class="quick-range-btn active" data-range="1h">1h</button>
-                  <button type="button" class="quick-range-btn" data-range="3h">3h</button>
-                  <button type="button" class="quick-range-btn" data-range="6h">6h</button>
-                </div>
-              </div>
-              <div class="grid two">
-                <label>开始时间
-                  <input id="errorStartAt" type="datetime-local" />
+          <div class="detail-body tool-layout log-analysis-layout">
+            <section class="card-inline log-filter-card compact">
+              <div class="grid two compact-grid">
+                <label>日志来源
+                  <select id="errorSource">
+                    <option value="" selected disabled>请选择来源</option>
+                    <option value="aegis">Aegis 日志</option>
+                    <option value="system">系统日志</option>
+                  </select>
                 </label>
-                <label>结束时间
-                  <input id="errorEndAt" type="datetime-local" />
+                <label>日志文件名
+                  <select id="errorFileName">
+                    <option value="" selected disabled>请选择文件</option>
+                  </select>
                 </label>
               </div>
+              <label>时间范围
+                <button type="button" id="btnOpenTimeFilter" class="ghost filter-trigger">选择时间范围</button>
+              </label>
               <label>日志级别
-                <select id="errorLogLevel"><option value="info">info</option><option value="warning" selected>warning</option><option value="error">error</option></select>
+                <select id="errorLogLevel"><option value="" selected disabled>请选择级别</option><option value="info">info</option><option value="warning">warning</option><option value="error">error</option></select>
               </label>
-              <div class="actions">
-                <button id="btnLoadErrors">提取错误日志</button>
+              <div id="errorTimeSummary" class="filter-summary">最近 1 小时</div>
+              <div class="actions compact-actions">
+                <button id="btnLoadErrors">提取日志</button>
                 <button id="btnAnalyzeErrors">AI 分析</button>
               </div>
             </section>
+            <div id="errorTimeModal" class="sheet-modal hidden">
+              <div class="sheet-backdrop" data-close-time-modal></div>
+              <div class="sheet-panel">
+                <div class="sheet-head">
+                  <h3>时间范围</h3>
+                  <button type="button" class="ghost small" data-close-time-modal>关闭</button>
+                </div>
+                <div class="quick-range-row">
+                  <span class="range-label">快捷时间</span>
+                  <div class="quick-range-group">
+                    <button type="button" class="quick-range-btn active" data-range="1h">1h</button>
+                    <button type="button" class="quick-range-btn" data-range="3h">3h</button>
+                    <button type="button" class="quick-range-btn" data-range="6h">6h</button>
+                  </div>
+                </div>
+                <div class="grid two compact-grid">
+                  <label>开始时间
+                    <input id="errorStartAt" type="datetime-local" />
+                  </label>
+                  <label>结束时间
+                    <input id="errorEndAt" type="datetime-local" />
+                  </label>
+                </div>
+                <div class="actions one compact-actions">
+                  <button type="button" id="btnApplyTimeFilter">确认时间范围</button>
+                </div>
+              </div>
+            </div>
             <div id="errorAiStatus" class="hint">点击“AI 分析”后，将结合当前日志生成结论与建议。</div>
-            <pre id="errorLogsView"></pre>
-            <pre id="errorAiView"></pre>
+            <section class="card-inline log-result-card analysis unified-result-card">
+              <div class="result-tab-bar">
+                <button type="button" class="result-tab-btn active" data-result-tab="logs">日志内容</button>
+                <button type="button" class="result-tab-btn" data-result-tab="analysis">AI 分析</button>
+              </div>
+              <div id="resultLogsPanel" class="result-tab-panel active">
+                <div class="section-head compact">
+                  <h3>日志内容</h3>
+                  <span class="section-meta">提取后展示</span>
+                </div>
+                <pre id="errorLogsView"></pre>
+              </div>
+              <div id="resultAnalysisPanel" class="result-tab-panel hidden">
+                <div class="section-head compact">
+                  <h3>AI 分析结果</h3>
+                  <span class="section-meta">分析后展示</span>
+                </div>
+                <pre id="errorAiView"></pre>
+              </div>
+            </section>
           </div>
         </section>
 

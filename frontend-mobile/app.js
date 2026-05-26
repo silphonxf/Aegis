@@ -11,6 +11,7 @@ const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/20
 const AI_CHAT_HISTORY_KEY = 'aegis_ai_chat_history';
 const AI_CHAT_CONVERSATION_KEY = 'aegis_ai_chat_conversation';
 const ACTIVE_TAB_KEY = 'aegis_mobile_active_tab';
+const API_BASE_KEY = 'aegis_mobile_api_base';
 const AI_MAX_ATTACHMENTS = 4;
 const AI_MAX_FILE_SIZE = 2 * 1024 * 1024;
 const DEFAULT_AI_MESSAGES = [
@@ -79,10 +80,26 @@ const state = {
   lastAiRequestPayload: null,
 };
 
-function getBase() {
+function getDefaultBase() {
   const host = window.location.hostname || '127.0.0.1';
-  return `http://${host}:8000`;
+  const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+  return `${protocol}://${host}:8000`;
 }
+
+function getBase() {
+  const configured = ($('apiBase')?.value || localStorage.getItem(API_BASE_KEY) || '').trim();
+  return configured || getDefaultBase();
+}
+
+function saveApiBase() {
+  const value = ($('apiBase')?.value || '').trim();
+  if (!value) {
+    localStorage.removeItem(API_BASE_KEY);
+    return;
+  }
+  localStorage.setItem(API_BASE_KEY, value);
+}
+
 function authHeaders() {
   const h = { 'Content-Type': 'application/json' };
   if (state.token) h.Authorization = `Bearer ${state.token}`;
@@ -163,6 +180,15 @@ function formatAiReply(result) {
   return result.reply || result.summary || 'AI 暂未返回有效内容。';
 }
 function setLoginState(text) { $('loginState').textContent = text; }
+
+function initApiBaseInput() {
+  const input = $('apiBase');
+  if (!input) return;
+  input.value = localStorage.getItem(API_BASE_KEY) || getDefaultBase();
+  input.addEventListener('change', saveApiBase);
+  input.addEventListener('blur', saveApiBase);
+}
+
 function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -1315,12 +1341,17 @@ async function startNfcScanner() {
 
 // auth
 onClick('btnPing', async () => {
-  try { const d = await api('/healthz'); alert(`后端可用：${d.status || 'ok'}`); }
+  try {
+    saveApiBase();
+    const d = await api('/healthz');
+    alert(`后端可用：${d.status || 'ok'}\n当前地址：${getBase()}`);
+  }
   catch (e) { alert(`连通失败：${e.message}`); }
 });
 
 onClick('btnLogin', async () => {
   try {
+    saveApiBase();
     const data = await api('/api/v1/auth/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: $('username').value.trim(), password: $('password').value }),
@@ -1494,6 +1525,14 @@ function formatDateTimeLocalValue(date) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+function switchResultTab(tab) {
+  document.querySelectorAll('.result-tab-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.resultTab === tab);
+  });
+  $('resultLogsPanel')?.classList.toggle('hidden', tab !== 'logs');
+  $('resultAnalysisPanel')?.classList.toggle('hidden', tab !== 'analysis');
+}
+
 function syncLogFileOptions() {
   const source = $('errorSource')?.value || 'aegis';
   const select = $('errorFileName');
@@ -1513,7 +1552,25 @@ function syncLogFileOptions() {
         { value: 'frontend-admin-https.log', label: 'frontend-admin-https.log' },
       ];
 
-  select.innerHTML = options.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
+  select.innerHTML = `<option value="" selected disabled>请选择文件</option>` + options.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
+}
+
+function updateTimeSummary() {
+  const start = $('errorStartAt')?.value || '';
+  const end = $('errorEndAt')?.value || '';
+  const summary = $('errorTimeSummary');
+  const trigger = $('btnOpenTimeFilter');
+  if (!summary) return;
+  if (start && end) {
+    const text = `${start.replace('T', ' ')} 至 ${end.replace('T', ' ')}`;
+    summary.textContent = text;
+    if (trigger) trigger.textContent = text;
+    return;
+  }
+  const labels = { '1h': '最近 1 小时', '3h': '最近 3 小时', '6h': '最近 6 小时' };
+  const text = labels[state.selectedQuickRange || '1h'] || '最近 1 小时';
+  summary.textContent = text;
+  if (trigger) trigger.textContent = text;
 }
 
 function syncQuickRangeInputs(rangeValue) {
@@ -1523,6 +1580,7 @@ function syncQuickRangeInputs(rangeValue) {
   const start = new Date(end.getTime() - hours * 60 * 60 * 1000);
   if ($('errorStartAt')) $('errorStartAt').value = formatDateTimeLocalValue(start);
   if ($('errorEndAt')) $('errorEndAt').value = formatDateTimeLocalValue(end);
+  updateTimeSummary();
 }
 
 document.querySelectorAll('.quick-range-btn').forEach((btn) => {
@@ -1533,12 +1591,29 @@ document.querySelectorAll('.quick-range-btn').forEach((btn) => {
   });
 });
 
+onClick('btnOpenTimeFilter', () => {
+  $('errorTimeModal')?.classList.remove('hidden');
+});
+
+document.querySelectorAll('[data-close-time-modal]').forEach((el) => {
+  el.addEventListener('click', () => {
+    $('errorTimeModal')?.classList.add('hidden');
+  });
+});
+
+onClick('btnApplyTimeFilter', () => {
+  updateTimeSummary();
+  $('errorTimeModal')?.classList.add('hidden');
+});
+
 if ($('errorStartAt') && $('errorEndAt')) {
   $('errorStartAt').addEventListener('change', () => {
     document.querySelectorAll('.quick-range-btn').forEach((item) => item.classList.remove('active'));
+    updateTimeSummary();
   });
   $('errorEndAt').addEventListener('change', () => {
     document.querySelectorAll('.quick-range-btn').forEach((item) => item.classList.remove('active'));
+    updateTimeSummary();
   });
   syncQuickRangeInputs(state.selectedQuickRange || '1h');
 }
@@ -1549,6 +1624,20 @@ if ($('errorSource')) {
   });
   syncLogFileOptions();
 }
+
+if ($('errorLogLevel')) {
+  $('errorLogLevel').value = 'warning';
+}
+if ($('errorSource')) {
+  $('errorSource').value = 'aegis';
+  syncLogFileOptions();
+  if ($('errorFileName')) $('errorFileName').value = 'backend.log';
+}
+updateTimeSummary();
+document.querySelectorAll('.result-tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => switchResultTab(btn.dataset.resultTab || 'logs'));
+});
+switchResultTab('logs');
 
 onClick('btnLoadErrors', async () => {
   try {
@@ -1573,6 +1662,8 @@ onClick('btnLoadErrors', async () => {
     const data = await api(`/api/v1/toolbox/error-logs?${query.toString()}`, { headers: authHeaders() });
     state.extractedErrors = String(data.content || '').split('\n').filter(Boolean).slice(0, 5000).map((line) => ({ line }));
     show('errorLogsView', data.content || '未读取到日志内容。');
+    show('errorAiView', '');
+    switchResultTab('logs');
     $('errorAiStatus').textContent = `已提取 ${data.line_count || state.extractedErrors.length} 行日志，可继续 AI 分析。`;
   } catch (e) {
     $('errorAiStatus').textContent = '日志提取失败，请稍后重试。';
@@ -1594,6 +1685,7 @@ onClick('btnAnalyzeErrors', async () => {
     const result = await api('/api/v1/ai/diagnose', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
     $('errorAiStatus').textContent = 'AI 分析完成。';
     show('errorAiView', formatErrorAiResult(result));
+    switchResultTab('analysis');
   } catch (e) {
     $('errorAiStatus').textContent = 'AI 分析失败，请稍后重试。';
     show('errorAiView', explainActionError(e, '错误日志 AI 分析', 'admin / super_admin'));
@@ -1692,6 +1784,7 @@ bindEmergencyToolActions();
 bindCaptureToolActions();
 renderAiMessages();
 renderAiAttachmentList();
+initApiBaseInput();
 applyProfileUI();
 setLoginState('未登录');
 switchScreen(false);
