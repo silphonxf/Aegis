@@ -13,8 +13,35 @@ class CreateAssetRequest(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     category: str = Field(default="server", min_length=1, max_length=64)
     system_id: Optional[int] = None
+    room_id: Optional[int] = None
     location: Optional[str] = Field(default=None, max_length=255)
+    ip_address: Optional[str] = Field(default=None, max_length=64)
+    port: Optional[int] = None
+    connection_type: Optional[str] = Field(default=None, max_length=32)
     status: str = Field(default="in_use", min_length=1, max_length=32)
+    remark: Optional[str] = Field(default=None, max_length=500)
+
+
+class CreateRoomRequest(BaseModel):
+    room_code: str = Field(min_length=1, max_length=64)
+    room_name: str = Field(min_length=1, max_length=128)
+    building: Optional[str] = Field(default=None, max_length=128)
+    floor: Optional[str] = Field(default=None, max_length=64)
+    location_detail: Optional[str] = Field(default=None, max_length=255)
+    remark: Optional[str] = Field(default=None, max_length=500)
+    is_active: bool = True
+
+
+class CreateInspectionPointRequest(BaseModel):
+    room_id: int
+    system_id: Optional[int] = None
+    point_code: str = Field(min_length=1, max_length=64)
+    point_name: str = Field(min_length=1, max_length=128)
+    point_type: str = Field(default="qr", max_length=32)
+    qr_content: Optional[str] = Field(default=None, max_length=255)
+    nfc_tag: Optional[str] = Field(default=None, max_length=255)
+    location_detail: Optional[str] = Field(default=None, max_length=255)
+    is_active: bool = True
 
 
 class BatchCreateAssetsRequest(BaseModel):
@@ -23,13 +50,13 @@ class BatchCreateAssetsRequest(BaseModel):
 
 class ThreatIntelQueryRequest(BaseModel):
     ips: List[str] = Field(default_factory=list, min_items=1, max_items=100)
-    lang: str = Field(default="zh", regex="^(zh|en)$")
+    lang: str = Field(default="zh", pattern="^(zh|en)$")
     realtime_verdict: bool = True
 
 
 class ThreatIntelQuickInputRequest(BaseModel):
     raw_input: str = Field(min_length=1, max_length=20000)
-    lang: str = Field(default="zh", regex="^(zh|en)$")
+    lang: str = Field(default="zh", pattern="^(zh|en)$")
     realtime_verdict: bool = True
 
     @validator("raw_input")

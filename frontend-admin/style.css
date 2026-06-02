@@ -59,21 +59,46 @@ body {
   grid-template-columns: 280px minmax(0,1fr);
 }
 .sidebar {
-  background: linear-gradient(180deg, rgba(12,31,48,.98), rgba(10,27,43,.98));
-  border-right: 1px solid var(--line);
-  padding: 16px;
+  background:
+    radial-gradient(circle at top left, rgba(56,189,248,.12), transparent 28%),
+    linear-gradient(180deg, rgba(12,31,48,.98), rgba(10,27,43,.98));
+  border-right: 1px solid rgba(58, 95, 126, .52);
+  padding: 18px 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  box-shadow: inset -1px 0 0 rgba(255,255,255,.03);
 }
-.sidebar h2 { margin: 0; }
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 6px 4px;
+}
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: #052035;
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  box-shadow: 0 12px 24px rgba(56,189,248,.22);
+}
+.sidebar h2 { margin: 0; font-size: 19px; letter-spacing: .02em; }
 .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 .menu-tree { display: grid; gap: 12px; margin-top: 8px; }
 .menu-group {
   border: 1px solid rgba(35,67,95,.75);
   background: rgba(8, 22, 35, .68);
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
+  transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+.menu-group.active {
+  border-color: rgba(56,189,248,.32);
+  box-shadow: 0 12px 28px rgba(0,0,0,.18);
 }
 .menu-btn {
   border: 1px solid #21425f;
@@ -111,13 +136,19 @@ body {
 }
 .submenu-btn {
   width: 100%;
-  padding: 9px 12px 9px 40px;
-  border-radius: 10px;
+  padding: 10px 12px 10px 40px;
+  border-radius: 12px;
   border: 1px solid transparent;
   background: rgba(12,31,48,.82);
   color: #9fb8ce;
   text-align: left;
   cursor: pointer;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+.submenu-btn:hover {
+  transform: translateX(2px);
+  border-color: rgba(56,189,248,.18);
+  background: rgba(18, 42, 62, .92);
 }
 .submenu-btn.active {
   background: linear-gradient(135deg, var(--primary), var(--primary-2));
@@ -132,14 +163,26 @@ body {
   color: #c7e6ff;
 }
 
-.workspace { padding: 18px; }
+.workspace { padding: 22px; }
 .workspace-header {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
   flex-wrap: wrap;
+  padding: 18px 20px;
+  border: 1px solid rgba(35,67,95,.72);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(13,31,48,.92), rgba(11,24,39,.96));
+  box-shadow: 0 14px 32px rgba(0,0,0,.18);
+}
+.header-eyebrow {
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #7bcdf3;
+  margin-bottom: 8px;
 }
 .workspace-header h1 { margin: 0; display: flex; align-items: center; gap: 10px; }
 .view-desc { color: #9cb8d3; margin: 8px 0 0; font-size: 14px; }
@@ -166,6 +209,29 @@ body {
   padding: 3px 8px;
   border-radius: 999px;
 }
+.control-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.control-chip {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(35,67,95,.72);
+  background: linear-gradient(145deg, rgba(15,34,51,.92), rgba(8,20,32,.95));
+  box-shadow: 0 10px 24px rgba(0,0,0,.16);
+}
+.control-chip span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.control-chip strong {
+  color: #f4fbff;
+  font-size: 15px;
+}
 
 .view-panel { display: none; }
 .view-panel.active { display: grid; gap: 14px; }
@@ -173,9 +239,9 @@ body {
 .card {
   background: linear-gradient(145deg, rgba(15,34,51,.96), rgba(11,29,46,.95));
   border: 1px solid #1f3a53;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 12px 30px rgba(0,0,0,.25);
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: 0 16px 36px rgba(0,0,0,.22);
 }
 .narrow-card { max-width: 1120px; }
 .card h2 { margin: 0 0 12px; }
@@ -348,7 +414,12 @@ pre {
   border: 1px solid #1d3a51;
 }
 .table-filters { margin: 10px 0; }
-.table-wrap { overflow: auto; }
+.table-wrap {
+  overflow: auto;
+  border: 1px solid rgba(31,58,83,.78);
+  border-radius: 16px;
+  background: rgba(6, 16, 26, .58);
+}
 table {
   width: 100%;
   border-collapse: collapse;
@@ -389,6 +460,74 @@ th { background: #113654; color: #7dd3fc; }
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   margin: 2px 0 14px;
+}
+.ops-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0 14px;
+}
+.ops-tab {
+  width: auto;
+  min-width: 180px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid #284a68;
+  background: #10283d;
+  color: #d8efff;
+  box-shadow: none;
+}
+.ops-tab.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  color: #052035;
+}
+.ops-workbench-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.ops-workbench-sections {
+  display: grid;
+  gap: 12px;
+}
+.ops-section-card {
+  padding: 14px;
+}
+.mini-panel {
+  border: 1px solid rgba(35,67,95,.7);
+  border-radius: 12px;
+  background: rgba(5, 14, 24, .42);
+  padding: 12px;
+}
+.mini-panel strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #d8efff;
+}
+.mini-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #8ea9c3;
+}
+.mini-list li {
+  margin: 6px 0;
+}
+.runbook-guide-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.guide-card {
+  border: 1px solid rgba(35,67,95,.7);
+  border-radius: 12px;
+  background: rgba(8,23,36,.56);
+  padding: 12px;
+}
+.guide-card h3 {
+  margin: 0 0 8px;
+}
+.guide-card p {
+  margin: 0 0 12px;
+  color: #8ea9c3;
+  line-height: 1.6;
 }
 .summary-card {
   border: 1px solid rgba(35,67,95,.7);
@@ -487,7 +626,7 @@ th { background: #113654; color: #7dd3fc; }
   .grid3, .grid4, .kpis, .tech-metrics, .debug-grid, .search-toolbar, .wide-toolbar { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
-  .grid2, .grid3, .grid4, .kpis, .tech-metrics, .debug-grid, .summary-strip, .search-toolbar, .wide-toolbar { grid-template-columns: 1fr; }
+  .grid2, .grid3, .grid4, .kpis, .tech-metrics, .debug-grid, .summary-strip, .search-toolbar, .wide-toolbar, .ops-workbench-guide, .runbook-guide-grid, .ops-workbench-sections { grid-template-columns: 1fr; }
   .action-row.compact button, .toolbar-btn { width: 100%; }
   .inline-result { margin-left: 0; width: 100%; }
 }

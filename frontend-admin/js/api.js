@@ -21,7 +21,7 @@ window.AegisAdmin = window.AegisAdmin || {};
 
   function base() {
     const host = window.location.hostname || '127.0.0.1';
-    return `http://${host}:8000`;
+    return `https://${host}:8000`;
   }
 
   function headers() {
@@ -53,5 +53,11 @@ window.AegisAdmin = window.AegisAdmin || {};
     return data;
   }
 
-  ns.api = { base, headers, request, getHistory, pushHistory, renderHistory };
+  async function loadOptions(path, mapper = (x) => x) {
+    const data = await request(path, { headers: headers() });
+    const items = Array.isArray(data.items) ? data.items : [];
+    return items.map(mapper);
+  }
+
+  ns.api = { base, headers, request, getHistory, pushHistory, renderHistory, loadOptions };
 })(window.AegisAdmin);

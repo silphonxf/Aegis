@@ -15,7 +15,21 @@ class System(Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     owner_user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     env: Mapped[str] = mapped_column(String(32), default="prod", nullable=False)
+    check_frequency: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    remark: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class SystemUserBinding(Base):
+    __tablename__ = "system_user_bindings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    system_id: Mapped[int] = mapped_column(Integer, ForeignKey("systems.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    binding_role: Mapped[str] = mapped_column(String(32), nullable=False)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class SystemStatusSnapshot(Base):

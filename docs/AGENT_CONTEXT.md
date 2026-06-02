@@ -1,6 +1,6 @@
 # Aegis 持久化上下文（给我下次快速接入）
 
-> 最后更新：2026-03-09  
+> 最后更新：2026-06-02  
 > 用途：避免每次都从零了解项目进度，5分钟内恢复工作上下文。
 
 ## 1. 项目定位
@@ -80,11 +80,22 @@ Aegis 是一个运维助手系统，包含：
 - [x] 补充 `backend/.env.example`
 - [ ] 按 `docs/phase1-development-plan.md` 推进第一阶段开发
 - [ ] 关键写库接口补充达梦集成测试
+- [x] 共享主数据第一优先级缺口补齐：机房、点位、资产共享字段与测试
 - [x] 补关键接口回归测试与 smoke 增强
 - [x] 整理本地开发脚本（up/stop/reset/status）
 - [ ] 完成第一阶段 C：工具箱 / 审批流闭环剩余交互与展示优化
 
 ## 7. 最近更新记录（倒序）
+
+
+### 2026-06-02
+- 接续 `docs/project-progress.md` 中“共享主数据模型收敛 + 管理端承接移动端配置源重构”的第一优先级
+- 新增迁移 `20260602_17_shared_point_system_nullable.py`，允许巡检点不强制绑定系统，只绑定机房/区域
+- 管理端资产列表与 CSV 导出补齐 `room_id/ip_address/port/connection_type/remark/updated_at` 等共享字段
+- 管理端机房列表补齐分页、`total`、启用状态返回与默认只查启用数据
+- 巡检点创建补齐 room/system 校验，移除缺省 `system_id=1` 硬编码
+- 管理端资产创建弹窗将系统、机房从手输 ID 改为共享主数据下拉
+- 已跑通：`./.venv/bin/pytest backend/tests/test_rooms_points.py backend/tests/test_admin_assets.py backend/tests/test_admin_systems.py backend/tests/test_inspections.py -q`（`11 passed`）
 
 ### 2026-05-14
 - 接续确认当前工作分支：`feat/ai-session-restore-test`

@@ -40,7 +40,7 @@ def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User 
             logger.warning("解析巡检点失败: system_id=%s 未找到巡检点", system_id)
             raise HTTPException(status_code=404, detail="找不到巡检点")
 
-        point_name = point.location or point.point_code
+        point_name = point.point_name or point.location_detail or point.location or point.point_code
         return {
             "point_id": point.id,
             "system_id": point.system_id,
@@ -48,6 +48,8 @@ def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User 
             "point_code": point.point_code,
             "point_name": point_name,
             "location": point.location,
+            "room_id": point.room_id,
+            "location_detail": point.location_detail,
         }
 
     # 兼容旧逻辑：二维码为完整 qr_content
@@ -57,7 +59,7 @@ def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User 
         raise HTTPException(status_code=404, detail="未找到对应巡检点")
 
     system = db.query(System).filter(System.id == point.system_id).first()
-    point_name = point.location or point.point_code
+    point_name = point.point_name or point.location_detail or point.location or point.point_code
     logger.info("解析巡检点成功: point_id=%s system_id=%s", point.id, point.system_id)
     return {
         "point_id": point.id,
@@ -66,6 +68,8 @@ def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User 
         "point_code": point.point_code,
         "point_name": point_name,
         "location": point.location,
+        "room_id": point.room_id,
+        "location_detail": point.location_detail,
     }
 
 
@@ -76,12 +80,15 @@ def create_record(
     current_user: User = Depends(require_roles("inspector", "admin", "super_admin")),
 ):
     logger.info("创建巡检记录: user=%s system_id=%s point_id=%s result=%s", current_user.username, payload.system_id, payload.point_id, payload.result)
+    point = db.query(InspectionPoint).filter(InspectionPoint.id == payload.point_id).first()
     rec = InspectionRecord(
         system_id=payload.system_id,
         point_id=payload.point_id,
+        room_id=payload.room_id or (point.room_id if point else None),
         inspector_id=current_user.id,
         result=payload.result,
         note=payload.note,
+        source=payload.source,
         inspected_at=payload.inspected_at,
     )
     db.add(rec)
@@ -130,8 +137,10 @@ def list_records(
                 "system_id": i.system_id,
                 "point_id": i.point_id,
                 "inspector_id": i.inspector_id,
+                "room_id": i.room_id,
                 "result": i.result,
                 "note": i.note,
+                "source": i.source,
                 "inspected_at": i.inspected_at,
             }
             for i in items

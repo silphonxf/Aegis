@@ -9,7 +9,7 @@ class StatusRuleUpdate(BaseModel):
     disk_warn: int = Field(ge=1, le=100)
     disk_critical: int = Field(ge=1, le=100)
 
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def validate_threshold_order(cls, values):
         if values.get("cpu_warn") >= values.get("cpu_critical"):
             raise ValueError("CPU 黄阈值必须小于红阈值")

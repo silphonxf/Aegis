@@ -127,7 +127,7 @@ def _resolve_time_range(quick_range: Optional[str], start_at: Optional[str], end
 def _level_keyword_pattern(level: str) -> str:
     level = (level or "warning").lower()
     if level == "info":
-        return r"INFO|WARNING|ERROR|CRITICAL|Exception|Traceback|\\[req:"
+        return r"INFO|WARNING|ERROR|CRITICAL|Exception|Traceback|\[req:"
     if level == "error":
         return r"ERROR|CRITICAL|Exception|Traceback"
     return r"WARNING|ERROR|CRITICAL|Exception|Traceback"
@@ -137,7 +137,7 @@ def _matches_time_range(line: str, start_dt: Optional[datetime], end_dt: Optiona
     if not (start_dt and end_dt):
         return True
     if len(line) < 16:
-        return False
+        return True
 
     parsed = None
     for candidate in (line[:19], line[:16]):
@@ -151,7 +151,7 @@ def _matches_time_range(line: str, start_dt: Optional[datetime], end_dt: Optiona
             break
 
     if not parsed:
-        return False
+        return True
     return start_dt <= parsed <= end_dt
 
 
@@ -162,7 +162,7 @@ def _collect_log_files(source: str) -> list[str]:
 
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
     logs_dir = os.path.join(repo_root, ".logs")
-    return [
+    candidates = [
         os.path.join(logs_dir, name)
         for name in [
             "backend.log",
@@ -174,6 +174,25 @@ def _collect_log_files(source: str) -> list[str]:
         ]
         if os.path.exists(os.path.join(logs_dir, name))
     ]
+
+    tmp_candidates = [
+        "/tmp/aegis-backend-https.log",
+        "/tmp/aegis-frontend-mobile-5173-https.log",
+        "/tmp/aegis-frontend-admin-5174-https.log",
+        "/tmp/aegis-frontend-mobile.log",
+        "/tmp/aegis-frontend-admin.log",
+        "/tmp/aegis-frontend-mobile-https.log",
+        "/tmp/aegis-frontend-admin-https.log",
+    ]
+    candidates.extend([path for path in tmp_candidates if os.path.exists(path)])
+
+    seen = set()
+    ordered = []
+    for path in candidates:
+        if path not in seen:
+            seen.add(path)
+            ordered.append(path)
+    return ordered
 
 
 def _read_selected_logs(source: str, file_name: Optional[str], level: str, start_dt: Optional[datetime], end_dt: Optional[datetime], lines: int) -> Tuple[str, str]:

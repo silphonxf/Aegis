@@ -7,7 +7,10 @@ class SystemCreate(BaseModel):
     system_code: str
     name: str
     owner_user_id: Optional[int] = None
+    owner_user_ids: List[int] = Field(default_factory=list)
     env: str = "prod"
+    check_frequency: Optional[str] = None
+    remark: Optional[str] = None
 
 
 class StatusSnapshotCreate(BaseModel):

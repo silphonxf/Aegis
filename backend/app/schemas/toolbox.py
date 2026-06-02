@@ -19,16 +19,16 @@ class RestartTaskRequest(BaseModel):
 
 
 class TaskStatusUpdateRequest(BaseModel):
-    status: str = Field(regex="^(approved|running|rejected|done|failed|cancelled)$")
+    status: str = Field(pattern="^(approved|running|rejected|done|failed|cancelled)$")
     note: Optional[str] = Field(default=None, max_length=255)
     executor: Optional[str] = Field(default=None, max_length=32)
 
 
 class ErrorLogSourceRequest(BaseModel):
-    source: str = Field(default="aegis", regex="^(aegis|system)$")
+    source: str = Field(default="aegis", pattern="^(aegis|system)$")
     file_name: Optional[str] = Field(default=None, max_length=128)
-    quick_range: Optional[str] = Field(default="1h", regex="^(1h|3h|6h)?$")
+    quick_range: Optional[str] = Field(default="1h", pattern="^(1h|3h|6h)?$")
     start_at: Optional[str] = Field(default=None, max_length=32)
     end_at: Optional[str] = Field(default=None, max_length=32)
-    level: str = Field(default="warning", regex="^(info|warning|error)$")
-    lines: int = Field(default=5000, ge=100, le=5000)
+    level: str = Field(default="warning", pattern="^(info|warning|error)$")
+    lines: int = Field(default=5000, ge=1, le=5000)

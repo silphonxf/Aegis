@@ -10,6 +10,7 @@ const onEvent = (id, eventName, handler) => {
 const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%230f2c44"/><circle cx="32" cy="24" r="12" fill="%236bd5ff"/><path d="M12 56c4-10 12-16 20-16s16 6 20 16" fill="%2338bdf8"/></svg>';
 const AI_CHAT_HISTORY_KEY = 'aegis_ai_chat_history';
 const AI_CHAT_CONVERSATION_KEY = 'aegis_ai_chat_conversation';
+const AI_CHAT_SIDEBAR_COLLAPSED_KEY = 'aegis_ai_chat_sidebar_collapsed';
 const ACTIVE_TAB_KEY = 'aegis_mobile_active_tab';
 const API_BASE_KEY = 'aegis_mobile_api_base';
 const AI_MAX_ATTACHMENTS = 4;
@@ -45,6 +46,10 @@ function loadActiveTab() {
   return value || 'tab-workbench';
 }
 
+function loadAiSidebarCollapsed() {
+  return localStorage.getItem(AI_CHAT_SIDEBAR_COLLAPSED_KEY) === '1';
+}
+
 function mapConversationMessagesToUi(messages) {
   if (!Array.isArray(messages) || !messages.length) return buildDefaultAiMessages();
   return messages
@@ -72,6 +77,7 @@ const state = {
   aiMessages: loadAiMessages(),
   aiConversationId: loadAiConversationId(),
   aiConversationItems: [],
+  aiSidebarCollapsed: loadAiSidebarCollapsed(),
   activeTab: loadActiveTab(),
   activeDetailPage: '',
   isAnalyzingErrors: false,
@@ -82,13 +88,13 @@ const state = {
 
 function getDefaultBase() {
   const host = window.location.hostname || '127.0.0.1';
-  const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
-  return `${protocol}://${host}:8000`;
+  return `https://${host}:8000`;
 }
 
 function getBase() {
   const configured = ($('apiBase')?.value || localStorage.getItem(API_BASE_KEY) || '').trim();
-  return configured || getDefaultBase();
+  if (configured) return configured;
+  return getDefaultBase();
 }
 
 function saveApiBase() {
@@ -184,7 +190,13 @@ function setLoginState(text) { $('loginState').textContent = text; }
 function initApiBaseInput() {
   const input = $('apiBase');
   if (!input) return;
-  input.value = localStorage.getItem(API_BASE_KEY) || getDefaultBase();
+  const stored = (localStorage.getItem(API_BASE_KEY) || '').trim();
+  const currentDefault = getDefaultBase();
+  const shouldResetTailnet = stored && /100\./.test(stored) && /192\.168\./.test(currentDefault);
+  input.value = shouldResetTailnet ? currentDefault : (stored || currentDefault);
+  if (shouldResetTailnet) {
+    localStorage.setItem(API_BASE_KEY, currentDefault);
+  }
   input.addEventListener('change', saveApiBase);
   input.addEventListener('blur', saveApiBase);
 }
@@ -402,6 +414,30 @@ function formatConversationTime(value) {
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function applyAiSidebarState() {
+  const shell = $('aiChatShell');
+  const toggleBtn = $('btnToggleAiSidebar');
+  const showBtn = $('btnShowAiSidebar');
+  if (!shell) return;
+  const isMobile = window.innerWidth <= 640;
+  shell.classList.toggle('sidebar-collapsed', state.aiSidebarCollapsed && !isMobile);
+  shell.classList.toggle('sidebar-expanded-mobile', !state.aiSidebarCollapsed && isMobile);
+  if (toggleBtn) {
+    toggleBtn.textContent = state.aiSidebarCollapsed ? '显示历史' : '隐藏历史';
+    toggleBtn.setAttribute('aria-expanded', String(!state.aiSidebarCollapsed));
+  }
+  if (showBtn) {
+    showBtn.classList.toggle('hidden', !state.aiSidebarCollapsed);
+    showBtn.setAttribute('aria-expanded', String(!state.aiSidebarCollapsed));
+  }
+}
+
+function setAiSidebarCollapsed(collapsed) {
+  state.aiSidebarCollapsed = Boolean(collapsed);
+  localStorage.setItem(AI_CHAT_SIDEBAR_COLLAPSED_KEY, state.aiSidebarCollapsed ? '1' : '0');
+  applyAiSidebarState();
+}
+
 function renderAiConversationList() {
   const box = $('aiConversationList');
   if (!box) return;
@@ -414,25 +450,75 @@ function renderAiConversationList() {
   box.classList.remove('hidden');
   box.innerHTML = state.aiConversationItems.map((item) => {
     const active = item.conversation_id === state.aiConversationId ? ' active' : '';
+    const preview = item.last_message || item.preview || item.summary || '暂无消息';
     return `
-      <div class="ai-conversation-item${active}">
+      <div class="ai-conversation-item${active}" data-ai-open-conversation="${escapeHtml(item.conversation_id)}">
         <div class="ai-conversation-item-head">
           <div class="ai-conversation-title">${escapeHtml(item.title || '新会话')}</div>
-          <button class="ai-conversation-open" data-ai-open-conversation="${escapeHtml(item.conversation_id)}">继续</button>
         </div>
-        <div class="ai-conversation-meta">${escapeHtml(item.source || 'mobile')} · ${escapeHtml(formatConversationTime(item.updated_at) || '')}</div>
+        <div class="ai-conversation-preview">${escapeHtml(preview)}</div>
+        <div class="ai-conversation-meta">${escapeHtml(formatConversationTime(item.updated_at) || '')}</div>
       </div>
     `;
   }).join('');
-  box.querySelectorAll('[data-ai-open-conversation]').forEach((btn) => {
-    btn.onclick = async () => {
-      state.aiConversationId = btn.dataset.aiOpenConversation || '';
+  box.querySelectorAll('[data-ai-open-conversation]').forEach((itemEl) => {
+    itemEl.onclick = async () => {
+      state.aiConversationId = itemEl.dataset.aiOpenConversation || '';
       saveAiMessages();
       await restoreAiConversationFromServer();
       renderAiConversationList();
+      if (window.innerWidth <= 640) setAiSidebarCollapsed(true);
     };
   });
   updateAiConversationMeta();
+}
+
+function renderKeyValueRows(items = []) {
+  return (items || []).map((item) => `
+    <div class="assistant-card-row">
+      <strong>${escapeHtml(item.label || item.system_name || item.result || '-')}</strong>
+      <span>${escapeHtml(item.value || item.status_color || item.inspected_at || item.checked_at || '-')}</span>
+    </div>
+  `).join('');
+}
+
+function renderAssistantCards(cards = []) {
+  if (!Array.isArray(cards) || !cards.length) return '';
+  return `<div class="assistant-cards">${cards.map((card) => {
+    if (card.type === 'system_status_overview') {
+      const items = (card.items || []).map((item) => `
+        <div class="assistant-card-row">
+          <strong>${escapeHtml(item.system_name || '-')}</strong>
+          <span>${escapeHtml(item.status_color || 'unknown')}</span>
+        </div>
+      `).join('');
+      return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '系统状态')}</div><div class="assistant-card-desc">${escapeHtml(card.summary || '')}</div>${items}</div>`;
+    }
+    if (card.type === 'system_detail') {
+      const detail = card.detail || {};
+      const snap = detail.status_snapshot || {};
+      return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || detail.system_name || '系统详情')}</div><div class="assistant-card-desc">编码：${escapeHtml(detail.system_code || '-')} · 环境：${escapeHtml(detail.env || '-')}</div>${renderKeyValueRows([
+        { label: '状态', value: snap.status_color || 'unknown' },
+        { label: 'CPU', value: snap.cpu_usage ?? '-' },
+        { label: '内存', value: snap.mem_usage ?? '-' },
+        { label: '磁盘', value: snap.disk_usage ?? '-' },
+      ])}</div>`;
+    }
+    if (card.type === 'inspection_records' || card.type === 'selfcheck_records' || card.type === 'log_suggestions' || card.type === 'assistant_capabilities' || card.type === 'log_analysis') {
+      const items = renderKeyValueRows(card.items || []);
+      return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '记录')}</div><div class="assistant-card-desc">${escapeHtml(card.summary || '')}</div>${items || '<div class="assistant-card-desc">暂无内容</div>'}</div>`;
+    }
+    if (card.type === 'pending_confirmation' || card.type === 'tool_task') {
+      const detail = card.detail || {};
+      return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '任务')}</div><div class="assistant-card-desc">${escapeHtml(JSON.stringify(detail))}</div></div>`;
+    }
+    return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '助手卡片')}</div></div>`;
+  }).join('')}</div>`;
+}
+
+function renderAssistantActions(actions = []) {
+  if (!Array.isArray(actions) || !actions.length) return '';
+  return `<div class="assistant-actions">${actions.map((action, index) => `<button class="ghost small" data-assistant-action="${index}">${escapeHtml(action.label || action.type || '操作')}</button>`).join('')}</div>`;
 }
 
 function renderAiMessages() {
@@ -448,10 +534,28 @@ function renderAiMessages() {
     const retry = item.failed && index === state.aiMessages.length - 1
       ? '<div style="margin-top:8px;"><button class="ghost small" id="btnRetryAiMessage">重试</button></div>'
       : '';
-    return `<div class="chat-bubble ${cls}${welcome}${pending}">${escapeHtml(item.text)}${attachments}${retry}</div>`;
+    const cards = item.role === 'ai' ? renderAssistantCards(item.cards) : '';
+    const actions = item.role === 'ai' ? renderAssistantActions(item.actions) : '';
+    return `<div class="chat-bubble ${cls}${welcome}${pending}">${escapeHtml(item.text)}${attachments}${cards}${actions}${retry}</div>`;
   }).join('');
   const retryBtn = $('btnRetryAiMessage');
   if (retryBtn) retryBtn.onclick = retryLastAiMessage;
+  box.querySelectorAll('[data-assistant-action]').forEach((btn) => {
+    btn.onclick = async () => {
+      const idx = Number(btn.dataset.assistantAction);
+      const aiItems = state.aiMessages.filter((item) => item.role === 'ai' && Array.isArray(item.actions) && item.actions.length);
+      const last = aiItems[aiItems.length - 1];
+      const action = last?.actions?.[idx];
+      if (!action) return;
+      if (action.type === 'confirm_action') {
+        await confirmAssistantAction(action.payload.action_id, true);
+      } else if (action.type === 'cancel_action') {
+        await confirmAssistantAction(action.payload.action_id, false);
+      } else {
+        await runAssistantOpenAction(action);
+      }
+    };
+  });
   saveAiMessages();
   updateAiConversationMeta();
   requestAnimationFrame(() => {
@@ -627,6 +731,69 @@ async function uploadAiAttachment(item) {
   return result.file;
 }
 
+async function appendAssistantResult(result, fallbackText = '操作已完成。') {
+  state.aiMessages.push({
+    role: 'ai',
+    text: result.reply || fallbackText,
+    cards: result.cards || [],
+    actions: result.actions || [],
+    data: result.data || {},
+  });
+  renderAiMessages();
+}
+
+async function confirmAssistantAction(actionId, confirmed) {
+  const result = await api('/api/v1/assistant/confirm', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      conversation_id: state.aiConversationId,
+      action_id: actionId,
+      confirmed,
+    }),
+    timeoutMs: 45000,
+  });
+
+  await appendAssistantResult(result, '操作已完成。');
+  $('aiQaResult').textContent = confirmed ? '助手已执行确认动作。' : '已取消执行。';
+}
+
+async function runAssistantQuickPrompt(message) {
+  if (!message) return;
+  $('aiQuestionInput').value = message;
+  await sendAiQuestion();
+}
+
+function resolveAssistantAction(action) {
+  const payload = action?.payload || {};
+  const type = action?.type || '';
+  if ((type === 'open_system_detail' || type === 'open_first_abnormal_system_detail') && payload.system_name) {
+    return { kind: 'message', message: `帮我看${payload.system_name}详情` };
+  }
+  if (type === 'open_inspection_records' && payload.system_name) {
+    return { kind: 'message', message: `看看${payload.system_name}最近巡检记录` };
+  }
+  if (type === 'open_selfcheck_records' && payload.system_name) {
+    return { kind: 'message', message: `看看${payload.system_name}最近自检记录` };
+  }
+  if (type === 'open_abnormal_systems') {
+    return { kind: 'message', message: '帮我查今天有哪些异常系统' };
+  }
+  if (['repeat_intent', 'quick_prompt', 'refresh_abnormal_systems', 'refresh_inspection_records', 'refresh_selfcheck_records'].includes(type) && payload.message) {
+    return { kind: 'message', message: payload.message };
+  }
+  return { kind: 'unsupported', message: '' };
+}
+
+async function runAssistantOpenAction(action) {
+  const resolved = resolveAssistantAction(action);
+  if (resolved.kind === 'message' && resolved.message) {
+    await runAssistantQuickPrompt(resolved.message);
+    return;
+  }
+  $('aiQaResult').textContent = `暂未接入动作：${action.label || action.type}`;
+}
+
 async function sendAiQuestion(reusePayload = null) {
   if (state.isSendingAiMessage) return;
   const inputEl = $('aiQuestionInput');
@@ -683,22 +850,44 @@ async function sendAiQuestion(reusePayload = null) {
       uploadedFiles,
     };
     $('aiQaResult').textContent = 'AI 回复中，请稍等...';
-    const result = await api('/api/v1/ai/chat/v2', {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify(payload),
-      timeoutMs: 45000,
-    });
+    const useAssistant = !uploadedFiles.length;
+    const result = useAssistant
+      ? await api('/api/v1/assistant/chat', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({
+            conversation_id: state.aiConversationId,
+            message: question,
+            attachments: [],
+            context: { page: 'mobile' },
+          }),
+          timeoutMs: 45000,
+        })
+      : await api('/api/v1/ai/chat/v2', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify(payload),
+          timeoutMs: 45000,
+        });
 
+    if (useAssistant && result.conversation_id) {
+      state.aiConversationId = result.conversation_id;
+    }
     const reply = formatAiReply(result);
     state.aiMessages = state.aiMessages.filter((item) => !item.pending);
     const hasUserBubble = state.aiMessages.some((item) => item.role === 'user' && item.text === (question || '请帮我分析这些附件。'));
     if (!hasUserBubble) {
       state.aiMessages.push({ role: 'user', text: question || '请帮我分析这些附件。', attachments: attachmentMeta });
     }
-    state.aiMessages.push({ role: 'ai', text: reply });
+    state.aiMessages.push({
+      role: 'ai',
+      text: reply,
+      cards: result.cards || [],
+      actions: result.actions || [],
+      data: result.data || {},
+    });
     renderAiMessages();
-    $('aiQaResult').textContent = 'AI 已返回结果。';
+    $('aiQaResult').textContent = useAssistant ? '助手已返回结构化结果。' : 'AI 已返回结果。';
     state.aiAttachments.forEach((item) => item.previewUrl && URL.revokeObjectURL(item.previewUrl));
     state.aiAttachments = [];
     renderAiAttachmentList();
@@ -1544,6 +1733,9 @@ function syncLogFileOptions() {
         { value: 'messages', label: 'messages' },
       ]
     : [
+        { value: 'aegis-backend-https.log', label: 'aegis-backend-https.log（当前后端 HTTPS）' },
+        { value: 'aegis-frontend-mobile-5173-https.log', label: 'aegis-frontend-mobile-5173-https.log（当前移动端 HTTPS）' },
+        { value: 'aegis-frontend-admin-5174-https.log', label: 'aegis-frontend-admin-5174-https.log（当前管理端 HTTPS）' },
         { value: 'backend.log', label: 'backend.log' },
         { value: 'backend-https.log', label: 'backend-https.log' },
         { value: 'frontend-mobile.log', label: 'frontend-mobile.log' },
@@ -1631,7 +1823,7 @@ if ($('errorLogLevel')) {
 if ($('errorSource')) {
   $('errorSource').value = 'aegis';
   syncLogFileOptions();
-  if ($('errorFileName')) $('errorFileName').value = 'backend.log';
+  if ($('errorFileName')) $('errorFileName').value = 'aegis-backend-https.log';
 }
 updateTimeSummary();
 document.querySelectorAll('.result-tab-btn').forEach((btn) => {
@@ -1755,23 +1947,16 @@ onClick('btnNewAiChat', () => {
   saveAiMessages();
   renderAiMessages();
   renderAiConversationList();
+  if (window.innerWidth <= 640) setAiSidebarCollapsed(true);
   $('aiQaResult').textContent = '已开启新会话。';
 });
-onClick('btnClearAiChat', () => {
-  state.aiMessages = buildDefaultAiMessages();
-  state.lastAiRequestPayload = null;
-  sessionStorage.removeItem(AI_CHAT_HISTORY_KEY);
-  renderAiAttachmentList();
-  saveAiMessages();
-  renderAiMessages();
-  renderAiConversationList();
-  $('aiQaResult').textContent = state.aiConversationId ? '已清空本地展示；再次进入会话时会按服务端记录恢复。' : '已清空当前 AI 会话。';
+onClick('btnToggleAiSidebar', () => {
+  setAiSidebarCollapsed(!state.aiSidebarCollapsed);
 });
-
-onClick('btnRefreshAiConversations', async () => {
-  const items = await refreshAiConversationList();
-  $('aiQaResult').textContent = items.length ? `已刷新最近会话，共 ${items.length} 条。` : '暂无最近会话记录。';
+onClick('btnShowAiSidebar', () => {
+  setAiSidebarCollapsed(false);
 });
+window.addEventListener('resize', applyAiSidebarState);
 onEvent('aiQuestionInput', 'keydown', (event) => {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
@@ -1784,6 +1969,7 @@ bindEmergencyToolActions();
 bindCaptureToolActions();
 renderAiMessages();
 renderAiAttachmentList();
+applyAiSidebarState();
 initApiBaseInput();
 applyProfileUI();
 setLoginState('未登录');

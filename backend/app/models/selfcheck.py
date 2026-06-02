@@ -26,4 +26,7 @@ class SelfcheckRecord(Base):
     operator_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     result: Mapped[str] = mapped_column(String(16), nullable=False)
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    review_status: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    reviewed_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     checked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)

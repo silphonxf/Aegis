@@ -15,6 +15,9 @@ class SelfcheckRecordCreate(BaseModel):
     template_id: int
     result: Literal["normal", "warning", "critical"]
     summary: Optional[str] = None
+    review_status: Optional[Literal["pending", "reviewed"]] = None
+    reviewed_by: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
     checked_at: datetime
 
 

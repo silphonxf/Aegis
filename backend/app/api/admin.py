@@ -15,11 +15,15 @@ from app.core.security import get_password_hash
 from app.db.session import get_db
 from app.models.asset import Asset
 from app.models.audit import AuditLog
-from app.models.system import System
+from app.models.inspection import InspectionPoint
+from app.models.shared_data import Room
+from app.models.system import System, SystemUserBinding
 from app.models.user import Role, User
 from app.schemas.admin import (
     BatchCreateAssetsRequest,
     CreateAssetRequest,
+    CreateInspectionPointRequest,
+    CreateRoomRequest,
     CreateUserRequest,
     ThreatIntelBlockRequest,
     ThreatIntelQueryRequest,
@@ -32,6 +36,7 @@ from app.schemas.emergency_config import (
     EmergencySshHostSaveRequest,
 )
 from app.services.emergency_config import (
+    import_emergency_json_to_db,
     list_public_config,
     upsert_db_action,
     upsert_process_action,
@@ -93,7 +98,7 @@ def list_users(
         "size": size,
         "total": total,
         "items": [
-            {"id": u.id, "username": u.username, "role": u.role.code, "is_active": u.is_active}
+            {"id": u.id, "username": u.username, "role": u.role.code, "role_code": u.role.code, "is_active": u.is_active}
             for u in users
         ],
     }
@@ -135,11 +140,27 @@ def list_systems(
     total = q.count()
     items = q.offset((page - 1) * size).limit(size).all()
     logger.info("查询系统列表完成: total=%s returned=%s", total, len(items))
+    binding_rows = db.query(SystemUserBinding).filter(SystemUserBinding.binding_role == "owner").all()
+    owner_map = {}
+    for row in binding_rows:
+        owner_map.setdefault(row.system_id, []).append(row.user_id)
     return {
         "page": page,
         "size": size,
         "total": total,
-        "items": [{"id": i.id, "system_code": i.system_code, "name": i.name, "env": i.env} for i in items],
+        "items": [
+            {
+                "id": i.id,
+                "system_code": i.system_code,
+                "name": i.name,
+                "env": i.env,
+                "owner_user_id": i.owner_user_id,
+                "owner_user_ids": owner_map.get(i.id, []),
+                "check_frequency": getattr(i, "check_frequency", None),
+                "remark": getattr(i, "remark", None),
+            }
+            for i in items
+        ],
     }
 
 
@@ -153,13 +174,30 @@ def create_system(
     if db.query(System).filter(System.system_code == payload.system_code).first():
         raise HTTPException(status_code=409, detail={"code": "SYSTEM_CODE_EXISTS", "message": "系统编号已存在"})
 
+    primary_owner_id = payload.owner_user_id or (payload.owner_user_ids[0] if payload.owner_user_ids else None)
     system = System(
         system_code=payload.system_code,
         name=payload.name,
-        owner_user_id=payload.owner_user_id,
+        owner_user_id=primary_owner_id,
         env=payload.env,
+        check_frequency=payload.check_frequency,
+        remark=payload.remark,
     )
     db.add(system)
+    db.flush()
+
+    owner_ids = []
+    for uid in ([primary_owner_id] if primary_owner_id else []) + list(payload.owner_user_ids):
+        if uid and uid not in owner_ids:
+            owner_ids.append(uid)
+    for index, uid in enumerate(owner_ids):
+        db.add(SystemUserBinding(
+            system_id=system.id,
+            user_id=uid,
+            binding_role="owner",
+            is_primary=(index == 0),
+        ))
+
     db.commit()
     db.refresh(system)
     logger.info("创建系统成功: system_id=%s system_code=%s", system.id, system.system_code)
@@ -271,9 +309,15 @@ def list_assets(
                 "name": a.name,
                 "category": a.category,
                 "system_id": a.system_id,
+                "room_id": a.room_id,
                 "location": a.location,
+                "ip_address": a.ip_address,
+                "port": a.port,
+                "connection_type": a.connection_type,
                 "status": a.status,
+                "remark": a.remark,
                 "created_at": a.created_at,
+                "updated_at": a.updated_at,
             }
             for a in items
         ],
@@ -292,9 +336,37 @@ def export_assets_csv(
     q = _asset_query(db, system_id, category, status, keyword)
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(["id", "asset_code", "name", "category", "system_id", "location", "status", "created_at"])
+    writer.writerow([
+        "id",
+        "asset_code",
+        "name",
+        "category",
+        "system_id",
+        "room_id",
+        "location",
+        "ip_address",
+        "port",
+        "connection_type",
+        "status",
+        "remark",
+        "created_at",
+    ])
     for a in q.order_by(Asset.id.desc()).all():
-        writer.writerow([a.id, a.asset_code, a.name, a.category, a.system_id, a.location or "", a.status, a.created_at])
+        writer.writerow([
+            a.id,
+            a.asset_code,
+            a.name,
+            a.category,
+            a.system_id or "",
+            a.room_id or "",
+            a.location or "",
+            a.ip_address or "",
+            a.port or "",
+            a.connection_type or "",
+            a.status,
+            a.remark or "",
+            a.created_at,
+        ])
 
     output.seek(0)
     return StreamingResponse(
@@ -330,13 +402,122 @@ def create_asset(
     if db.query(Asset).filter(Asset.asset_code == payload.asset_code).first():
         raise HTTPException(status_code=400, detail={"code": "ASSET_EXISTS", "message": "资产编码已存在"})
 
-    asset = Asset(**payload.model_dump())
+    asset = Asset(**payload.dict())
     db.add(asset)
     db.commit()
     db.refresh(asset)
     logger.info("创建资产成功: asset_id=%s asset_code=%s", asset.id, asset.asset_code)
     log_action(db, "create_asset", "asset", current_user, {"asset_id": asset.id, "asset_code": asset.asset_code})
     return {"id": asset.id}
+
+
+@router.get("/rooms")
+def list_rooms(
+    page: int = 1,
+    size: int = 200,
+    include_inactive: bool = False,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    page = max(page, 1)
+    size = min(max(size, 1), 500)
+    q = db.query(Room)
+    if not include_inactive:
+        q = q.filter(Room.is_active.is_(True))
+    total = q.count()
+    items = q.order_by(Room.id.asc()).offset((page - 1) * size).limit(size).all()
+    return {
+        "page": page,
+        "size": size,
+        "total": total,
+        "items": [
+            {
+                "id": item.id,
+                "room_code": item.room_code,
+                "room_name": item.room_name,
+                "building": item.building,
+                "floor": item.floor,
+                "location_detail": item.location_detail,
+                "remark": item.remark,
+                "is_active": item.is_active,
+                "created_at": item.created_at,
+                "updated_at": item.updated_at,
+            }
+            for item in items
+        ],
+    }
+
+
+@router.post("/rooms")
+def create_room(
+    payload: CreateRoomRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    if db.query(Room).filter(Room.room_code == payload.room_code).first():
+        raise HTTPException(status_code=400, detail={"code": "ROOM_EXISTS", "message": "机房编码已存在"})
+    room = Room(**payload.dict())
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+    log_action(db, "create_room", "room", current_user, {"room_id": room.id, "room_code": room.room_code})
+    return {"id": room.id}
+
+
+@router.get("/inspection-points")
+def list_inspection_points(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    items = db.query(InspectionPoint).order_by(InspectionPoint.id.asc()).all()
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "room_id": item.room_id,
+                "system_id": item.system_id,
+                "point_code": item.point_code,
+                "point_name": item.point_name,
+                "point_type": item.point_type,
+                "qr_content": item.qr_content,
+                "nfc_tag": item.nfc_tag,
+                "location_detail": item.location_detail,
+                "is_active": item.is_active,
+            }
+            for item in items
+        ]
+    }
+
+
+@router.post("/inspection-points")
+def create_inspection_point(
+    payload: CreateInspectionPointRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    if db.query(InspectionPoint).filter(InspectionPoint.point_code == payload.point_code).first():
+        raise HTTPException(status_code=400, detail={"code": "POINT_EXISTS", "message": "巡检点编码已存在"})
+    if not db.query(Room).filter(Room.id == payload.room_id, Room.is_active.is_(True)).first():
+        raise HTTPException(status_code=400, detail={"code": "ROOM_NOT_FOUND", "message": "机房不存在或已停用"})
+    if payload.system_id is not None and not db.query(System).filter(System.id == payload.system_id).first():
+        raise HTTPException(status_code=400, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在"})
+    point = InspectionPoint(
+        room_id=payload.room_id,
+        system_id=payload.system_id,
+        point_code=payload.point_code,
+        point_name=payload.point_name,
+        point_type=payload.point_type,
+        qr_content=payload.qr_content or payload.point_code,
+        nfc_tag=payload.nfc_tag,
+        location_detail=payload.location_detail,
+        is_active=payload.is_active,
+        location=payload.location_detail,
+    )
+    db.add(point)
+    db.commit()
+    db.refresh(point)
+    log_action(db, "create_inspection_point", "inspection_point", current_user, {"point_id": point.id, "point_code": point.point_code})
+    return {"id": point.id}
 
 
 @router.post("/assets/batch")
@@ -370,7 +551,7 @@ def batch_create_assets(
         if item.asset_code in existing_codes:
             skipped.append({"asset_code": item.asset_code, "reason": "ASSET_EXISTS"})
             continue
-        asset = Asset(**item.model_dump())
+        asset = Asset(**item.dict())
         db.add(asset)
         db.flush()
         created.append({"id": asset.id, "asset_code": asset.asset_code})
@@ -478,9 +659,10 @@ async def query_ip_reputation_excel(
 
 @router.get("/emergency-config")
 def get_emergency_config(
+    db: Session = Depends(get_db),
     _: User = Depends(require_roles("super_admin")),
 ):
-    return list_public_config()
+    return list_public_config(db)
 
 
 @router.post("/emergency-config/ssh-hosts")
@@ -489,7 +671,7 @@ def save_emergency_ssh_host(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("super_admin")),
 ):
-    item = upsert_ssh_host(payload)
+    item = upsert_ssh_host(payload, db=db)
     log_action(db, "save_emergency_ssh_host", "emergency_config", current_user, {"host_code": payload.host_code})
     return item
 
@@ -500,7 +682,7 @@ def save_emergency_server_action(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("super_admin")),
 ):
-    item = upsert_server_action(payload)
+    item = upsert_server_action(payload, db=db)
     log_action(db, "save_emergency_server_action", "emergency_config", current_user, {"action_code": payload.action_code})
     return item
 
@@ -511,7 +693,7 @@ def save_emergency_db_action(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("super_admin")),
 ):
-    item = upsert_db_action(payload)
+    item = upsert_db_action(payload, db=db)
     log_action(db, "save_emergency_db_action", "emergency_config", current_user, {"action_code": payload.action_code})
     return item
 
@@ -522,9 +704,19 @@ def save_emergency_process_action(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("super_admin")),
 ):
-    item = upsert_process_action(payload)
+    item = upsert_process_action(payload, db=db)
     log_action(db, "save_emergency_process_action", "emergency_config", current_user, {"action_code": payload.action_code})
     return item
+
+
+@router.post("/emergency-config/import-json")
+def import_emergency_config_json(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+):
+    result = import_emergency_json_to_db(db)
+    log_action(db, "import_emergency_config_json", "emergency_config", current_user, result)
+    return result
 
 
 @router.post("/threat-intel/block-ip")

@@ -6,6 +6,41 @@
 - 当前重点：Aegis AI 能力已从 skeleton/mock 联调推进到真实 OpenClaw 接入，并完成阶段2第一版附件引用式链路与移动端 AI 体验收尾
 - 当前开发路线：`docs/phase1-development-plan.md`
 
+
+## 本次新增进展（2026-06-02）
+
+### 0) 共享主数据第一优先级缺口补齐
+
+已完成：
+- 巡检点 `system_id` 调整为可空，支持“只绑定机房/区域”的共享点位模型
+- 新增迁移：`backend/alembic/versions/20260602_17_shared_point_system_nullable.py`
+- 管理端资产列表与 CSV 导出补齐共享字段：
+  - `room_id`
+  - `ip_address`
+  - `port`
+  - `connection_type`
+  - `remark`
+  - `updated_at`
+- 管理端机房列表补齐分页、`total` 与 `is_active` 过滤语义
+- 管理端巡检点创建补齐校验：
+  - 机房必须存在且启用
+  - 传入系统时系统必须存在
+  - 不再把缺省 `system_id` 硬编码为 `1`
+- 管理端新增资产弹窗中，系统与机房字段从手输 ID 收敛为共享主数据下拉
+- 新增/补强回归测试：
+  - 机房列表分页与启用状态返回
+  - 只绑定机房的巡检点创建
+  - 缺失机房的巡检点创建拒绝
+  - 资产共享字段列表返回与 CSV 导出
+
+验证结果：
+- `./.venv/bin/pytest backend/tests/test_rooms_points.py backend/tests/test_admin_assets.py -q` → `7 passed`
+- `./.venv/bin/pytest backend/tests/test_rooms_points.py backend/tests/test_admin_assets.py backend/tests/test_admin_systems.py backend/tests/test_inspections.py -q` → `11 passed`
+
+当前剩余：
+- 继续把系统负责人、机房、点位、资产的管理端页面做成完整 CRUD，而不是只提供创建/列表
+- 后续将 `emergency_hosts` / `runbooks` 与系统、机房、资产下拉做正式联动
+
 ## 本次新增进展（2026-05-14）
 
 ### 0) 应急处置移动端前端骨架与管理端配置方案初稿
@@ -380,14 +415,88 @@
 补充说明：
 - 模块结构说明见：`frontend-admin/js/README.md`
 
+## 当前补充进展（2026-05-27）
+
+### 管理端 V2 重构主线重新定位完成
+
+已重新扫描并对齐以下文档与实现：
+- `docs/emergency-ops-admin-design.md`
+- `docs/admin-console-v2-frontend-implementation.md`
+- `frontend-admin/index.html`
+- `backend/app/models/*`
+- `backend/app/api/admin.py`
+- `backend/app/api/inspections.py`
+- `backend/app/api/systems.py`
+- `frontend-mobile/app.js`
+
+本次确认的重构原则：
+- 管理端不是独立业务端，而是移动端的**配置界面 + 审阅界面**
+- 系统 / 用户 / 机房 / 巡检点 / 应急处置目标数据必须是**两端共享主数据**
+- 后续应急处置配置（SSH 主机 / 服务器动作 / 数据库动作 / 进程动作）本质上都是为了移动端应急处置入口服务
+- 用户侧已进一步确认：`users` 不再补扩展字段，且现有 `nickname` 可移除；`systems` 按共享主数据目标方案改造，并立即引入系统-用户关联表
+
+当前已识别出的实现差异：
+
+1. **系统负责人模型仍偏单负责人**
+- 当前 `systems.owner_user_id` 只能挂单人
+- 与设计文档中的“系统负责人支持多选 / 多班次交接”不一致
+- 后续应收敛为系统-用户多对多关系，而不是单个 owner 字段
+
+2. **机房主数据尚未独立成表**
+- 当前巡检点 `inspection_points` 仍以 `location` 字符串承载位置语义
+- 资产 `assets.location` 也仍为字符串
+- 这会导致机房、资产、巡检点、二维码/NFC 点位无法做强关联
+
+3. **移动端已在真实消费共享数据，但管理端主数据还没完全收口**
+- 移动端巡检当前依赖：`system_id`、`point_id`、二维码解析结果
+- 管理端已经开始承接“机房巡检配置与记录”“基础数据录入”工作台
+- 但后端层还缺真正的机房/点位/系统负责人共享主模型
+
+4. **应急处置配置当前仍是独立 JSON 配置态**
+- `app/services/emergency_config.py` 当前基于 `config/emergency_ops.json`
+- 适合联调占位，但还不满足后续“按系统 / 主机 / 机房 / 角色 / 移动端入口”联动的正式形态
+
+当前判断：
+- 上一轮工作并不是停在纯前端视觉骨架
+- 真正的下一步应转入：**共享主数据模型收敛 + 管理端承接移动端配置源重构**
+
+建议的下一步落地顺序：
+
+### 第一优先级：先收主数据模型
+建议补齐或重构为以下共享实体：
+- `users`
+- `systems`
+- `rooms`（机房/区域）
+- `system_user_bindings`（系统-用户多对多，区分负责人/值班/审阅角色）
+- `assets`
+- `inspection_points`（绑定 `room_id`，必要时再挂 `system_id`）
+- `emergency_hosts` / `runbooks` / `runbook_bindings`（后续替代当前 JSON 配置）
+
+### 第二优先级：再改管理端承接页
+围绕移动端配置源改造：
+- 系统页：负责人多选、运行服务器、检查频次、关联预案
+- 机房页：机房主数据、二维码/NFC 点位、巡检记录审阅
+- 基础数据页：用户、服务器、资产统一为共享下拉源
+
+### 第三优先级：最后把应急处置配置正式入库
+目标是让管理端配置：
+- SSH 主机
+- 服务器动作
+- 数据库动作
+- 进程动作
+
+再由移动端按场景消费：
+- 主机名 / IP / 动作按钮 / 审批状态 / 执行结果
+
 ## 下一步建议
 
 ### 第一优先级
-- 完成 D 分支的收尾整理与联调验证
-- 将当前模块拆分成果推送并等待用户 review / merge
+- 输出一版“现状表结构 → 目标共享表结构”的最小迁移方案
+- 明确哪些字段保留兼容，哪些字段需要迁移/废弃
 
 ### 第二优先级
-- 回到 C 分支继续完善工具任务交互细节（如需）
+- 为管理端 / 移动端补共享主数据接口草案
+- 优先覆盖：系统负责人、机房、巡检点、服务器基础数据
 
 ### 第三优先级
-- 进入下一轮功能开发时，继续沿用功能分支工作流
+- 将当前 JSON 版应急处置配置设计为可迁移到数据库的正式模型

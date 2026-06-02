@@ -1,7 +1,11 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Set, Tuple
 from pydantic import validator
-from pydantic import BaseSettings
+
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):

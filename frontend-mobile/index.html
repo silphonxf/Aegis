@@ -458,31 +458,37 @@
             <button class="ghost small" data-close-page>返回</button>
             <h2>AI 问答</h2>
           </div>
-          <div class="ai-chat-layout detail-body">
-            <div id="aiChatMessages" class="ai-chat-messages">
-              <div class="chat-bubble ai welcome">
-                你好，我是 Aegis AI 助手。你可以直接提问，也可以上传图片或文件让我一起分析。
+          <div id="aiChatShell" class="ai-chat-shell detail-body">
+            <aside id="aiSessionSidebar" class="ai-session-sidebar">
+              <div class="ai-sidebar-topbar">
+                <button id="btnNewAiChat" class="ai-session-new">+ 开启新会话</button>
+                <button id="btnToggleAiSidebar" class="ghost small ai-sidebar-toggle" type="button" aria-expanded="true" aria-controls="aiSessionSidebar">隐藏历史</button>
               </div>
-            </div>
-            <div class="ai-toolbar">
+              <div id="aiConversationList" class="ai-conversation-list"></div>
+            </aside>
+            <section class="ai-chat-main">
+              <div class="ai-chat-main-topbar">
+                <button id="btnShowAiSidebar" class="ghost small ai-sidebar-show hidden" type="button" aria-expanded="false" aria-controls="aiSessionSidebar">会话历史</button>
+              </div>
+              <div id="aiChatMessages" class="ai-chat-messages">
+                <div class="chat-bubble ai welcome">
+                  你好，我是 Aegis AI 助手。你可以直接提问，也可以上传图片或文件让我一起分析。
+                </div>
+              </div>
+              <div id="aiAttachmentList" class="attachment-list"></div>
+              <div class="ai-composer">
+                <input id="aiFileInput" type="file" accept="image/*,.txt,.log,.json,.csv,.md,.pdf,.doc,.docx,.xls,.xlsx" multiple hidden />
+                <div class="ai-composer-input-wrap">
+                  <textarea id="aiQuestionInput" rows="3" placeholder="输入消息，支持添加图片和附件"></textarea>
+                  <div class="ai-composer-bottom">
+                    <label class="upload-trigger" for="aiFileInput">添加附件</label>
+                    <button id="btnSendAiQuestion" class="ai-send-btn">发送</button>
+                  </div>
+                </div>
+              </div>
               <div id="aiConversationMeta" class="hint">当前会话将保留最近聊天记录，便于连续追问。</div>
-              <div class="ai-toolbar-actions">
-                <button id="btnRefreshAiConversations" class="ghost small">最近会话</button>
-                <button id="btnNewAiChat" class="ghost small">新会话</button>
-                <button id="btnClearAiChat" class="ghost small">清空会话</button>
-              </div>
-            </div>
-            <div id="aiConversationList" class="ai-conversation-list hidden"></div>
-            <div id="aiAttachmentList" class="attachment-list"></div>
-            <div class="ai-composer card-inline">
-              <label class="upload-trigger" for="aiFileInput">上传图片/文件</label>
-              <input id="aiFileInput" type="file" accept="image/*,.txt,.log,.json,.csv,.md,.pdf,.doc,.docx,.xls,.xlsx" multiple hidden />
-              <textarea id="aiQuestionInput" rows="3" placeholder="输入你的问题，或描述你想让 AI 帮你分析的内容"></textarea>
-              <div class="actions one">
-                <button id="btnSendAiQuestion">发送给 AI</button>
-              </div>
-            </div>
-            <div id="aiQaResult" class="hint">支持纯文字问答，也支持带附件一起发起分析。</div>
+              <div id="aiQaResult" class="hint">支持纯文字问答，也支持带附件一起发起分析。</div>
+            </section>
           </div>
         </section>
 

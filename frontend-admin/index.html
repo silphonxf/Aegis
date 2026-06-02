@@ -21,62 +21,59 @@
 
   <div id="appView" class="app-shell hidden">
     <aside class="sidebar">
-      <div>
-        <h2>运维助手</h2>
-        <p class="subtitle">Admin Console</p>
+      <div class="sidebar-brand">
+        <div class="brand-mark">A</div>
+        <div>
+          <h2>运维助手</h2>
+          <p class="subtitle">Admin Console</p>
+        </div>
       </div>
       <nav class="menu-tree">
         <div class="menu-group active" data-group="dashboard">
           <button class="menu-btn group-btn active" data-group-target="dashboard">
-            <span class="menu-icon">📊</span><span class="menu-label">总览看板</span>
+            <span class="menu-icon">📊</span><span class="menu-label">监控大盘</span>
           </button>
           <div class="submenu-list active">
             <button class="submenu-btn active" data-view="view-dashboard-overview">运行总览</button>
           </div>
         </div>
 
-        <div class="menu-group" data-group="organization">
-          <button class="menu-btn group-btn" data-group-target="organization">
-            <span class="menu-icon">👥</span><span class="menu-label">用户与系统</span>
+        <div class="menu-group" data-group="ops-workbench">
+          <button class="menu-btn group-btn" data-group-target="ops-workbench">
+            <span class="menu-icon">🗂️</span><span class="menu-label">资产与日常运维</span>
           </button>
           <div class="submenu-list">
-            <button class="submenu-btn" data-view="view-users">用户管理</button>
-            <button class="submenu-btn" data-view="view-systems">系统管理</button>
-          </div>
-        </div>
-
-        <div class="menu-group" data-group="assets">
-          <button class="menu-btn group-btn" data-group-target="assets">
-            <span class="menu-icon">🗂️</span><span class="menu-label">资产管理</span>
-          </button>
-          <div class="submenu-list">
-            <button class="submenu-btn" data-view="view-assets">资产录入与查询</button>
-          </div>
-        </div>
-
-        <div class="menu-group" data-group="tools">
-          <button class="menu-btn group-btn" data-group-target="tools">
-            <span class="menu-icon">🧰</span><span class="menu-label">高级工具</span>
-          </button>
-          <div class="submenu-list">
-            <button class="submenu-btn" data-view="view-tool-ops">运维审批</button>
-            <button class="submenu-btn" data-view="view-tool-ai">AI诊断</button>
+            <button class="submenu-btn" data-view="view-ops-workbench">综合工作台</button>
+            <button class="submenu-btn" data-view="view-systems">系统自检配置与记录</button>
+            <button class="submenu-btn" data-view="view-assets">基础数据录入</button>
+            <button class="submenu-btn" data-view="view-users">用户数据维护</button>
             <button class="submenu-btn" data-view="view-tool-template">模板与快照</button>
-            <button class="submenu-btn" data-view="view-tool-rules">规则与审计</button>
-            <button class="submenu-btn" data-view="view-tool-threatbook">高危IP研判</button>
-            <button class="submenu-btn" data-view="view-tool-debug">调试与错误码</button>
           </div>
         </div>
 
-        <div class="menu-group" data-group="emergency-config">
-          <button class="menu-btn group-btn" data-group-target="emergency-config">
-            <span class="menu-icon">🚨</span><span class="menu-label">应急处置配置</span>
+        <div class="menu-group" data-group="runbook">
+          <button class="menu-btn group-btn" data-group-target="runbook">
+            <span class="menu-icon">🚨</span><span class="menu-label">应急预案配置</span>
           </button>
           <div class="submenu-list">
+            <button class="submenu-btn" data-view="view-runbook-console">预案脚本库总览</button>
             <button class="submenu-btn" data-view="view-emergency-ssh">SSH 主机配置</button>
             <button class="submenu-btn" data-view="view-emergency-server">服务器动作配置</button>
             <button class="submenu-btn" data-view="view-emergency-db">数据库动作配置</button>
             <button class="submenu-btn" data-view="view-emergency-process">进程动作配置</button>
+          </div>
+        </div>
+
+        <div class="menu-group" data-group="approval-audit">
+          <button class="menu-btn group-btn" data-group-target="approval-audit">
+            <span class="menu-icon">🧾</span><span class="menu-label">运维审批与审计</span>
+          </button>
+          <div class="submenu-list">
+            <button class="submenu-btn" data-view="view-tool-ops">运维审批</button>
+            <button class="submenu-btn" data-view="view-tool-rules">规则与审计</button>
+            <button class="submenu-btn" data-view="view-tool-ai">AI诊断</button>
+            <button class="submenu-btn" data-view="view-tool-threatbook">高危IP研判</button>
+            <button class="submenu-btn" data-view="view-tool-debug">调试与错误码</button>
           </div>
         </div>
       </nav>
@@ -86,6 +83,7 @@
     <main class="workspace">
       <header class="workspace-header">
         <div>
+          <div class="header-eyebrow">Aegis 管理控制台</div>
           <h1>管理工作台 <span class="badge">v2.1 Tech</span></h1>
           <p id="currentViewDesc" class="view-desc">查看系统运行状态、资产统计与关键指标。</p>
         </div>
@@ -95,6 +93,21 @@
           <span id="lastUpdated" class="last-updated">最近更新：--</span>
         </div>
       </header>
+
+      <section class="control-strip">
+        <div class="control-chip">
+          <span>当前模块</span>
+          <strong id="controlStripView">运行总览</strong>
+        </div>
+        <div class="control-chip">
+          <span>刷新状态</span>
+          <strong id="controlStripRefresh">自动刷新</strong>
+        </div>
+        <div class="control-chip">
+          <span>控制台风格</span>
+          <strong>深色运维态</strong>
+        </div>
+      </section>
 
       <section id="view-dashboard-overview" class="view-panel active" data-view-title="运行总览" data-view-desc="查看系统运行状态、资产统计与关键指标。">
         <section class="card">
@@ -172,18 +185,43 @@
         </section>
       </section>
 
-      <section id="view-users" class="view-panel" data-view-title="用户管理" data-view-desc="新增、检索和维护后台用户账号。">
+      <section id="view-users" class="view-panel" data-view-title="用户与角色配置" data-view-desc="维护移动端与管理端共用的用户主数据、角色与后续负责人配置。">
         <section class="card narrow-card">
           <div class="section-head">
             <div>
-              <h2>用户管理</h2>
-              <p class="muted">默认展示全量结果，需要时再用关键词过滤。</p>
+              <h2>用户与角色配置</h2>
+              <p class="muted">这里维护的是移动端与管理端共用的一张用户表。后续负责人分配、审批人、巡检/自检填报人都应从这里统一取数。</p>
+            </div>
+            <div class="summary-strip compact-summary-strip">
+              <div class="summary-card"><span>移动端对应</span><strong>登录 / 填报人 / 负责人</strong></div>
+              <div class="summary-card"><span>管理端对应</span><strong>配置 / 审阅 / 审批</strong></div>
+              <div class="summary-card"><span>共享主数据</span><strong>同一张用户表</strong></div>
             </div>
           </div>
           <div class="search-toolbar">
             <input id="userSearchKeyword" class="search-input" placeholder="搜索用户名 / 账号关键字" />
             <button id="btnFindUsers" class="toolbar-btn">搜索</button>
-            <button id="btnOpenCreateUserModal" class="toolbar-btn secondary">新增</button>
+            <button id="btnOpenCreateUserModal" class="toolbar-btn secondary">新增用户配置</button>
+          </div>
+          <div class="grid2 ops-workbench-guide">
+            <div class="mini-panel">
+              <strong>给移动端提供的用户数据</strong>
+              <ul class="mini-list">
+                <li>登录账号</li>
+                <li>巡检 / 自检填报人</li>
+                <li>系统负责人 / 审批相关人</li>
+                <li>后续联系方式展示</li>
+              </ul>
+            </div>
+            <div class="mini-panel">
+              <strong>管理端审阅与配置职责</strong>
+              <ul class="mini-list">
+                <li>维护系统角色</li>
+                <li>后续维护负责系统范围</li>
+                <li>支持交接与权限调整</li>
+                <li>作为审批流人员来源</li>
+              </ul>
+            </div>
           </div>
           <div id="userListSummary" class="result-line">默认全量查询</div>
           <div class="table-wrap">
@@ -195,35 +233,60 @@
         </section>
       </section>
 
-      <section id="view-systems" class="view-panel" data-view-title="系统管理" data-view-desc="维护系统主数据与环境信息。">
+      <section id="view-systems" class="view-panel" data-view-title="系统自检配置与记录" data-view-desc="为移动端系统状态、自检提交与异常审阅提供系统主数据配置。">
         <section class="card narrow-card">
           <div class="section-head">
             <div>
-              <h2>系统管理</h2>
-              <p class="muted">默认展示全量系统，再按编号或名称做过滤检索。</p>
+              <h2>系统自检配置与记录</h2>
+              <p class="muted">这里维护的系统主数据，直接服务于移动端的系统状态、自检提交、异常分析与助手查询能力。</p>
+            </div>
+            <div class="summary-strip compact-summary-strip">
+              <div class="summary-card"><span>移动端对应</span><strong>系统状态 / 提交自检</strong></div>
+              <div class="summary-card"><span>当前作用</span><strong>系统配置源 + 审阅入口</strong></div>
+              <div class="summary-card"><span>后续补齐</span><strong>负责人 / 频次 / 运行服务器</strong></div>
             </div>
           </div>
           <div class="search-toolbar">
             <input id="systemSearchKeyword2" class="search-input" placeholder="搜索系统编号 / 系统名称" />
             <button id="btnFindSystems" class="toolbar-btn">搜索</button>
-            <button id="btnOpenCreateSystemModal" class="toolbar-btn secondary">新增</button>
+            <button id="btnOpenCreateSystemModal" class="toolbar-btn secondary">新增系统配置</button>
+          </div>
+          <div class="grid2 ops-workbench-guide">
+            <div class="mini-panel">
+              <strong>配置给移动端的关键数据</strong>
+              <ul class="mini-list">
+                <li>系统名称 / 系统编号</li>
+                <li>系统状态页下拉来源</li>
+                <li>自检提交时的系统选择源</li>
+                <li>AI 助手系统查询对象</li>
+              </ul>
+            </div>
+            <div class="mini-panel">
+              <strong>管理端审阅职责</strong>
+              <ul class="mini-list">
+                <li>审阅系统是否已建档</li>
+                <li>审阅系统环境是否正确</li>
+                <li>后续补审负责人 / 服务器绑定</li>
+                <li>为异常处理和预案联动做准备</li>
+              </ul>
+            </div>
           </div>
           <div id="systemListSummary" class="result-line">默认全量查询</div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>环境</th></tr></thead>
-              <tbody id="systemListTbody"><tr><td colspan="4">暂无数据</td></tr></tbody>
+              <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>环境</th><th>负责人ID</th><th>检查频次</th></tr></thead>
+              <tbody id="systemListTbody"><tr><td colspan="6">暂无数据</td></tr></tbody>
             </table>
           </div>
         </section>
       </section>
 
-      <section id="view-assets" class="view-panel" data-view-title="资产录入与查询" data-view-desc="以列表为中心管理资产，新增与导入通过弹窗或动作按钮完成。">
+      <section id="view-assets" class="view-panel" data-view-title="基础数据录入" data-view-desc="维护移动端会依赖的资产、系统关联与后续机房/服务器基础数据。">
         <section class="card narrow-card">
           <div class="section-head">
             <div>
-              <h2>资产录入与查询</h2>
-              <p class="muted">把资产页设计成标准列表页：默认全量查询，新增走弹窗，导入导出围绕当前查询结果操作。</p>
+              <h2>基础数据录入</h2>
+              <p class="muted">这里维护的资产与后续服务器/机房数据，会逐步成为移动端巡检、自检、应急处置的配置来源与审阅基础。</p>
             </div>
           </div>
 
@@ -257,9 +320,9 @@
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>序号</th><th>资产编码</th><th>资产名称</th><th>分类</th><th>系统ID</th><th>位置</th><th>状态</th></tr>
+                <tr><th>序号</th><th>资产编码</th><th>资产名称</th><th>分类</th><th>系统ID</th><th>机房ID</th><th>位置</th><th>IP</th><th>状态</th></tr>
               </thead>
-              <tbody id="assetListTbody"><tr><td colspan="7">暂无资产数据</td></tr></tbody>
+              <tbody id="assetListTbody"><tr><td colspan="9">暂无资产数据</td></tr></tbody>
             </table>
           </div>
 
@@ -271,6 +334,154 @@
             <summary>查看新增/导入操作结果</summary>
             <pre id="assetResult"></pre>
           </details>
+        </section>
+      </section>
+
+      <section id="view-ops-workbench" class="view-panel" data-view-title="资产与日常运维" data-view-desc="以三 Tab 工作台整合系统自检、机房巡检与基础数据录入。">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>资产与日常运维工作台</h2>
+              <p class="muted">先把现有系统、自检模板、用户与资产数据收进统一工作台，后续再继续拆细到真正的三 Tab 深度页面。</p>
+            </div>
+          </div>
+          <div class="ops-tabs">
+            <button class="ops-tab active" type="button" data-target-view="view-systems">系统自检配置与记录</button>
+            <button class="ops-tab" type="button" data-target-view="view-tool-template">机房巡检配置与记录</button>
+            <button class="ops-tab" type="button" data-target-view="view-assets">基础数据录入</button>
+          </div>
+          <div class="summary-strip">
+            <div class="summary-card"><span>Tab 1</span><strong>系统自检配置与记录</strong></div>
+            <div class="summary-card"><span>Tab 2</span><strong>机房巡检配置与记录</strong></div>
+            <div class="summary-card"><span>Tab 3</span><strong>基础数据录入</strong></div>
+          </div>
+          <div class="ops-workbench-sections">
+            <section class="guide-card ops-section-card">
+              <div class="section-head">
+                <div>
+                  <h3>系统自检配置与记录</h3>
+                  <p>以系统为主线，维护负责人、运行环境与最近自检相关数据入口。</p>
+                </div>
+                <button class="toolbar-btn" type="button" data-jump-view="view-systems">进入完整页</button>
+              </div>
+              <div class="grid2">
+                <div class="mini-panel">
+                  <strong>当前承接能力</strong>
+                  <ul class="mini-list">
+                    <li>系统列表检索</li>
+                    <li>新建系统</li>
+                    <li>后续联动负责人 / 服务器</li>
+                  </ul>
+                </div>
+                <div class="mini-panel">
+                  <strong>下一步补齐</strong>
+                  <ul class="mini-list">
+                    <li>负责人字段</li>
+                    <li>检查频次</li>
+                    <li>最近自检状态与时间</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <section class="guide-card ops-section-card">
+              <div class="section-head">
+                <div>
+                  <h3>机房巡检配置与记录</h3>
+                  <p>这一块最终要给移动端的扫码巡检、NFC 巡检和巡检记录审阅提供配置与审阅能力。</p>
+                </div>
+                <button class="toolbar-btn" type="button" data-jump-view="view-tool-template">进入承接页</button>
+              </div>
+              <div class="grid2">
+                <div class="mini-panel">
+                  <strong>对移动端提供的数据</strong>
+                  <ul class="mini-list">
+                    <li>机房 / 区域基础信息</li>
+                    <li>二维码 / NFC 对应点位</li>
+                    <li>巡检记录审阅入口</li>
+                  </ul>
+                </div>
+                <div class="mini-panel">
+                  <strong>共享主数据原则</strong>
+                  <ul class="mini-list">
+                    <li>管理端配置机房/点位</li>
+                    <li>移动端扫码/NFC 直接消费</li>
+                    <li>两端共用同一套机房与巡检点数据</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <section class="guide-card ops-section-card">
+              <div class="section-head">
+                <div>
+                  <h3>基础数据录入</h3>
+                  <p>优先集中用户与资产数据，后续再补服务器/IP 录入、Excel 模板导入与角色联动。</p>
+                </div>
+                <div class="action-row compact">
+                  <button class="toolbar-btn" type="button" data-jump-view="view-assets">进入资产数据</button>
+                  <button class="toolbar-btn secondary" type="button" data-jump-view="view-users">进入用户数据</button>
+                </div>
+              </div>
+              <div class="grid2">
+                <div class="mini-panel">
+                  <strong>当前承接能力</strong>
+                  <ul class="mini-list">
+                    <li>资产列表 / 导入导出</li>
+                    <li>用户列表 / 新增用户</li>
+                    <li>基础查询与筛选</li>
+                  </ul>
+                </div>
+                <div class="mini-panel">
+                  <strong>后续补强方向</strong>
+                  <ul class="mini-list">
+                    <li>系统角色字段</li>
+                    <li>服务器基础 IP 录入</li>
+                    <li>Excel 模板化导入</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-runbook-console" class="view-panel" data-view-title="应急预案配置" data-view-desc="统一承接 SSH、服务器、数据库、进程动作配置，逐步收敛为预案脚本库。">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>Runbook 预案脚本库总览</h2>
+              <p class="muted">当前先复用已有 4 类配置页，后续再合并成真正的“预案脚本库”。</p>
+            </div>
+          </div>
+          <div class="summary-strip">
+            <div class="summary-card"><span>主机凭据</span><strong>SSH 主机配置</strong></div>
+            <div class="summary-card"><span>服务器预案</span><strong>重启等高危动作</strong></div>
+            <div class="summary-card"><span>数据库预案</span><strong>SQL / Shell 模板</strong></div>
+            <div class="summary-card"><span>进程预案</span><strong>重启 / 关闭动作</strong></div>
+          </div>
+          <div class="ops-workbench-guide runbook-guide-grid">
+            <div class="guide-card">
+              <h3>SSH 主机配置</h3>
+              <p>维护主机连接与认证方式，作为其他预案动作的底层依赖。</p>
+              <button class="toolbar-btn" type="button" data-jump-view="view-emergency-ssh">进入 SSH 配置</button>
+            </div>
+            <div class="guide-card">
+              <h3>服务器动作配置</h3>
+              <p>先承接服务器重启等动作，后续收敛为标准 Runbook。</p>
+              <button class="toolbar-btn" type="button" data-jump-view="view-emergency-server">进入服务器动作</button>
+            </div>
+            <div class="guide-card">
+              <h3>数据库动作配置</h3>
+              <p>维护 SQL / shell 模板，覆盖查询、解锁、闪回等动作。</p>
+              <button class="toolbar-btn" type="button" data-jump-view="view-emergency-db">进入数据库动作</button>
+            </div>
+            <div class="guide-card">
+              <h3>进程动作配置</h3>
+              <p>管理进程重启/关闭动作，后续支持动态 PID 解析与高危审批。</p>
+              <button class="toolbar-btn" type="button" data-jump-view="view-emergency-process">进入进程动作</button>
+            </div>
+          </div>
         </section>
       </section>
 
@@ -324,6 +535,7 @@
             <div class="action-row compact">
               <button id="btnEmergencySshMockSave">保存主机配置</button>
               <button id="btnEmergencySshMockList" class="toolbar-btn secondary">刷新列表</button>
+              <button id="btnEmergencyImportJson" class="toolbar-btn ghost">导入 JSON 到数据库</button>
             </div>
           </div>
           <div class="grid4 emergency-admin-grid">
@@ -461,12 +673,17 @@
         </section>
       </section>
 
-      <section id="view-tool-template" class="view-panel" data-view-title="模板与快照" data-view-desc="维护自检模板并提交系统状态快照。">
+      <section id="view-tool-template" class="view-panel" data-view-title="机房巡检配置与记录（承接页）" data-view-desc="当前先承接移动端巡检/自检相关配置与审阅能力，后续再拆成独立机房巡检页。">
         <section class="card">
           <div class="section-head">
             <div>
-              <h2>模板与快照</h2>
-              <p class="muted">模板管理与状态快照关联紧密，保留在一个页面但拆成上下两段。</p>
+              <h2>机房巡检配置与记录（承接页）</h2>
+              <p class="muted">当前先承接移动端巡检、自检和状态审阅所需的模板与快照能力，后续会继续拆成“机房/二维码配置 + 巡检历史”双栏结构。</p>
+            </div>
+            <div class="summary-strip compact-summary-strip">
+              <div class="summary-card"><span>移动端对应</span><strong>扫码巡检 / NFC 巡检</strong></div>
+              <div class="summary-card"><span>当前承接</span><strong>模板 / 状态快照 / 审阅入口</strong></div>
+              <div class="summary-card"><span>后续补齐</span><strong>机房 / 二维码 / 巡检记录</strong></div>
             </div>
           </div>
           <div class="form-section">
@@ -702,6 +919,15 @@
           <option value="dev">开发</option>
         </select>
       </label>
+      <label>负责人 ID 列表
+        <input id="modalSystemOwnerIds" placeholder="多个用逗号分隔，例如 1,2" />
+      </label>
+      <label>检查频次
+        <input id="modalSystemCheckFrequency" placeholder="例如 daily / weekly" />
+      </label>
+      <label>备注
+        <input id="modalSystemRemark" placeholder="补充说明（可选）" />
+      </label>
       <div class="grid2">
         <button id="btnSubmitCreateSystem">确认新增</button>
         <button id="btnCloseCreateSystemModal" type="button">取消</button>
@@ -721,11 +947,30 @@
       <label>资产分类
         <input id="modalAssetCategory" placeholder="例如 server / network" value="server" />
       </label>
-      <label>系统ID
-        <input id="modalAssetSystemId" placeholder="可空，例如 1" />
+      <label>系统
+        <select id="modalAssetSystemId">
+          <option value="">请选择</option>
+        </select>
+      </label>
+      <label>机房
+        <select id="modalAssetRoomId">
+          <option value="">请选择</option>
+        </select>
       </label>
       <label>位置
         <input id="modalAssetLocation" placeholder="例如 机房A" />
+      </label>
+      <label>IP 地址
+        <input id="modalAssetIpAddress" placeholder="例如 10.10.1.21" />
+      </label>
+      <label>端口
+        <input id="modalAssetPort" placeholder="例如 22" />
+      </label>
+      <label>连接类型
+        <input id="modalAssetConnectionType" placeholder="例如 ssh / db / agent" />
+      </label>
+      <label>备注
+        <input id="modalAssetRemark" placeholder="补充说明（可选）" />
       </label>
       <label>状态
         <input id="modalAssetStatus" placeholder="例如 in_use / repair" value="in_use" />
@@ -764,6 +1009,7 @@
   <script src="./js/threatbook.js"></script>
   <script src="./js/debug.js"></script>
   <script src="./js/emergency-config.js"></script>
+  <script src="./js/shared-data.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

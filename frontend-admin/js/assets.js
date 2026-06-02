@@ -26,11 +26,13 @@ window.AegisAdmin = window.AegisAdmin || {};
         <td>${ns.toolbox.escapeHtml(item.name || '-')}</td>
         <td>${ns.toolbox.escapeHtml(item.category || '-')}</td>
         <td>${ns.toolbox.escapeHtml(item.system_id ?? '-')}</td>
+        <td>${ns.toolbox.escapeHtml(item.room_id ?? '-')}</td>
         <td>${ns.toolbox.escapeHtml(item.location || '-')}</td>
+        <td>${ns.toolbox.escapeHtml(item.ip_address || '-')}</td>
         <td>${ns.toolbox.escapeHtml(item.status || '-')}</td>
       </tr>
     `).join('');
-    tbody.innerHTML = rows || '<tr><td colspan="7">暂无资产数据</td></tr>';
+    tbody.innerHTML = rows || '<tr><td colspan="9">暂无资产数据</td></tr>';
   }
 
   async function listAssets() {

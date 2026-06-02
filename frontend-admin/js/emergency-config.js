@@ -20,6 +20,17 @@ window.AegisAdmin = window.AegisAdmin || {};
     return ns.api.request('/api/v1/admin/emergency-config', { headers: ns.api.headers() });
   }
 
+  async function importJsonToDb() {
+    const data = await ns.api.request('/api/v1/admin/emergency-config/import-json', {
+      method: 'POST',
+      headers: ns.api.headers(),
+    });
+    const result = document.getElementById('emgSshResult');
+    if (result) result.textContent = `JSON 导入完成：SSH ${data.ssh_hosts || 0} 条，服务器动作 ${data.server_actions || 0} 条，数据库动作 ${data.database_actions || 0} 条，进程动作 ${data.process_actions || 0} 条`;
+    await listSshHosts();
+    return data;
+  }
+
   async function listSshHosts() {
     const data = await loadAll();
     const rows = (data.ssh_hosts || []).map((item) => `
@@ -192,6 +203,7 @@ window.AegisAdmin = window.AegisAdmin || {};
 
   ns.emergencyConfig = {
     loadAll,
+    importJsonToDb,
     listSshHosts,
     saveSshHostMock,
     listServerActions,

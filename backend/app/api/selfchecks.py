@@ -80,6 +80,9 @@ def create_selfcheck_record(
         operator_id=current_user.id,
         result=payload.result,
         summary=payload.summary,
+        review_status=payload.review_status,
+        reviewed_by=payload.reviewed_by,
+        reviewed_at=payload.reviewed_at,
         checked_at=payload.checked_at,
     )
     db.add(r)
@@ -179,6 +182,9 @@ def list_selfcheck_records(
                 "operator_id": i.operator_id,
                 "result": i.result,
                 "summary": i.summary,
+                "review_status": i.review_status,
+                "reviewed_by": i.reviewed_by,
+                "reviewed_at": i.reviewed_at,
                 "checked_at": i.checked_at,
             }
             for i in items

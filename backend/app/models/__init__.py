@@ -3,10 +3,11 @@ from .asset import Asset
 from .audit import AuditLog
 from .base import Base
 from .inspection import InspectionPoint, InspectionRecord
+from .shared_data import EmergencyHost, Room, Runbook
 from .offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from .rule import StatusRule
 from .selfcheck import ChecklistTemplate, SelfcheckRecord
-from .system import System, SystemStatusSnapshot
+from .system import System, SystemStatusSnapshot, SystemUserBinding
 from .tool_task import ToolTask
 from .user import Role, User
 
@@ -16,8 +17,12 @@ __all__ = [
     "User",
     "System",
     "SystemStatusSnapshot",
+    "SystemUserBinding",
     "InspectionPoint",
     "InspectionRecord",
+    "Room",
+    "EmergencyHost",
+    "Runbook",
     "OfflineAnalysisTask",
     "OfflineAnalysisResult",
     "ChecklistTemplate",

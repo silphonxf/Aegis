@@ -19,6 +19,25 @@ ns.state = ns.state || {
   activeGroup: 'dashboard',
 };
 
+const VIEW_GROUP_MAP = {
+  'view-dashboard-overview': 'dashboard',
+  'view-ops-workbench': 'ops-workbench',
+  'view-systems': 'ops-workbench',
+  'view-assets': 'ops-workbench',
+  'view-users': 'ops-workbench',
+  'view-tool-template': 'ops-workbench',
+  'view-runbook-console': 'runbook',
+  'view-emergency-ssh': 'runbook',
+  'view-emergency-server': 'runbook',
+  'view-emergency-db': 'runbook',
+  'view-emergency-process': 'runbook',
+  'view-tool-ops': 'approval-audit',
+  'view-tool-rules': 'approval-audit',
+  'view-tool-ai': 'approval-audit',
+  'view-tool-threatbook': 'approval-audit',
+  'view-tool-debug': 'approval-audit',
+};
+
 function formatError(moduleName, e) {
   const msg = e?.message || String(e) || '未知错误';
   return `【${moduleName}】请求失败\n原因：${msg}\n建议：请检查登录状态或稍后重试。`;
@@ -30,8 +49,10 @@ function setHeaderByView(viewId) {
   const desc = panel?.dataset.viewDesc || '请选择左侧功能继续操作。';
   const titleHost = document.querySelector('.workspace-header h1');
   const descHost = document.getElementById('currentViewDesc');
+  const stripView = document.getElementById('controlStripView');
   if (titleHost) titleHost.innerHTML = `${title} <span class="badge">v2.1 Tech</span>`;
   if (descHost) descHost.textContent = desc;
+  if (stripView) stripView.textContent = title;
 }
 
 function switchView(viewId, groupId) {
@@ -100,6 +121,7 @@ bindClick('btnLogout', () => {
 bindClick('btnRefreshDashboard', () => ns.dashboard?.refreshDashboard?.());
 bindClick('btnEmergencySshMockSave', () => ns.emergencyConfig?.saveSshHostMock?.());
 bindClick('btnEmergencySshMockList', () => ns.emergencyConfig?.listSshHosts?.());
+bindClick('btnEmergencyImportJson', () => ns.emergencyConfig?.importJsonToDb?.());
 bindClick('btnEmergencyServerMockSave', () => ns.emergencyConfig?.saveServerActionMock?.());
 bindClick('btnEmergencyServerMockList', () => ns.emergencyConfig?.listServerActions?.());
 bindClick('btnEmergencyDbMockSave', () => ns.emergencyConfig?.saveDbActionMock?.());
@@ -109,6 +131,18 @@ bindClick('btnEmergencyProcessMockList', () => ns.emergencyConfig?.listProcessAc
 bindClick('btnToolTaskList', () => ns.toolbox.listTasks().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnToolTaskUpdate', () => ns.toolbox.updateTask().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnListAssets', () => ns.assets.listAssets().catch((e) => { $('assetListResult').textContent = formatError('资产列表', e); }));
+bindClick('btnAssetFilterClear', () => {
+  ns.assets?.clearFilters?.();
+  ns.assets?.listAssets?.().catch((e) => { $('assetListResult').textContent = formatError('资产列表', e); });
+});
+bindClick('btnAssetExport', async () => {
+  try {
+    const url = `${ns.api.base()}/api/v1/admin/assets/export?${ns.assets.buildAssetQuery()}`;
+    window.open(url, '_blank', 'noopener');
+  } catch (e) {
+    $('assetResult').textContent = formatError('资产导出', e);
+  }
+});
 bindClick('btnFindUsers', () => ns.users.findUsers($('userSearchKeyword').value.trim()).catch((e) => {
   $('userListSummary').textContent = formatError('用户查询', e);
   $('userListTbody').innerHTML = '<tr><td colspan="4">查询失败</td></tr>';
@@ -120,6 +154,13 @@ bindClick('btnFindSystems', () => ns.systems.findSystems($('systemSearchKeyword2
 bindClick('btnLoadRules', () => ns.rulesAudit.loadRules().catch((e) => { $('ruleResult').textContent = formatError('规则配置', e); }));
 bindClick('btnSaveRules', () => ns.rulesAudit.saveRules().catch((e) => { $('ruleResult').textContent = formatError('规则配置', e); }));
 bindClick('btnAudit', () => ns.rulesAudit.loadAudit().catch((e) => { $('audit').textContent = formatError('审计日志', e); }));
+bindClick('btnAuditClear', () => {
+  ['auditAction', 'auditUsername', 'auditResource', 'auditStartAt', 'auditEndAt', 'auditKeyword'].forEach((id) => {
+    const el = $(id);
+    if (el) el.value = '';
+  });
+  $('audit').textContent = '';
+});
 bindClick('btnCreateTemplate', () => ns.templates.createTemplate().catch((e) => { $('templateCreateResult').textContent = formatError('创建模板', e); }));
 bindClick('btnListTemplates', () => ns.templates.listTemplates().catch((e) => { $('templateListResult').textContent = formatError('模板列表', e); }));
 bindClick('btnCreateSnapshot', () => ns.templates.createSnapshot().catch((e) => { $('snapshotResult').textContent = formatError('状态快照', e); }));
@@ -165,6 +206,8 @@ bindClick('btnToggleAutoRefresh', () => {
   if (ns.state.autoRefreshEnabled && ns.state.activeView === 'view-dashboard-overview') ns.dashboard?.startDashboardAutoRefresh?.();
   else ns.dashboard?.stopDashboardAutoRefresh?.();
   ns.dashboard?.setLiveStatus?.(ns.state.autoRefreshEnabled && Boolean(ns.state.dashboardTimer));
+  const refreshHost = document.getElementById('controlStripRefresh');
+  if (refreshHost) refreshHost.textContent = ns.state.autoRefreshEnabled ? '自动刷新' : '手动刷新';
 });
 
 Array.from(document.querySelectorAll('.group-btn')).forEach((btn) => {
@@ -184,15 +227,43 @@ Array.from(document.querySelectorAll('.submenu-btn')).forEach((btn) => {
   });
 });
 
+Array.from(document.querySelectorAll('[data-jump-view]')).forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const viewId = btn.dataset.jumpView;
+    const group = VIEW_GROUP_MAP[viewId] || ns.state.activeGroup;
+    if (viewId) switchView(viewId, group);
+  });
+});
+
+Array.from(document.querySelectorAll('.ops-tab')).forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.ops-tab').forEach((tab) => tab.classList.remove('active'));
+    btn.classList.add('active');
+    const viewId = btn.dataset.targetView;
+    const group = VIEW_GROUP_MAP[viewId] || 'ops-workbench';
+    if (viewId) switchView(viewId, group);
+  });
+});
+
+function safeBoot(task, onError) {
+  try {
+    const result = task?.();
+    if (result && typeof result.catch === 'function') result.catch(onError || (() => {}));
+  } catch (e) {
+    (onError || console.error)(e);
+  }
+}
+
 ns.api.renderHistory();
-ns.debug?.syncDebugMeta?.();
-ns.auth.setAuthView(false);
-openGroup('dashboard');
-switchView('view-dashboard-overview', 'dashboard');
-ns.users?.findUsers?.('').catch(() => {});
-ns.systems?.findSystems?.('').catch(() => {});
-ns.assets?.listAssets?.().catch(() => {});
-ns.emergencyConfig?.listSshHosts?.();
-ns.emergencyConfig?.listServerActions?.();
-ns.emergencyConfig?.listDbActions?.();
-ns.emergencyConfig?.listProcessActions?.();
+safeBoot(() => ns.debug?.syncDebugMeta?.(), console.error);
+safeBoot(() => ns.auth.setAuthView(false), console.error);
+safeBoot(() => openGroup('dashboard'), console.error);
+safeBoot(() => switchView('view-dashboard-overview', 'dashboard'), console.error);
+safeBoot(() => ns.sharedData?.hydrateAdminSelectors?.(), console.error);
+safeBoot(() => ns.users?.findUsers?.(''), () => {});
+safeBoot(() => ns.systems?.findSystems?.(''), () => {});
+safeBoot(() => ns.assets?.listAssets?.(), () => {});
+safeBoot(() => ns.emergencyConfig?.listSshHosts?.(), () => {});
+safeBoot(() => ns.emergencyConfig?.listServerActions?.(), () => {});
+safeBoot(() => ns.emergencyConfig?.listDbActions?.(), () => {});
+safeBoot(() => ns.emergencyConfig?.listProcessActions?.(), () => {});

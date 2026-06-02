@@ -15,7 +15,7 @@ window.AegisAdmin = window.AegisAdmin || {};
   }
 
   function resetCreateSystemModal() {
-    const ids = ['modalSystemCode', 'modalSystemName'];
+    const ids = ['modalSystemCode', 'modalSystemName', 'modalSystemOwnerIds', 'modalSystemCheckFrequency', 'modalSystemRemark'];
     ids.forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
   }
 
@@ -25,7 +25,12 @@ window.AegisAdmin = window.AegisAdmin || {};
       modalAssetName: '',
       modalAssetCategory: 'server',
       modalAssetSystemId: '',
+      modalAssetRoomId: '',
       modalAssetLocation: '',
+      modalAssetIpAddress: '',
+      modalAssetPort: '',
+      modalAssetConnectionType: '',
+      modalAssetRemark: '',
       modalAssetStatus: 'in_use',
     };
     Object.entries(defaults).forEach(([id, value]) => {
@@ -51,6 +56,10 @@ window.AegisAdmin = window.AegisAdmin || {};
   }
 
   async function submitCreateSystem() {
+    const ownerIds = (document.getElementById('modalSystemOwnerIds').value || '')
+      .split(',')
+      .map((v) => Number(v.trim()))
+      .filter((v) => Number.isFinite(v) && v > 0);
     const d = await ns.api.request('/api/v1/admin/systems', {
       method: 'POST',
       headers: ns.api.headers(),
@@ -58,6 +67,9 @@ window.AegisAdmin = window.AegisAdmin || {};
         system_code: document.getElementById('modalSystemCode').value.trim(),
         name: document.getElementById('modalSystemName').value.trim(),
         env: document.getElementById('modalSystemEnv').value || 'prod',
+        owner_user_ids: ownerIds,
+        check_frequency: document.getElementById('modalSystemCheckFrequency').value.trim() || null,
+        remark: document.getElementById('modalSystemRemark').value.trim() || null,
       }),
     });
     ns.systems.renderSystemResultBoard([d], '新增成功，已创建 1 个系统');
@@ -72,7 +84,12 @@ window.AegisAdmin = window.AegisAdmin || {};
       name: document.getElementById('modalAssetName').value.trim(),
       category: document.getElementById('modalAssetCategory').value.trim() || 'server',
       system_id: document.getElementById('modalAssetSystemId').value.trim() ? Number(document.getElementById('modalAssetSystemId').value) : null,
+      room_id: document.getElementById('modalAssetRoomId').value.trim() ? Number(document.getElementById('modalAssetRoomId').value) : null,
       location: document.getElementById('modalAssetLocation').value.trim() || null,
+      ip_address: document.getElementById('modalAssetIpAddress').value.trim() || null,
+      port: document.getElementById('modalAssetPort').value.trim() ? Number(document.getElementById('modalAssetPort').value) : null,
+      connection_type: document.getElementById('modalAssetConnectionType').value.trim() || null,
+      remark: document.getElementById('modalAssetRemark').value.trim() || null,
       status: document.getElementById('modalAssetStatus').value.trim() || 'in_use',
     };
     const d = await ns.assets.createAsset(payload);
