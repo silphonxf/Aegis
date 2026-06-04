@@ -310,11 +310,17 @@ body {
   margin-right: 6px;
   border-radius: 6px;
   font-size: 12px;
-  background: rgba(103, 179, 255, 0.18);
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  color: #042033;
+  font-weight: 800;
+  border: 0;
+  box-shadow: 0 8px 18px rgba(45, 212, 191, .2);
 }
 .table-action-btn.danger {
   background: rgba(255, 107, 107, 0.18);
   color: #ffb8b8;
+  border: 1px solid rgba(255, 107, 107, .24);
+  box-shadow: none;
 }
 .list-toolbar {
   display: flex;

@@ -42,7 +42,7 @@ window.AegisAdmin = window.AegisAdmin || {};
       pushHistory({ startedAt, method, path, ok: false, status: resp.status, code: code || null, message: msg });
       renderHistory();
 
-      if (ns.auth && (code === 'TOKEN_EXPIRED' || code === 'TOKEN_INVALID' || code === 'USER_DISABLED' || code === 'USER_NOT_FOUND')) {
+      if (ns.auth && (resp.status === 401 || code === 'TOKEN_EXPIRED' || code === 'TOKEN_INVALID' || code === 'USER_DISABLED' || code === 'USER_NOT_FOUND')) {
         ns.auth.forceRelogin(`${msg}（请重新登录）`);
       }
       throw new Error(`${code ? `[${code}] ` : ''}${msg}`);

@@ -9,13 +9,29 @@
     [hidden],
     body:not(.is-authenticated) #appView,
     body.is-authenticated #loginView,
-    body:not(.is-authenticated) .modal {
+    body:not(.is-authenticated) .modal,
+    body.auth-restoring #loginView,
+    body.auth-restoring #appView {
       display: none !important;
     }
   </style>
+  <script>
+    try {
+      if (localStorage.getItem('aegis_admin_token') || sessionStorage.getItem('aegis_admin_token')) {
+        document.documentElement.classList.add('auth-restoring');
+      }
+    } catch {}
+  </script>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
+  <script>
+    try {
+      if (document.documentElement.classList.contains('auth-restoring')) {
+        document.body.classList.add('auth-restoring');
+      }
+    } catch {}
+  </script>
   <section id="loginView" class="login-view">
     <div class="login-card">
       <div class="brand-pill">Aegis Admin</div>
@@ -1033,20 +1049,20 @@
     </div>
   </div>
 
-  <script src="./js/api.js"></script>
-  <script src="./js/auth.js"></script>
-  <script src="./js/dashboard.js"></script>
-  <script src="./js/toolbox.js"></script>
-  <script src="./js/assets.js"></script>
-  <script src="./js/users.js"></script>
-  <script src="./js/systems.js"></script>
-  <script src="./js/rules-audit.js"></script>
-  <script src="./js/templates.js"></script>
-  <script src="./js/modals.js"></script>
-  <script src="./js/threatbook.js"></script>
-  <script src="./js/debug.js"></script>
-  <script src="./js/emergency-config.js"></script>
-  <script src="./js/shared-data.js"></script>
-  <script src="./app.js"></script>
+  <script defer src="./js/api.js"></script>
+  <script defer src="./js/auth.js"></script>
+  <script defer src="./js/dashboard.js"></script>
+  <script defer src="./js/toolbox.js"></script>
+  <script defer src="./js/assets.js"></script>
+  <script defer src="./js/users.js"></script>
+  <script defer src="./js/systems.js"></script>
+  <script defer src="./js/rules-audit.js"></script>
+  <script defer src="./js/templates.js"></script>
+  <script defer src="./js/modals.js"></script>
+  <script defer src="./js/threatbook.js"></script>
+  <script defer src="./js/debug.js"></script>
+  <script defer src="./js/emergency-config.js"></script>
+  <script defer src="./js/shared-data.js"></script>
+  <script defer src="./app.js"></script>
 </body>
 </html>

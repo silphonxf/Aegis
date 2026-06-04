@@ -115,9 +115,12 @@ bindClick('btnLogin', async () => {
     await ns.auth.login($('username').value, $('password').value);
     $('state').textContent = '登录成功';
     ns.debug?.syncDebugMeta?.();
-    await ns.sharedData?.hydrateAdminSelectors?.();
+    openGroup('dashboard');
     switchView('view-dashboard-overview', 'dashboard');
-    await ns.dashboard?.refreshDashboard?.();
+    Promise.allSettled([
+      ns.sharedData?.hydrateAdminSelectors?.(),
+      ns.dashboard?.refreshDashboard?.(),
+    ]);
   } catch (e) {
     $('state').textContent = `登录失败: ${e.message}`;
   }
@@ -276,4 +279,17 @@ function safeBoot(task, onError) {
 
 ns.api.renderHistory();
 safeBoot(() => ns.debug?.syncDebugMeta?.(), console.error);
-safeBoot(() => ns.auth.setAuthView(false), console.error);
+safeBoot(async () => {
+  const me = await ns.auth.restoreSession();
+  if (!me) return;
+
+  const stateEl = $('state');
+  if (stateEl) stateEl.textContent = `已恢复登录：${me.username || 'admin'}`;
+  ns.debug?.syncDebugMeta?.();
+  openGroup('dashboard');
+  switchView('view-dashboard-overview', 'dashboard');
+  Promise.allSettled([
+    ns.sharedData?.hydrateAdminSelectors?.(),
+    ns.dashboard?.refreshDashboard?.(),
+  ]);
+}, console.error);

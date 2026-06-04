@@ -1,3 +1,4 @@
+from collections import deque
 from typing import Any, Dict, List, Optional, Set, Tuple
 import json
 import os
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.core.logging import get_logger
 from app.db.session import get_db
+from app.models.system import SystemLogConfig
 from app.models.tool_task import ToolTask
 from app.models.user import User
 from app.schemas.capture import CaptureAnalyzeRequest, CaptureFetchRequest
@@ -207,14 +209,22 @@ def _log_file_aliases(file_name: str) -> list[str]:
     return [file_name, *alias_map.get(file_name, [])]
 
 
-def _read_selected_logs(source: str, file_name: Optional[str], level: str, start_dt: Optional[datetime], end_dt: Optional[datetime], lines: int) -> Tuple[str, str]:
-    candidates = _collect_log_files(source)
+def _read_log_tail(path: str, max_lines: int = 20000) -> list[str]:
+    with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+        return list(deque(fh, maxlen=max_lines))
+
+
+def _read_selected_logs(source: str, file_name: Optional[str], level: str, start_dt: Optional[datetime], end_dt: Optional[datetime], lines: int, configured_paths: Optional[list[str]] = None) -> Tuple[str, str]:
+    candidates = configured_paths if configured_paths is not None else _collect_log_files(source)
     if not candidates:
         return "", "未找到可用日志文件"
 
     if file_name:
-        accepted_names = set(_log_file_aliases(file_name))
-        selected = [path for path in candidates if os.path.basename(path) in accepted_names]
+        if os.path.isabs(file_name):
+            selected = [path for path in candidates if os.path.abspath(path) == os.path.abspath(file_name)]
+        else:
+            accepted_names = set(_log_file_aliases(file_name))
+            selected = [path for path in candidates if os.path.basename(path) in accepted_names]
         if not selected:
             raise HTTPException(status_code=400, detail={"code": "LOG_FILE_NOT_FOUND", "message": f"未找到日志文件：{file_name}"})
         candidates = selected
@@ -224,8 +234,7 @@ def _read_selected_logs(source: str, file_name: Optional[str], level: str, start
     used_sources = []
     for path in candidates:
         try:
-            with open(path, "r", encoding="utf-8", errors="ignore") as fh:
-                lines_buf = fh.readlines()[-20000:]
+            lines_buf = _read_log_tail(path)
         except OSError:
             continue
 
@@ -247,8 +256,7 @@ def _read_selected_logs(source: str, file_name: Optional[str], level: str, start
 
     for path in candidates:
         try:
-            with open(path, "r", encoding="utf-8", errors="ignore") as fh:
-                lines_buf = fh.readlines()[-20000:]
+            lines_buf = _read_log_tail(path)
         except OSError:
             continue
         matched = []
@@ -383,6 +391,15 @@ def read_error_logs(
         payload.lines,
     )
 
+    configured_paths = None
+    if payload.source == "system":
+        q = db.query(SystemLogConfig.absolute_path).filter(SystemLogConfig.is_active.is_(True))
+        if payload.file_name and os.path.isabs(payload.file_name):
+            q = q.filter(SystemLogConfig.absolute_path == payload.file_name)
+        configured_paths = [row.absolute_path for row in q.all()]
+        if payload.file_name and os.path.isabs(payload.file_name) and not configured_paths:
+            raise HTTPException(status_code=400, detail={"code": "LOG_FILE_NOT_CONFIGURED", "message": "该日志路径未在管理端系统日志配置中启用"})
+
     content, source_detail = _read_selected_logs(
         source=payload.source,
         file_name=payload.file_name,
@@ -390,6 +407,7 @@ def read_error_logs(
         start_dt=start_dt,
         end_dt=end_dt,
         lines=payload.lines,
+        configured_paths=configured_paths,
     )
     if payload.source == "system":
         empty_message = "未读取到系统日志，请确认系统日志文件存在且筛选条件合理。"

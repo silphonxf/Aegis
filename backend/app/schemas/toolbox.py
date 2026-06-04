@@ -26,7 +26,7 @@ class TaskStatusUpdateRequest(BaseModel):
 
 class ErrorLogSourceRequest(BaseModel):
     source: str = Field(default="aegis", pattern="^(aegis|system)$")
-    file_name: Optional[str] = Field(default=None, max_length=128)
+    file_name: Optional[str] = Field(default=None, max_length=512)
     quick_range: Optional[str] = Field(default="1h", pattern="^(1h|3h|6h)?$")
     start_at: Optional[str] = Field(default=None, max_length=32)
     end_at: Optional[str] = Field(default=None, max_length=32)

@@ -13,6 +13,7 @@ const AI_CHAT_CONVERSATION_KEY = 'aegis_ai_chat_conversation';
 const AI_CHAT_SIDEBAR_COLLAPSED_KEY = 'aegis_ai_chat_sidebar_collapsed';
 const ACTIVE_TAB_KEY = 'aegis_mobile_active_tab';
 const API_BASE_KEY = 'aegis_mobile_api_base';
+const AUTH_TOKEN_KEY = 'aegis_mobile_token';
 const AI_MAX_ATTACHMENTS = 4;
 const AI_MAX_FILE_SIZE = 2 * 1024 * 1024;
 const DEFAULT_AI_MESSAGES = [
@@ -61,7 +62,7 @@ function mapConversationMessagesToUi(messages) {
 }
 
 const state = {
-  token: '',
+  token: loadStoredToken(),
   requestLogs: JSON.parse(localStorage.getItem('aegis_request_logs') || '[]'),
   selectedQuickRange: '1h',
   metricSeries: { cpu: [], mem: [], disk: [] },
@@ -73,6 +74,9 @@ const state = {
   logConfigsBySystem: {},
   selectedLogSystemId: null,
   selectedLogConfig: null,
+  errorSystemsLoadedAt: 0,
+  errorSystemsLoading: null,
+  logConfigsLoadingBySystem: {},
   nfcTagText: 'NFC://DEMO-SYS-001/P-002',
   qrScanText: '',
   qrResolvedPoint: null,
@@ -88,6 +92,28 @@ const state = {
   isSendingAiMessage: false,
   lastAiRequestPayload: null,
 };
+
+function loadStoredToken() {
+  try { return localStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_TOKEN_KEY) || ''; }
+  catch {
+    try { return sessionStorage.getItem(AUTH_TOKEN_KEY) || ''; }
+    catch { return ''; }
+  }
+}
+
+function storeToken(token) {
+  try { localStorage.setItem(AUTH_TOKEN_KEY, token); }
+  catch {}
+  try { sessionStorage.setItem(AUTH_TOKEN_KEY, token); }
+  catch {}
+}
+
+function clearStoredToken() {
+  try { localStorage.removeItem(AUTH_TOKEN_KEY); }
+  catch {}
+  try { sessionStorage.removeItem(AUTH_TOKEN_KEY); }
+  catch {}
+}
 
 function getDefaultBase() {
   const host = window.location.hostname || '127.0.0.1';
@@ -274,7 +300,11 @@ function rememberLog(log) {
 
 function normalizeApiError(error, resp, data, url) {
   if (resp) {
-    if (resp.status === 401) return new Error('未登录或登录已过期，请重新登录后再试。');
+    if (resp.status === 401) {
+      state.token = '';
+      clearStoredToken();
+      return new Error('未登录或登录已过期，请重新登录后再试。');
+    }
     if (resp.status === 403) return new Error('当前账号权限不足，无法执行该操作。');
     if (resp.status === 404) return new Error(`接口不存在：${url}`);
     return new Error((data && (data.message || data.detail)) || `HTTP ${resp.status}`);
@@ -951,7 +981,10 @@ function initSubNavigation() {
       }
 
       if (pageId === 'page-selfcheck-errors') {
-        $('errorAiView').textContent = '先加载 Aegis 日志，再点击“AI 分析”生成结论与建议。';
+        $('errorAiView').textContent = '先加载系统日志，再点击“AI 分析”生成结论与建议。';
+        renderErrorSystemOptions();
+        syncLogFileOptions();
+        refreshErrorSystems().catch(() => {});
       }
 
       if (pageId === 'page-tool-aiqa') {
@@ -1253,8 +1286,15 @@ function renderErrorSystemOptions() {
 
 async function refreshStatusBase() {
   try {
-    const data = await api('/api/v1/monitoring/overview', { headers: authHeaders() });
-    state.statusSystems = Array.isArray(data?.items) ? data.items : [];
+    const systemsData = await api('/api/v1/systems/accessible', { headers: authHeaders() });
+    renderAccessibleSystems(systemsData.items || []);
+
+    const monitoringData = await api('/api/v1/monitoring/overview', { headers: authHeaders() }).catch(() => ({ items: [] }));
+    const monitoringById = new Map((monitoringData.items || []).map((item) => [Number(item.system_id), item]));
+    state.statusSystems = state.statusSystems.map((system) => ({
+      ...monitoringById.get(Number(system.system_id)),
+      ...system,
+    }));
     renderStatusSystemOptions();
     renderErrorSystemOptions();
     syncLogFileOptions();
@@ -1279,6 +1319,50 @@ async function refreshStatusBase() {
     pushMetric('disk', 45 + Math.random() * 25);
     if ($('statusSystemHint')) $('statusSystemHint').textContent = '状态接口调用失败，已展示本地模拟曲线。';
     renderCharts();
+  }
+}
+
+function renderAccessibleSystems(items, options = {}) {
+  state.statusSystems = (items || []).map((system) => ({
+    system_id: system.system_id,
+    system_code: system.system_code,
+    system_name: system.system_name,
+    host_address: system.host_address,
+    env: system.env,
+  }));
+  if (options.replaceLogConfigs) {
+    const nextConfigs = {};
+    (items || []).forEach((system) => {
+      nextConfigs[Number(system.system_id)] = Array.isArray(system.log_configs) ? system.log_configs : [];
+    });
+    state.logConfigsBySystem = nextConfigs;
+  }
+  renderStatusSystemOptions();
+  renderErrorSystemOptions();
+}
+
+async function refreshErrorSystems({ force = false } = {}) {
+  try {
+    const now = Date.now();
+    if (!force && state.errorSystemsLoadedAt && now - state.errorSystemsLoadedAt < 60000) {
+      syncLogFileOptions();
+      return;
+    }
+    if (!force && state.errorSystemsLoading) {
+      await state.errorSystemsLoading;
+      syncLogFileOptions();
+      return;
+    }
+
+    state.errorSystemsLoading = api('/api/v1/systems/accessible-log-configs', { headers: authHeaders() });
+    const data = await state.errorSystemsLoading;
+    state.errorSystemsLoadedAt = Date.now();
+    renderAccessibleSystems(data.items || [], { replaceLogConfigs: true });
+    syncLogFileOptions();
+  } catch (e) {
+    if ($('errorAiStatus')) $('errorAiStatus').textContent = `系统列表读取失败：${e.message}`;
+  } finally {
+    state.errorSystemsLoading = null;
   }
 }
 
@@ -1354,6 +1438,25 @@ function decodeWithJsQR(ctx, canvas) {
   }
 }
 
+function loadScriptOnce(src, globalName) {
+  if (globalName && window[globalName]) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-dynamic-src="${src}"]`);
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('脚本加载失败')), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.dataset.dynamicSrc = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('脚本加载失败'));
+    document.head.appendChild(script);
+  });
+}
+
 async function startQrScanner() {
   if (!window.isSecureContext) {
     setQrScanState(secureContextHint('相机扫码'));
@@ -1385,8 +1488,13 @@ async function startQrScanner() {
     }
 
     if (!qrScan.detector && typeof window.jsQR !== 'function') {
-      setQrScanState('二维码识别引擎不可用，请刷新页面后重试。');
-      return;
+      setQrScanState('正在加载二维码识别引擎...');
+      try {
+        await loadScriptOnce('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js', 'jsQR');
+      } catch {
+        setQrScanState('二维码识别引擎加载失败，请检查网络后重试。');
+        return;
+      }
     }
 
     qrScan.stream = await navigator.mediaDevices.getUserMedia({
@@ -1576,21 +1684,27 @@ onClick('btnLogin', async () => {
       body: JSON.stringify({ username: $('username').value.trim(), password: $('password').value }),
     });
     state.token = data.access_token;
-    const me = await api('/api/v1/auth/me', { headers: authHeaders() });
-    state.profile.username = me.username || $('username').value.trim() || state.profile.username || 'admin';
-    state.profile.nickname = me.nickname || '';
-    state.profile.avatar = me.avatar_url || '';
-    saveProfileState();
+    storeToken(state.token);
+    state.profile.username = $('username').value.trim() || state.profile.username || 'admin';
     applyProfileUI();
     setLoginState('登录成功');
     switchScreen(true);
     closeDetailPages();
     switchTab(state.activeTab || 'tab-workbench');
+    api('/api/v1/auth/me', { headers: authHeaders() }).then((me) => {
+      state.profile.username = me.username || state.profile.username || 'admin';
+      state.profile.nickname = me.nickname || '';
+      state.profile.avatar = me.avatar_url || '';
+      saveProfileState();
+      applyProfileUI();
+    }).catch(() => {});
+    refreshErrorSystems().catch(() => {});
   } catch (e) { setLoginState(`登录失败：${e.message}`); }
 });
 
 function doLogout() {
   state.token = '';
+  clearStoredToken();
   state.activeDetailPage = '';
   state.activeTab = 'tab-workbench';
   try {
@@ -1605,6 +1719,35 @@ function doLogout() {
 }
 
 onClick('btnLogout', doLogout);
+
+async function restoreSession() {
+  if (!state.token) {
+    setLoginState('未登录');
+    switchScreen(false);
+    return false;
+  }
+
+  try {
+    const me = await api('/api/v1/auth/me', { headers: authHeaders() });
+    state.profile.username = me.username || state.profile.username || 'admin';
+    state.profile.nickname = me.nickname || '';
+    state.profile.avatar = me.avatar_url || '';
+    saveProfileState();
+    applyProfileUI();
+    setLoginState(`已恢复登录：${state.profile.username}`);
+    switchScreen(true);
+    closeDetailPages();
+    switchTab(state.activeTab || 'tab-workbench');
+    refreshErrorSystems().catch(() => {});
+    return true;
+  } catch (e) {
+    state.token = '';
+    clearStoredToken();
+    setLoginState('登录已过期，请重新登录');
+    switchScreen(false);
+    return false;
+  }
+}
 
 onClick('btnSaveProfile', async () => {
   try {
@@ -1754,50 +1897,47 @@ function switchResultTab(tab) {
 
 async function loadSystemLogConfigs(systemId) {
   if (!systemId) return [];
-  if (state.logConfigsBySystem[systemId]) return state.logConfigsBySystem[systemId];
-  const data = await api(`/api/v1/systems/${systemId}/log-configs`, { headers: authHeaders() });
-  const items = Array.isArray(data?.items) ? data.items : [];
-  state.logConfigsBySystem[systemId] = items;
-  return items;
+  if (Object.prototype.hasOwnProperty.call(state.logConfigsBySystem, systemId)) {
+    return state.logConfigsBySystem[systemId] || [];
+  }
+  if (state.logConfigsLoadingBySystem[systemId]) {
+    return state.logConfigsLoadingBySystem[systemId];
+  }
+  state.logConfigsLoadingBySystem[systemId] = api(`/api/v1/systems/${systemId}/log-configs`, { headers: authHeaders() })
+    .then((data) => {
+      const items = Array.isArray(data?.items) ? data.items : [];
+      state.logConfigsBySystem[systemId] = items;
+      return items;
+    })
+    .finally(() => {
+      delete state.logConfigsLoadingBySystem[systemId];
+    });
+  return state.logConfigsLoadingBySystem[systemId];
 }
 
-async function syncLogFileOptions() {
-  const source = $('errorSource')?.value || 'aegis';
+function renderLogFileOptionsFromConfigs(systemId, configs) {
   const select = $('errorFileName');
   if (!select) return;
 
-  let options = [
-    { value: 'backend-https.log', label: 'backend-https.log' },
-    { value: 'backend.log', label: 'backend.log' },
-    { value: 'frontend-mobile-https.log', label: 'frontend-mobile-https.log' },
-    { value: 'frontend-mobile.log', label: 'frontend-mobile.log' },
-    { value: 'frontend-admin-https.log', label: 'frontend-admin-https.log' },
-    { value: 'frontend-admin.log', label: 'frontend-admin.log' },
-  ];
+  const options = (configs || []).map((item) => ({
+    value: String(item.id),
+    label: item.log_name || item.absolute_path || '日志',
+    config: item,
+  }));
 
-  if (source === 'system') {
-    const systemId = Number($('errorSystem')?.value || state.selectedLogSystemId || state.selectedStatusSystemId || 0);
-    state.selectedLogSystemId = systemId || null;
-    try {
-      const configs = await loadSystemLogConfigs(systemId);
-      options = configs.map((item) => ({
-        value: String(item.id),
-        label: `${item.log_name || '日志'}：${item.absolute_path}`,
-        config: item,
-      }));
-    } catch (e) {
-      options = [];
-      if ($('errorAiStatus')) $('errorAiStatus').textContent = `日志配置读取失败：${e.message}`;
-    }
-  }
-
-  select.innerHTML = `<option value="" selected disabled>请选择文件</option>` + options.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
-  if (source === 'system' && options.length) {
+  select.innerHTML = `<option value="" selected disabled>${options.length ? '请选择日志' : '暂无日志配置'}</option>` + options.map((item) => `<option value="${item.value}">${escapeHtml(item.label)}</option>`).join('');
+  if (options.length) {
     select.value = options[0].value;
     state.selectedLogConfig = options[0].config || null;
   } else {
     state.selectedLogConfig = null;
   }
+}
+
+function syncLogFileOptions() {
+  const systemId = Number($('errorSystem')?.value || state.selectedLogSystemId || state.selectedStatusSystemId || 0);
+  state.selectedLogSystemId = systemId || null;
+  renderLogFileOptionsFromConfigs(systemId, state.logConfigsBySystem[systemId] || []);
 }
 
 function updateTimeSummary() {
@@ -1863,21 +2003,27 @@ if ($('errorStartAt') && $('errorEndAt')) {
   syncQuickRangeInputs(state.selectedQuickRange || '1h');
 }
 
-if ($('errorSource')) {
-  $('errorSource').addEventListener('change', () => {
-    syncLogFileOptions();
-  });
-  syncLogFileOptions();
-}
-
 if ($('errorSystem')) {
-  $('errorSystem').addEventListener('change', () => {
+  $('errorSystem').addEventListener('focus', () => {
+    renderErrorSystemOptions();
+  });
+  $('errorSystem').addEventListener('change', async () => {
     state.selectedLogSystemId = Number($('errorSystem').value || 0) || null;
-    syncLogFileOptions();
+    renderLogFileOptionsFromConfigs(state.selectedLogSystemId, state.logConfigsBySystem[state.selectedLogSystemId] || []);
+    try {
+      const configs = await loadSystemLogConfigs(state.selectedLogSystemId);
+      renderLogFileOptionsFromConfigs(state.selectedLogSystemId, configs);
+    } catch (e) {
+      state.selectedLogConfig = null;
+      if ($('errorAiStatus')) $('errorAiStatus').textContent = `日志配置读取失败：${e.message}`;
+    }
   });
 }
 
 if ($('errorFileName')) {
+  $('errorFileName').addEventListener('focus', () => {
+    syncLogFileOptions();
+  });
   $('errorFileName').addEventListener('change', () => {
     const systemId = Number($('errorSystem')?.value || state.selectedLogSystemId || 0);
     const configs = state.logConfigsBySystem[systemId] || [];
@@ -1888,11 +2034,6 @@ if ($('errorFileName')) {
 if ($('errorLogLevel')) {
   $('errorLogLevel').value = 'warning';
 }
-if ($('errorSource')) {
-  $('errorSource').value = 'aegis';
-  syncLogFileOptions();
-  if ($('errorFileName')) $('errorFileName').value = 'backend-https.log';
-}
 updateTimeSummary();
 document.querySelectorAll('.result-tab-btn').forEach((btn) => {
   btn.addEventListener('click', () => switchResultTab(btn.dataset.resultTab || 'logs'));
@@ -1901,19 +2042,19 @@ switchResultTab('logs');
 
 onClick('btnLoadErrors', async () => {
   try {
-    const source = $('errorSource').value;
-    const selectedConfig = source === 'system' ? state.selectedLogConfig : null;
+    const source = 'system';
+    const selectedConfig = state.selectedLogConfig;
     const configuredPath = selectedConfig?.absolute_path || '';
-    const fileName = selectedConfig
-      ? (configuredPath.split('/').filter(Boolean).at(-1) || selectedConfig.log_name || $('errorFileName').value)
-      : $('errorFileName').value;
+    const fileName = selectedConfig ? configuredPath : $('errorFileName').value;
+    if (!state.selectedLogSystemId) throw new Error('请先选择系统');
+    if (!configuredPath) throw new Error('该系统暂无管理端日志配置');
     const level = $('errorLogLevel').value;
     const startAt = $('errorStartAt').value;
     const endAt = $('errorEndAt').value;
     const quickRange = state.selectedQuickRange || '1h';
     $('errorAiStatus').textContent = configuredPath
       ? `正在提取 ${configuredPath}，请稍等...`
-      : `正在提取${source === 'aegis' ? ' Aegis ' : ''}日志，请稍等...`;
+      : '正在提取日志，请稍等...';
     const query = new URLSearchParams({
       source,
       file_name: fileName,
@@ -1947,8 +2088,8 @@ onClick('btnAnalyzeErrors', async () => {
   try {
     const detail = state.extractedErrors.length
       ? state.extractedErrors.map((e) => e.line || `${e.at} ${e.method || ''} ${e.url || ''} status=${e.status || 0} err=${e.network_error || ''}`).join('\n').slice(0, 1800)
-      : '暂无 Aegis 日志，建议先执行“提取错误日志”。';
-    const payload = { title: 'Aegis 日志分析', detail, severity: $('errorLogLevel').value === 'error' ? 'high' : $('errorLogLevel').value === 'warning' ? 'medium' : 'low' };
+      : '暂无系统日志，建议先执行“提取日志”。';
+    const payload = { title: '系统日志分析', detail, severity: $('errorLogLevel').value === 'error' ? 'high' : $('errorLogLevel').value === 'warning' ? 'medium' : 'low' };
     const result = await api('/api/v1/ai/diagnose', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
     $('errorAiStatus').textContent = 'AI 分析完成。';
     show('errorAiView', formatErrorAiResult(result));
@@ -2047,7 +2188,8 @@ renderAiAttachmentList();
 applyAiSidebarState();
 initApiBaseInput();
 applyProfileUI();
-setLoginState('未登录');
-switchScreen(false);
 closeDetailPages();
 switchTab('tab-workbench');
+setLoginState(state.token ? '正在恢复登录...' : '未登录');
+switchScreen(Boolean(state.token));
+restoreSession();

@@ -62,6 +62,45 @@ def list_accessible_systems(db: Session = Depends(get_db), current_user: User = 
     }
 
 
+@router.get("/accessible-log-configs")
+def list_accessible_system_log_configs(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    systems = _visible_system_query(db, current_user).order_by(System.id.asc()).all()
+    system_ids = [item.id for item in systems]
+    log_rows = (
+        db.query(SystemLogConfig)
+        .filter(SystemLogConfig.system_id.in_(system_ids), SystemLogConfig.is_active.is_(True))
+        .order_by(SystemLogConfig.system_id.asc(), SystemLogConfig.id.asc())
+        .all()
+        if system_ids else []
+    )
+    logs_by_system: Dict[int, List[SystemLogConfig]] = {}
+    for row in log_rows:
+        logs_by_system.setdefault(row.system_id, []).append(row)
+
+    return {
+        "items": [
+            {
+                "system_id": s.id,
+                "system_code": s.system_code,
+                "system_name": s.name,
+                "host_address": s.host_address,
+                "env": s.env,
+                "log_configs": [
+                    {
+                        "id": item.id,
+                        "log_name": item.log_name,
+                        "absolute_path": item.absolute_path,
+                        "log_level": item.log_level,
+                        "remark": item.remark,
+                    }
+                    for item in logs_by_system.get(s.id, [])
+                ],
+            }
+            for s in systems
+        ]
+    }
+
+
 @router.get("/{system_id}/log-configs")
 def list_system_log_configs(system_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     system = _visible_system_query(db, current_user).filter(System.id == system_id).first()

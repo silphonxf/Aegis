@@ -126,6 +126,11 @@ def test_accessible_systems_and_log_configs_are_owner_scoped(client, admin_heade
     assert accessible.status_code == 200, accessible.text
     assert [item["system_id"] for item in accessible.json()["items"]] == [owned_id]
 
+    combined = client.get("/api/v1/systems/accessible-log-configs", headers=user_headers)
+    assert combined.status_code == 200, combined.text
+    assert [item["system_id"] for item in combined.json()["items"]] == [owned_id]
+    assert combined.json()["items"][0]["log_configs"][0]["absolute_path"] == "/data/app/logs/owned.log"
+
     logs = client.get(f"/api/v1/systems/{owned_id}/log-configs", headers=user_headers)
     assert logs.status_code == 200, logs.text
     assert logs.json()["host_address"] == "172.16.1.10"

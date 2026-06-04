@@ -133,3 +133,34 @@ def test_toolbox_error_logs_accepts_aegis_https_alias(client, admin_headers, mon
     body = resp.json()
     assert "示例告警" in body["content"]
     assert "backend-https.log" in body["source_detail"]
+
+
+def test_toolbox_error_logs_reads_configured_system_log_path(client, admin_headers, tmp_path):
+    log_file = tmp_path / "configured-system.log"
+    log_file.write_text(
+        "2026-06-04 12:00:00 INFO app normal\n"
+        "2026-06-04 12:01:00 ERROR app configured path failed\n",
+        encoding="utf-8",
+    )
+    created = client.post(
+        "/api/v1/admin/systems",
+        headers=admin_headers,
+        json={
+            "system_code": "SYS-LOG-CONFIG-001",
+            "name": "日志配置系统",
+            "host_address": "127.0.0.1",
+            "env": "prod",
+            "log_configs": [{"log_name": "configured", "absolute_path": str(log_file), "log_level": "error"}],
+        },
+    )
+    assert created.status_code == 200, created.text
+
+    resp = client.get(
+        "/api/v1/toolbox/error-logs",
+        headers=admin_headers,
+        params={"source": "system", "file_name": str(log_file), "level": "error", "lines": 20},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "configured path failed" in body["content"]
+    assert str(log_file) in body["source_detail"]

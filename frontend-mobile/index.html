@@ -376,21 +376,14 @@
           <div class="detail-body tool-layout log-analysis-layout">
             <section class="card-inline log-filter-card compact">
               <div class="grid two compact-grid">
-                <label>日志来源
-                  <select id="errorSource">
-                    <option value="" selected disabled>请选择来源</option>
-                    <option value="aegis">Aegis 日志</option>
-                    <option value="system">系统日志</option>
-                  </select>
-                </label>
                 <label>系统
                   <select id="errorSystem">
                     <option value="" selected disabled>请选择系统</option>
                   </select>
                 </label>
-                <label>日志位置
+                <label>日志
                   <select id="errorFileName">
-                    <option value="" selected disabled>请选择文件</option>
+                    <option value="" selected disabled>请选择日志</option>
                   </select>
                 </label>
               </div>
@@ -729,8 +722,6 @@
     <div class="scanner-tip">请将二维码放入框内，识别后自动返回</div>
     <button id="btnCloseScanner" class="scanner-close">关闭</button>
   </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-  <script src="./app.js"></script>
+  <script defer src="./app.js"></script>
 </body>
 </html>
