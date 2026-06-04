@@ -142,17 +142,17 @@ bindClick('btnEmergencyProcessMockSave', () => ns.emergencyConfig?.saveProcessAc
 bindClick('btnEmergencyProcessMockList', () => ns.emergencyConfig?.listProcessActions?.());
 bindClick('btnToolTaskList', () => ns.toolbox.listTasks().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnToolTaskUpdate', () => ns.toolbox.updateTask().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
-bindClick('btnListAssets', () => ns.assets.listAssets().catch((e) => { $('assetListResult').textContent = formatError('资产列表', e); }));
+bindClick('btnListAssets', () => ns.assets.listAssets().catch((e) => { $('assetListResult').textContent = formatError('机房列表', e); }));
 bindClick('btnAssetFilterClear', () => {
   ns.assets?.clearFilters?.();
-  ns.assets?.listAssets?.().catch((e) => { $('assetListResult').textContent = formatError('资产列表', e); });
+  ns.assets?.listAssets?.().catch((e) => { $('assetListResult').textContent = formatError('机房列表', e); });
 });
 bindClick('btnAssetExport', async () => {
   try {
     const url = `${ns.api.base()}/api/v1/admin/assets/export?${ns.assets.buildAssetQuery()}`;
     window.open(url, '_blank', 'noopener');
   } catch (e) {
-    $('assetResult').textContent = formatError('资产导出', e);
+    $('assetResult').textContent = formatError('机房导出', e);
   }
 });
 bindClick('btnFindUsers', () => ns.users.findUsers($('userSearchKeyword').value.trim()).catch((e) => {
@@ -205,10 +205,10 @@ bindClick('btnSubmitCreateSystem', () => ns.modals.submitCreateSystem().catch((e
   $('systemListTbody').innerHTML = '<tr><td colspan="9">操作失败</td></tr>';
 }));
 bindClick('btnSubmitCreateAsset', () => ns.modals.submitCreateAsset().catch((e) => {
-  $('assetResult').textContent = formatError('资产操作', e);
+  $('assetResult').textContent = formatError('机房操作', e);
 }));
 bindClick('btnBatchAssets', () => ns.assets.batchAssets().catch((e) => {
-  $('assetResult').textContent = formatError('资产导入', e);
+  $('assetResult').textContent = formatError('机房导入', e);
 }));
 
 bindClick('btnRefreshHistory', () => ns.api.renderHistory());

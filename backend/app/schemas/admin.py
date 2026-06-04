@@ -37,8 +37,11 @@ class UpdateAssetRequest(BaseModel):
 
 
 class CreateRoomRequest(BaseModel):
-    room_code: str = Field(min_length=1, max_length=64)
+    room_code: Optional[str] = Field(default=None, min_length=1, max_length=64)
     room_name: str = Field(min_length=1, max_length=128)
+    qr_content: str = Field(min_length=1, max_length=255)
+    nfc_tag: Optional[str] = Field(default=None, max_length=255)
+    check_items: List[str] = Field(default_factory=list, max_items=50)
     building: Optional[str] = Field(default=None, max_length=128)
     floor: Optional[str] = Field(default=None, max_length=64)
     location_detail: Optional[str] = Field(default=None, max_length=255)
@@ -49,6 +52,9 @@ class CreateRoomRequest(BaseModel):
 class UpdateRoomRequest(BaseModel):
     room_code: Optional[str] = Field(default=None, min_length=1, max_length=64)
     room_name: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    qr_content: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    nfc_tag: Optional[str] = Field(default=None, max_length=255)
+    check_items: Optional[List[str]] = Field(default=None, max_items=50)
     building: Optional[str] = Field(default=None, max_length=128)
     floor: Optional[str] = Field(default=None, max_length=64)
     location_detail: Optional[str] = Field(default=None, max_length=255)

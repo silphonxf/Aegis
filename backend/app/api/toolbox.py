@@ -254,25 +254,26 @@ def _read_selected_logs(source: str, file_name: Optional[str], level: str, start
     if chunks:
         return "\n\n".join(chunks)[-120000:], ", ".join(used_sources)
 
-    for path in candidates:
-        try:
-            lines_buf = _read_log_tail(path)
-        except OSError:
-            continue
-        matched = []
-        for raw in lines_buf:
-            line = raw.rstrip("\n")
-            if not line.strip():
+    if (level or "warning").lower() == "info":
+        for path in candidates:
+            try:
+                lines_buf = _read_log_tail(path)
+            except OSError:
                 continue
-            if not _matches_time_range(line, start_dt, end_dt):
-                continue
-            matched.append(line)
-        if matched:
-            chunks.append(f"===== {os.path.basename(path)} =====\n" + "\n".join(matched[-lines:]))
-            used_sources.append(path)
+            matched = []
+            for raw in lines_buf:
+                line = raw.rstrip("\n")
+                if not line.strip():
+                    continue
+                if not _matches_time_range(line, start_dt, end_dt):
+                    continue
+                matched.append(line)
+            if matched:
+                chunks.append(f"===== {os.path.basename(path)} =====\n" + "\n".join(matched[-lines:]))
+                used_sources.append(path)
 
-    if chunks:
-        return "\n\n".join(chunks)[-120000:], ", ".join(used_sources)
+        if chunks:
+            return "\n\n".join(chunks)[-120000:], ", ".join(used_sources)
 
     return "", "未命中符合筛选条件的日志"
 

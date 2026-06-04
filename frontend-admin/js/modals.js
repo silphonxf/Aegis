@@ -93,17 +93,11 @@ window.AegisAdmin = window.AegisAdmin || {};
   function resetCreateAssetModal() {
     ns.state.editingAssetId = null;
     const defaults = {
-      modalAssetCode: '',
       modalAssetName: '',
-      modalAssetCategory: 'server',
-      modalAssetSystemId: '',
-      modalAssetRoomId: '',
-      modalAssetLocation: '',
-      modalAssetIpAddress: '',
-      modalAssetPort: '',
-      modalAssetConnectionType: '',
+      modalAssetQrContent: '',
+      modalAssetNfcTag: '',
+      modalAssetCheckItems: '',
       modalAssetRemark: '',
-      modalAssetStatus: 'in_use',
     };
     Object.entries(defaults).forEach(([id, value]) => {
       const el = document.getElementById(id);
@@ -111,7 +105,7 @@ window.AegisAdmin = window.AegisAdmin || {};
     });
     const title = document.getElementById('assetModalTitle');
     const submit = document.getElementById('btnSubmitCreateAsset');
-    if (title) title.textContent = '新增资产';
+    if (title) title.textContent = '新增机房';
     if (submit) submit.textContent = '确认新增';
   }
 
@@ -207,19 +201,13 @@ window.AegisAdmin = window.AegisAdmin || {};
     ns.state.editingAssetId = item.id;
     const title = document.getElementById('assetModalTitle');
     const submit = document.getElementById('btnSubmitCreateAsset');
-    if (title) title.textContent = '编辑资产';
+    if (title) title.textContent = '编辑机房';
     if (submit) submit.textContent = '保存修改';
-    setValue('modalAssetCode', item.asset_code);
-    setValue('modalAssetName', item.name);
-    setValue('modalAssetCategory', item.category || 'server');
-    setValue('modalAssetSystemId', item.system_id);
-    setValue('modalAssetRoomId', item.room_id);
-    setValue('modalAssetLocation', item.location);
-    setValue('modalAssetIpAddress', item.ip_address);
-    setValue('modalAssetPort', item.port);
-    setValue('modalAssetConnectionType', item.connection_type);
+    setValue('modalAssetName', item.room_name);
+    setValue('modalAssetQrContent', item.qr_content);
+    setValue('modalAssetNfcTag', item.nfc_tag);
+    setValue('modalAssetCheckItems', (item.check_items || []).join('\n'));
     setValue('modalAssetRemark', item.remark);
-    setValue('modalAssetStatus', item.status || 'in_use');
     openModal('createAssetModal');
   }
 
@@ -280,17 +268,14 @@ window.AegisAdmin = window.AegisAdmin || {};
 
   async function submitCreateAsset() {
     const payload = {
-      asset_code: document.getElementById('modalAssetCode').value.trim(),
-      name: document.getElementById('modalAssetName').value.trim(),
-      category: document.getElementById('modalAssetCategory').value.trim() || 'server',
-      system_id: document.getElementById('modalAssetSystemId').value.trim() ? Number(document.getElementById('modalAssetSystemId').value) : null,
-      room_id: document.getElementById('modalAssetRoomId').value.trim() ? Number(document.getElementById('modalAssetRoomId').value) : null,
-      location: document.getElementById('modalAssetLocation').value.trim() || null,
-      ip_address: document.getElementById('modalAssetIpAddress').value.trim() || null,
-      port: document.getElementById('modalAssetPort').value.trim() ? Number(document.getElementById('modalAssetPort').value) : null,
-      connection_type: document.getElementById('modalAssetConnectionType').value.trim() || null,
+      room_name: document.getElementById('modalAssetName').value.trim(),
+      qr_content: document.getElementById('modalAssetQrContent').value.trim(),
+      nfc_tag: document.getElementById('modalAssetNfcTag').value.trim() || null,
+      check_items: (document.getElementById('modalAssetCheckItems').value || '')
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean),
       remark: document.getElementById('modalAssetRemark').value.trim() || null,
-      status: document.getElementById('modalAssetStatus').value.trim() || 'in_use',
     };
     const d = ns.state.editingAssetId
       ? await ns.assets.updateAsset(ns.state.editingAssetId, payload)

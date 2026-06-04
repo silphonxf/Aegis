@@ -969,6 +969,7 @@ function initSubNavigation() {
         state.qrScanText = '';
         state.qrResolvedPoint = null;
         if ($('inspectionPointName')) $('inspectionPointName').value = '';
+        renderInspectionChecklist([], null);
         show('inspectionResult', '可先手动填写巡检点，也可以点击“开始扫码”自动识别。');
       }
 
@@ -1594,12 +1595,49 @@ async function resolveNfcLocation(tagText) {
   return resolved;
 }
 
+function renderInspectionChecklist(checkItems = [], monitoring = null) {
+  const host = $('inspectionCheckItems');
+  if (host) {
+    const rows = (checkItems || []).map((item, index) => `
+      <div class="check-row" data-check-index="${index}">
+        <span>${escapeHtml(item)}</span>
+        <select data-check-result>
+          <option value="normal">正常</option>
+          <option value="abnormal">异常</option>
+        </select>
+      </div>
+    `).join('');
+    host.innerHTML = rows || '<div class="hint">该机房暂未配置检查项。</div>';
+  }
+
+  const monitorHost = $('inspectionMonitoringItem');
+  if (monitorHost) {
+    const options = monitoring?.options || [{ value: 'monitoring_no_alarm', label: '监控无异常' }];
+    monitorHost.innerHTML = `
+      <div class="check-row">
+        <span>${escapeHtml(monitoring?.label || '监控无异常')}</span>
+        <select id="inspectionMonitoringConfirm">
+          ${options.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join('')}
+        </select>
+      </div>
+    `;
+  }
+}
+
+function collectInspectionCheckResults() {
+  return Array.from(document.querySelectorAll('#inspectionCheckItems .check-row')).map((row) => ({
+    item: row.querySelector('span')?.textContent || '',
+    result: row.querySelector('[data-check-result]')?.value || 'normal',
+  }));
+}
+
 async function resolveQrPoint(tagText) {
   const resolved = await api(`/api/v1/inspections/points/resolve?qr_content=${encodeURIComponent(tagText)}`, { headers: authHeaders() });
   state.qrResolvedPoint = resolved;
-  const pointName = resolved.point_name || resolved.location || resolved.point_code || '';
-  if ($('inspectionPointName')) $('inspectionPointName').value = pointName;
-  show('inspectionResult', `扫码成功，已定位巡检点：${pointName || '未命名点位'}。`);
+  const roomName = resolved.room_name || resolved.point_name || resolved.location || resolved.point_code || '';
+  if ($('inspectionPointName')) $('inspectionPointName').value = roomName;
+  renderInspectionChecklist(resolved.check_items || [], resolved.monitoring_confirmation || null);
+  show('inspectionResult', `扫码成功，已定位机房：${roomName || '未命名机房'}。`);
   return resolved;
 }
 
@@ -1817,11 +1855,17 @@ onClick('btnCreateInspection', async () => {
     if (!qrText) throw new Error('请先调用相机完成二维码扫描');
 
     const resolved = state.qrResolvedPoint || await resolveQrPoint(qrText);
+    const checkResults = collectInspectionCheckResults();
+    const monitoringConfirmation = $('inspectionMonitoringConfirm')?.value || 'monitoring_no_alarm';
+    const hasAbnormal = checkResults.some((item) => item.result === 'abnormal') || monitoringConfirmation === 'alarm_abnormal_processing';
     const payload = {
-      system_id: Number(resolved.system_id),
+      system_id: resolved.system_id ? Number(resolved.system_id) : null,
       point_id: Number(resolved.point_id),
-      result: $('insResult').value,
+      room_id: resolved.room_id ? Number(resolved.room_id) : null,
+      result: hasAbnormal ? 'abnormal' : 'normal',
       note: $('insNote').value || null,
+      check_results: checkResults,
+      monitoring_confirmation: monitoringConfirmation,
       inspected_at: new Date().toISOString(),
     };
     const created = await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });

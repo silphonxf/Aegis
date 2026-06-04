@@ -135,9 +135,9 @@ start_local_processes() {
   ensure_https_assets
   run_migrations
 
-  nohup bash -lc "cd '$BACKEND_DIR' && PYTHONPATH=. '$VENV_UVICORN' app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} --ssl-certfile '$HTTPS_CERT' --ssl-keyfile '$HTTPS_KEY'" > "$LOG_DIR/backend-https.log" 2>&1 &
-  nohup "$VENV_PYTHON" "$ROOT_DIR/scripts/serve_https.py" --host 0.0.0.0 --port ${MOBILE_PORT} --dir "$MOBILE_DIR" --cert "$HTTPS_CERT" --key "$HTTPS_KEY" > "$LOG_DIR/frontend-mobile.log" 2>&1 &
-  nohup "$VENV_PYTHON" "$ROOT_DIR/scripts/serve_https.py" --host 0.0.0.0 --port ${ADMIN_PORT} --dir "$ADMIN_DIR" --cert "$HTTPS_CERT" --key "$HTTPS_KEY" > "$LOG_DIR/frontend-admin.log" 2>&1 &
+  setsid -f bash -lc "cd '$BACKEND_DIR' && PYTHONPATH=. '$VENV_UVICORN' app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} --ssl-certfile '$HTTPS_CERT' --ssl-keyfile '$HTTPS_KEY' > '$LOG_DIR/backend-https.log' 2>&1"
+  setsid -f bash -lc "'$VENV_PYTHON' '$ROOT_DIR/scripts/serve_https.py' --host 0.0.0.0 --port ${MOBILE_PORT} --dir '$MOBILE_DIR' --cert '$HTTPS_CERT' --key '$HTTPS_KEY' > '$LOG_DIR/frontend-mobile.log' 2>&1"
+  setsid -f bash -lc "'$VENV_PYTHON' '$ROOT_DIR/scripts/serve_https.py' --host 0.0.0.0 --port ${ADMIN_PORT} --dir '$ADMIN_DIR' --cert '$HTTPS_CERT' --key '$HTTPS_KEY' > '$LOG_DIR/frontend-admin.log' 2>&1"
 
   sleep 3
   echo "📋 Local dev process status:"

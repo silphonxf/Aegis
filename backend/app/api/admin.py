@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 from io import BytesIO, StringIO
 import csv
+import json
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -350,6 +351,59 @@ def _validate_inspection_point_refs(db: Session, room_id: Optional[int], system_
         raise HTTPException(status_code=400, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在"})
 
 
+def _normalize_check_items(items: Optional[List[str]]) -> str:
+    cleaned = [str(item).strip() for item in (items or []) if str(item).strip()]
+    return json.dumps(cleaned, ensure_ascii=False)
+
+
+def _parse_check_items(value: Optional[str]) -> List[str]:
+    if not value:
+        return []
+    try:
+        data = json.loads(value)
+        if isinstance(data, list):
+            return [str(item).strip() for item in data if str(item).strip()]
+    except Exception:
+        pass
+    return [line.strip() for line in value.splitlines() if line.strip()]
+
+
+def _generate_room_code(db: Session) -> str:
+    prefix = datetime.utcnow().strftime("ROOM-%Y%m%d%H%M%S")
+    candidate = prefix
+    index = 1
+    while db.query(Room).filter(Room.room_code == candidate).first():
+        index += 1
+        candidate = f"{prefix}-{index}"
+    return candidate
+
+
+def _ensure_room_inspection_point(db: Session, room: Room) -> None:
+    qr_content = (getattr(room, "qr_content", None) or "").strip()
+    if not qr_content:
+        return
+    point = (
+        db.query(InspectionPoint)
+        .filter(InspectionPoint.room_id == room.id, InspectionPoint.point_code == f"ROOM-{room.id}")
+        .first()
+    )
+    if not point:
+        point = db.query(InspectionPoint).filter(InspectionPoint.qr_content == qr_content).first()
+    if not point:
+        point = InspectionPoint(room_id=room.id, point_code=f"ROOM-{room.id}", is_active=True)
+        db.add(point)
+    point.room_id = room.id
+    point.point_code = point.point_code or f"ROOM-{room.id}"
+    point.point_name = room.room_name
+    point.point_type = "room"
+    point.qr_content = qr_content
+    point.nfc_tag = (getattr(room, "nfc_tag", None) or None)
+    point.location = room.room_name
+    point.location_detail = room.location_detail or room.room_name
+    point.is_active = room.is_active
+    point.updated_at = datetime.utcnow()
+
+
 def _apply_updates(instance, values: Dict[str, Any]) -> None:
     for key, value in values.items():
         setattr(instance, key, value)
@@ -622,6 +676,7 @@ def retire_asset(
 def list_rooms(
     page: int = 1,
     size: int = 200,
+    keyword: Optional[str] = None,
     include_inactive: bool = False,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
@@ -631,6 +686,13 @@ def list_rooms(
     q = db.query(Room)
     if not include_inactive:
         q = q.filter(Room.is_active.is_(True))
+    if keyword:
+        q = q.filter(
+            (Room.room_code.like(f"%{keyword}%"))
+            | (Room.room_name.like(f"%{keyword}%"))
+            | (Room.qr_content.like(f"%{keyword}%"))
+            | (Room.nfc_tag.like(f"%{keyword}%"))
+        )
     total = q.count()
     items = q.order_by(Room.id.asc()).offset((page - 1) * size).limit(size).all()
     return {
@@ -642,6 +704,9 @@ def list_rooms(
                 "id": item.id,
                 "room_code": item.room_code,
                 "room_name": item.room_name,
+                "qr_content": getattr(item, "qr_content", None),
+                "nfc_tag": getattr(item, "nfc_tag", None),
+                "check_items": _parse_check_items(getattr(item, "check_items", None)),
                 "building": item.building,
                 "floor": item.floor,
                 "location_detail": item.location_detail,
@@ -661,10 +726,20 @@ def create_room(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
-    if db.query(Room).filter(Room.room_code == payload.room_code).first():
+    room_code = payload.room_code or _generate_room_code(db)
+    if db.query(Room).filter(Room.room_code == room_code).first():
         raise HTTPException(status_code=400, detail={"code": "ROOM_EXISTS", "message": "机房编码已存在"})
-    room = Room(**payload.dict())
+    if db.query(Room).filter(Room.qr_content == payload.qr_content).first() or db.query(InspectionPoint).filter(InspectionPoint.qr_content == payload.qr_content).first():
+        raise HTTPException(status_code=400, detail={"code": "ROOM_QR_EXISTS", "message": "二维码值已存在"})
+    if payload.nfc_tag and (db.query(Room).filter(Room.nfc_tag == payload.nfc_tag).first() or db.query(InspectionPoint).filter(InspectionPoint.nfc_tag == payload.nfc_tag).first()):
+        raise HTTPException(status_code=400, detail={"code": "ROOM_NFC_EXISTS", "message": "NFC 值已存在"})
+    values = payload.dict()
+    values["room_code"] = room_code
+    values["check_items"] = _normalize_check_items(payload.check_items)
+    room = Room(**values)
     db.add(room)
+    db.flush()
+    _ensure_room_inspection_point(db, room)
     db.commit()
     db.refresh(room)
     log_action(db, "create_room", "room", current_user, {"room_id": room.id, "room_code": room.room_code})
@@ -685,7 +760,20 @@ def update_room(
     if "room_code" in values and values["room_code"] != room.room_code:
         if db.query(Room).filter(Room.room_code == values["room_code"], Room.id != room_id).first():
             raise HTTPException(status_code=400, detail={"code": "ROOM_EXISTS", "message": "机房编码已存在"})
+    if "qr_content" in values and values["qr_content"] != room.qr_content:
+        if db.query(Room).filter(Room.qr_content == values["qr_content"], Room.id != room_id).first():
+            raise HTTPException(status_code=400, detail={"code": "ROOM_QR_EXISTS", "message": "二维码值已存在"})
+        if db.query(InspectionPoint).filter(InspectionPoint.qr_content == values["qr_content"], InspectionPoint.room_id != room_id).first():
+            raise HTTPException(status_code=400, detail={"code": "ROOM_QR_EXISTS", "message": "二维码值已存在"})
+    if "nfc_tag" in values and values["nfc_tag"] and values["nfc_tag"] != room.nfc_tag:
+        if db.query(Room).filter(Room.nfc_tag == values["nfc_tag"], Room.id != room_id).first():
+            raise HTTPException(status_code=400, detail={"code": "ROOM_NFC_EXISTS", "message": "NFC 值已存在"})
+        if db.query(InspectionPoint).filter(InspectionPoint.nfc_tag == values["nfc_tag"], InspectionPoint.room_id != room_id).first():
+            raise HTTPException(status_code=400, detail={"code": "ROOM_NFC_EXISTS", "message": "NFC 值已存在"})
+    if "check_items" in values:
+        values["check_items"] = _normalize_check_items(values.get("check_items"))
     _apply_updates(room, values)
+    _ensure_room_inspection_point(db, room)
     db.commit()
     db.refresh(room)
     log_action(db, "update_room", "room", current_user, {"room_id": room.id, "room_code": room.room_code})
@@ -703,6 +791,10 @@ def deactivate_room(
         raise HTTPException(status_code=404, detail={"code": "ROOM_NOT_FOUND", "message": "机房不存在"})
     room.is_active = False
     room.updated_at = datetime.utcnow()
+    point = db.query(InspectionPoint).filter(InspectionPoint.room_id == room.id, InspectionPoint.point_code == f"ROOM-{room.id}").first()
+    if point:
+        point.is_active = False
+        point.updated_at = datetime.utcnow()
     db.commit()
     log_action(db, "deactivate_room", "room", current_user, {"room_id": room.id, "room_code": room.room_code})
     return {"id": room.id, "is_active": room.is_active}

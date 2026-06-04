@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
+import json
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -8,6 +9,7 @@ from app.api.deps import get_current_user, require_roles
 from app.core.logging import get_logger
 from app.db.session import get_db
 from app.models.inspection import InspectionPoint, InspectionRecord
+from app.models.shared_data import Room
 from app.models.system import System
 from app.models.user import User
 from app.schemas.inspection import InspectionCreate
@@ -15,6 +17,46 @@ from app.services.audit import log_action
 
 router = APIRouter(prefix="/inspections", tags=["inspections"])
 logger = get_logger("inspections")
+
+
+def _parse_check_items(value: Optional[str]) -> List[str]:
+    if not value:
+        return []
+    try:
+        data = json.loads(value)
+        if isinstance(data, list):
+            return [str(item).strip() for item in data if str(item).strip()]
+    except Exception:
+        pass
+    return [line.strip() for line in value.splitlines() if line.strip()]
+
+
+def _monitoring_confirmation(room_id: Optional[int]) -> Dict[str, Any]:
+    return {
+        "has_alarm": False,
+        "label": "监控无异常",
+        "value": "monitoring_no_alarm",
+        "options": [{"value": "monitoring_no_alarm", "label": "监控无异常"}],
+    }
+
+
+def _serialize_resolved_point(point: InspectionPoint, db: Session) -> Dict[str, Any]:
+    room = db.query(Room).filter(Room.id == point.room_id).first() if point.room_id else None
+    system = db.query(System).filter(System.id == point.system_id).first() if point.system_id else None
+    point_name = point.point_name or (room.room_name if room else None) or point.location_detail or point.location or point.point_code
+    return {
+        "point_id": point.id,
+        "system_id": point.system_id,
+        "system_name": system.name if system else "",
+        "point_code": point.point_code,
+        "point_name": point_name,
+        "location": point.location,
+        "room_id": point.room_id,
+        "room_name": room.room_name if room else "",
+        "location_detail": point.location_detail,
+        "check_items": _parse_check_items(getattr(room, "check_items", None)) if room else [],
+        "monitoring_confirmation": _monitoring_confirmation(point.room_id),
+    }
 
 
 @router.get("/points/resolve")
@@ -40,37 +82,31 @@ def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User 
             logger.warning("解析巡检点失败: system_id=%s 未找到巡检点", system_id)
             raise HTTPException(status_code=404, detail="找不到巡检点")
 
-        point_name = point.point_name or point.location_detail or point.location or point.point_code
-        return {
-            "point_id": point.id,
-            "system_id": point.system_id,
-            "system_name": system.name,
-            "point_code": point.point_code,
-            "point_name": point_name,
-            "location": point.location,
-            "room_id": point.room_id,
-            "location_detail": point.location_detail,
-        }
+        return _serialize_resolved_point(point, db)
 
-    # 兼容旧逻辑：二维码为完整 qr_content
-    point = db.query(InspectionPoint).filter(InspectionPoint.qr_content == qr_text).first()
+    # 兼容旧逻辑：二维码/NFC 为完整内容
+    point = (
+        db.query(InspectionPoint)
+        .filter(
+            InspectionPoint.is_active.is_(True),
+            (InspectionPoint.qr_content == qr_text) | (InspectionPoint.nfc_tag == qr_text),
+        )
+        .first()
+    )
     if not point:
         logger.warning("解析巡检点失败: qr_content=%s 未命中", qr_text)
         raise HTTPException(status_code=404, detail="未找到对应巡检点")
 
-    system = db.query(System).filter(System.id == point.system_id).first()
-    point_name = point.point_name or point.location_detail or point.location or point.point_code
     logger.info("解析巡检点成功: point_id=%s system_id=%s", point.id, point.system_id)
-    return {
-        "point_id": point.id,
-        "system_id": point.system_id,
-        "system_name": system.name if system else "",
-        "point_code": point.point_code,
-        "point_name": point_name,
-        "location": point.location,
-        "room_id": point.room_id,
-        "location_detail": point.location_detail,
-    }
+    return _serialize_resolved_point(point, db)
+
+
+@router.get("/rooms/{room_id}/monitoring-confirmation")
+def room_monitoring_confirmation(room_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    room = db.query(Room).filter(Room.id == room_id, Room.is_active.is_(True)).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="机房不存在")
+    return _monitoring_confirmation(room_id)
 
 
 @router.post("/records")
@@ -81,13 +117,19 @@ def create_record(
 ):
     logger.info("创建巡检记录: user=%s system_id=%s point_id=%s result=%s", current_user.username, payload.system_id, payload.point_id, payload.result)
     point = db.query(InspectionPoint).filter(InspectionPoint.id == payload.point_id).first()
+    note_payload = {
+        "note": payload.note,
+        "check_results": payload.check_results,
+        "monitoring_confirmation": payload.monitoring_confirmation,
+    }
+    note = json.dumps(note_payload, ensure_ascii=False)
     rec = InspectionRecord(
         system_id=payload.system_id,
         point_id=payload.point_id,
         room_id=payload.room_id or (point.room_id if point else None),
         inspector_id=current_user.id,
         result=payload.result,
-        note=payload.note,
+        note=note,
         source=payload.source,
         inspected_at=payload.inspected_at,
     )

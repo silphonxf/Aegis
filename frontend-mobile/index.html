@@ -279,12 +279,11 @@
             <h2>扫码巡检</h2>
           </div>
           <div class="detail-body">
-            <label class="full">巡检点名称
+            <label class="full">机房名称
               <input id="inspectionPointName" placeholder="扫码后自动识别，不可修改" readonly />
             </label>
-            <label>结果
-              <select id="insResult"><option value="normal">正常</option><option value="abnormal">异常</option></select>
-            </label>
+            <div id="inspectionCheckItems" class="checklist-panel"></div>
+            <div id="inspectionMonitoringItem" class="checklist-panel"></div>
             <label class="full">备注<input id="insNote" placeholder="可选" /></label>
             <div class="actions">
               <button id="btnStartQrScan">调用相机扫码</button>

@@ -2,7 +2,7 @@ def test_create_and_list_rooms(client, admin_headers):
     create = client.post(
         "/api/v1/admin/rooms",
         headers=admin_headers,
-        json={"room_code": "ROOM-TEST-001", "room_name": "测试机房", "building": "A座", "floor": "3F"},
+        json={"room_code": "ROOM-TEST-001", "room_name": "测试机房", "qr_content": "QR://ROOM-TEST-001", "building": "A座", "floor": "3F"},
     )
     assert create.status_code == 200, create.text
     room_id = create.json()["id"]
@@ -15,11 +15,68 @@ def test_create_and_list_rooms(client, admin_headers):
     assert any(item["id"] == room_id and item["is_active"] is True for item in data["items"])
 
 
+def test_room_config_resolves_for_mobile_inspection(client, admin_headers):
+    create = client.post(
+        "/api/v1/admin/rooms",
+        headers=admin_headers,
+        json={
+            "room_name": "移动巡检机房",
+            "qr_content": "QR://ROOM-MOBILE-001",
+            "nfc_tag": "NFC://ROOM-MOBILE-001",
+            "check_items": ["门禁状态", "温湿度", "UPS 状态"],
+        },
+    )
+    assert create.status_code == 200, create.text
+    room_id = create.json()["id"]
+
+    listing = client.get("/api/v1/admin/rooms?keyword=ROOM-MOBILE-001", headers=admin_headers)
+    assert listing.status_code == 200, listing.text
+    room = listing.json()["items"][0]
+    assert room["room_name"] == "移动巡检机房"
+    assert room["check_items"] == ["门禁状态", "温湿度", "UPS 状态"]
+
+    resolved = client.get(
+        "/api/v1/inspections/points/resolve",
+        headers=admin_headers,
+        params={"qr_content": "QR://ROOM-MOBILE-001"},
+    )
+    assert resolved.status_code == 200, resolved.text
+    body = resolved.json()
+    assert body["room_id"] == room_id
+    assert body["room_name"] == "移动巡检机房"
+    assert body["check_items"] == ["门禁状态", "温湿度", "UPS 状态"]
+    assert body["monitoring_confirmation"]["label"] == "监控无异常"
+
+    monitoring = client.get(f"/api/v1/inspections/rooms/{room_id}/monitoring-confirmation", headers=admin_headers)
+    assert monitoring.status_code == 200, monitoring.text
+    assert monitoring.json()["has_alarm"] is False
+
+    record = client.post(
+        "/api/v1/inspections/records",
+        headers=admin_headers,
+        json={
+            "system_id": None,
+            "point_id": body["point_id"],
+            "room_id": room_id,
+            "result": "abnormal",
+            "check_results": [{"item": "门禁状态", "result": "normal"}, {"item": "温湿度", "result": "abnormal"}],
+            "monitoring_confirmation": "monitoring_no_alarm",
+            "inspected_at": "2026-06-04T15:20:00",
+        },
+    )
+    assert record.status_code == 200, record.text
+    records = client.get("/api/v1/inspections/records?result=abnormal", headers=admin_headers)
+    assert records.status_code == 200, records.text
+    target = next(item for item in records.json()["items"] if item["id"] == record.json()["id"])
+    assert target["room_id"] == room_id
+    assert "温湿度" in target["note"]
+
+
 def test_create_and_list_inspection_points(client, admin_headers):
     room = client.post(
         "/api/v1/admin/rooms",
         headers=admin_headers,
-        json={"room_code": "ROOM-TEST-002", "room_name": "巡检机房"},
+        json={"room_code": "ROOM-TEST-002", "room_name": "巡检机房", "qr_content": "QR://ROOM-TEST-002"},
     )
     assert room.status_code == 200, room.text
     room_id = room.json()["id"]
@@ -51,7 +108,7 @@ def test_create_inspection_point_can_be_room_only(client, admin_headers):
     room = client.post(
         "/api/v1/admin/rooms",
         headers=admin_headers,
-        json={"room_code": "ROOM-ONLY-001", "room_name": "无系统点位机房"},
+        json={"room_code": "ROOM-ONLY-001", "room_name": "无系统点位机房", "qr_content": "QR://ROOM-ONLY-001"},
     )
     assert room.status_code == 200, room.text
 
@@ -93,7 +150,7 @@ def test_asset_shared_fields_are_returned_and_exported(client, admin_headers):
     room = client.post(
         "/api/v1/admin/rooms",
         headers=admin_headers,
-        json={"room_code": "ROOM-ASSET-001", "room_name": "资产机房"},
+        json={"room_code": "ROOM-ASSET-001", "room_name": "资产机房", "qr_content": "QR://ROOM-ASSET-001"},
     )
     assert room.status_code == 200, room.text
     room_id = room.json()["id"]
@@ -133,7 +190,7 @@ def test_update_and_deactivate_room(client, admin_headers):
     create = client.post(
         "/api/v1/admin/rooms",
         headers=admin_headers,
-        json={"room_code": "ROOM-EDIT-001", "room_name": "待编辑机房"},
+        json={"room_code": "ROOM-EDIT-001", "room_name": "待编辑机房", "qr_content": "QR://ROOM-EDIT-001"},
     )
     assert create.status_code == 200, create.text
     room_id = create.json()["id"]
@@ -163,7 +220,7 @@ def test_update_and_deactivate_inspection_point(client, admin_headers):
     room = client.post(
         "/api/v1/admin/rooms",
         headers=admin_headers,
-        json={"room_code": "ROOM-POINT-EDIT-001", "room_name": "点位编辑机房"},
+        json={"room_code": "ROOM-POINT-EDIT-001", "room_name": "点位编辑机房", "qr_content": "QR://ROOM-POINT-EDIT-001"},
     )
     assert room.status_code == 200, room.text
 

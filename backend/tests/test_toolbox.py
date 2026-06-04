@@ -164,3 +164,34 @@ def test_toolbox_error_logs_reads_configured_system_log_path(client, admin_heade
     body = resp.json()
     assert "configured path failed" in body["content"]
     assert str(log_file) in body["source_detail"]
+
+
+def test_toolbox_error_logs_warning_does_not_fallback_to_info(client, admin_headers, tmp_path):
+    log_file = tmp_path / "info-only-system.log"
+    log_file.write_text(
+        "2026-06-04 12:00:00 INFO app normal startup\n"
+        "2026-06-04 12:01:00 INFO app regular heartbeat\n",
+        encoding="utf-8",
+    )
+    created = client.post(
+        "/api/v1/admin/systems",
+        headers=admin_headers,
+        json={
+            "system_code": "SYS-LOG-INFO-ONLY-001",
+            "name": "仅 INFO 日志系统",
+            "host_address": "127.0.0.1",
+            "env": "prod",
+            "log_configs": [{"log_name": "info-only", "absolute_path": str(log_file), "log_level": "info"}],
+        },
+    )
+    assert created.status_code == 200, created.text
+
+    resp = client.get(
+        "/api/v1/toolbox/error-logs",
+        headers=admin_headers,
+        params={"source": "system", "file_name": str(log_file), "level": "warning", "lines": 20},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "regular heartbeat" not in body["content"]
+    assert "未读取到系统日志" in body["content"]
