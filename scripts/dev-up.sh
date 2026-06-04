@@ -32,14 +32,14 @@ print_access_urls() {
 
   echo
   echo "🚀 Aegis services are up. Access URLs:"
-  echo "- Backend API:     http://127.0.0.1:${BACKEND_PORT}"
+  echo "- Backend API:     https://127.0.0.1:${BACKEND_PORT}"
   echo "- Admin Frontend:  https://127.0.0.1:${ADMIN_PORT}"
   echo "- Mobile Frontend: https://127.0.0.1:${MOBILE_PORT}"
 
   if [[ -n "$ips" ]]; then
     while IFS= read -r ip; do
       [[ -z "$ip" ]] && continue
-      echo "- Backend API (LAN):     http://$ip:${BACKEND_PORT}"
+      echo "- Backend API (LAN):     https://$ip:${BACKEND_PORT}"
       echo "- Admin Frontend (LAN):  https://$ip:${ADMIN_PORT}"
       echo "- Mobile Frontend (LAN): https://$ip:${MOBILE_PORT}"
     done <<< "$ips"
@@ -47,7 +47,7 @@ print_access_urls() {
 
   echo
   echo "🔐 默认本地管理员: admin / ${LOCAL_ADMIN_PASSWORD}"
-  echo "💡 前端 API 地址建议填当前页面主机的 :${BACKEND_PORT}"
+  echo "💡 前端 API 默认使用 https://当前页面主机:${BACKEND_PORT}"
   echo "📄 日志目录: $LOG_DIR"
   echo
 }
@@ -103,11 +103,23 @@ ensure_python_deps() {
 }
 
 ensure_https_assets() {
-  if [[ ! -f "$HTTPS_CERT" || ! -f "$HTTPS_KEY" ]]; then
-    echo "❌ 未找到 HTTPS 证书或私钥："
-    echo "   cert=$HTTPS_CERT"
-    echo "   key=$HTTPS_KEY"
-    exit 1
+  mkdir -p "$(dirname "$HTTPS_CERT")" "$(dirname "$HTTPS_KEY")"
+  local ips san_args primary_cn
+  ips="$(get_lan_ips | sort -u)"
+  primary_cn="$(printf '%s\n' "$ips" | head -n 1)"
+  [[ -n "$primary_cn" ]] || primary_cn="127.0.0.1"
+  san_args="subjectAltName=IP:127.0.0.1,DNS:localhost"
+  while IFS= read -r ip; do
+    [[ -z "$ip" || "$ip" == "127.0.0.1" ]] && continue
+    san_args="${san_args},IP:${ip}"
+  done <<< "$ips"
+
+  if [[ ! -f "$HTTPS_CERT" || ! -f "$HTTPS_KEY" ]] || ! openssl x509 -in "$HTTPS_CERT" -noout -ext subjectAltName 2>/dev/null | grep -Fq "$primary_cn"; then
+    openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+      -keyout "$HTTPS_KEY" -out "$HTTPS_CERT" \
+      -subj "/CN=${primary_cn}" \
+      -addext "$san_args" >/dev/null 2>&1
+    echo "ℹ️ 已生成/更新 HTTPS 自签名证书: $HTTPS_CERT"
   fi
 }
 
@@ -123,7 +135,7 @@ start_local_processes() {
   ensure_https_assets
   run_migrations
 
-  nohup bash -lc "cd '$BACKEND_DIR' && PYTHONPATH=. '$VENV_UVICORN' app.main:app --host 0.0.0.0 --port ${BACKEND_PORT}" > "$LOG_DIR/backend.log" 2>&1 &
+  nohup bash -lc "cd '$BACKEND_DIR' && PYTHONPATH=. '$VENV_UVICORN' app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} --ssl-certfile '$HTTPS_CERT' --ssl-keyfile '$HTTPS_KEY'" > "$LOG_DIR/backend-https.log" 2>&1 &
   nohup "$VENV_PYTHON" "$ROOT_DIR/scripts/serve_https.py" --host 0.0.0.0 --port ${MOBILE_PORT} --dir "$MOBILE_DIR" --cert "$HTTPS_CERT" --key "$HTTPS_KEY" > "$LOG_DIR/frontend-mobile.log" 2>&1 &
   nohup "$VENV_PYTHON" "$ROOT_DIR/scripts/serve_https.py" --host 0.0.0.0 --port ${ADMIN_PORT} --dir "$ADMIN_DIR" --cert "$HTTPS_CERT" --key "$HTTPS_KEY" > "$LOG_DIR/frontend-admin.log" 2>&1 &
 
@@ -131,7 +143,7 @@ start_local_processes() {
   echo "📋 Local dev process status:"
   ss -lntp | grep -E ":(${BACKEND_PORT}|${MOBILE_PORT}|${ADMIN_PORT})\\b" || true
   echo
-  curl -fsS "http://127.0.0.1:${BACKEND_PORT}/healthz" || true
+  curl -k -fsS "https://127.0.0.1:${BACKEND_PORT}/healthz" || true
   echo
   curl -k -I -fsS "https://127.0.0.1:${MOBILE_PORT}" | head -n 1 || true
   curl -k -I -fsS "https://127.0.0.1:${ADMIN_PORT}" | head -n 1 || true

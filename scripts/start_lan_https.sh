@@ -26,14 +26,18 @@ stop_all() {
 }
 
 gen_cert() {
-  if [[ -f "$CERT_FILE" && -f "$KEY_FILE" ]]; then
-    return 0
-  fi
+  local ips san_args
+  ips="$(hostname -I 2>/dev/null | awk '{for(i=1;i<=NF;i++) print $i}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | sort -u || true)"
+  san_args="subjectAltName=IP:127.0.0.1,DNS:localhost"
+  while IFS= read -r ip; do
+    [[ -z "$ip" || "$ip" == "127.0.0.1" ]] && continue
+    san_args="${san_args},IP:${ip}"
+  done <<< "$ips"
 
   openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
     -keyout "$KEY_FILE" -out "$CERT_FILE" \
     -subj "/CN=$LAN_IP" \
-    -addext "subjectAltName=IP:$LAN_IP,IP:127.0.0.1,DNS:localhost"
+    -addext "$san_args"
 }
 
 start_services() {

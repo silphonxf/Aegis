@@ -1,6 +1,6 @@
 # Aegis 持久化上下文（给我下次快速接入）
 
-> 最后更新：2026-06-02  
+> 最后更新：2026-06-03
 > 用途：避免每次都从零了解项目进度，5分钟内恢复工作上下文。
 
 ## 1. 项目定位
@@ -81,12 +81,43 @@ Aegis 是一个运维助手系统，包含：
 - [ ] 按 `docs/phase1-development-plan.md` 推进第一阶段开发
 - [ ] 关键写库接口补充达梦集成测试
 - [x] 共享主数据第一优先级缺口补齐：机房、点位、资产共享字段与测试
+- [x] 共享主数据 CRUD 第二步：系统、机房、巡检点、资产后端更新/停用接口，资产前端编辑/停用入口
 - [x] 补关键接口回归测试与 smoke 增强
 - [x] 整理本地开发脚本（up/stop/reset/status）
 - [ ] 完成第一阶段 C：工具箱 / 审批流闭环剩余交互与展示优化
 
 ## 7. 最近更新记录（倒序）
 
+
+### 2026-06-03（系统配置与移动端日志路径）
+- 管理端“资产与日常运维”子菜单收敛为“系统 / 资产 / 用户”
+- 系统页面第一版完成：列表、搜索、环境/状态筛选、排序、新增、编辑
+- 系统新增/编辑支持 `host_address`、管理员 ID 列表与多条日志绝对路径
+- 后端新增迁移 `20260603_18_system_host_logs.py`，新增 `systems.host_address` 与 `system_log_configs`
+- 移动端系统可见性改为：`admin/super_admin` 看全部系统，普通用户只看自己绑定为管理员的系统
+- 移动端错误日志分析页可按可见系统读取管理端配置的日志绝对路径
+- 已跑通：`./.venv/bin/pytest backend/tests/test_admin_systems.py -q`（`4 passed`）
+- 已跑通：前端 admin/mobile 关键 JS `node --check`
+- 剩余：真实 SSH 远程日志读取需要继续补目标服务器 SSH 凭据绑定
+
+### 2026-06-03（日志分析修复）
+- 修复移动端错误日志分析读取失败
+- 根因：移动端默认请求 `aegis-backend-https.log`，后端实际候选文件为 `.logs/backend-https.log` / `.logs/backend.log`
+- 移动端默认文件名改为 `backend-https.log`
+- 后端 `_read_selected_logs` 增加旧文件名别名兼容，避免浏览器旧选项继续触发 `LOG_FILE_NOT_FOUND`
+- `scripts/dev-up.sh` 后端 HTTPS 日志输出改为 `.logs/backend-https.log`，`scripts/dev-status.sh` 同步展示该文件
+- 已跑通：`./.venv/bin/pytest backend/tests/test_toolbox.py -q`（`6 passed`）
+- 已实测 HTTPS 日志接口能读取 `backend-https.log`
+
+### 2026-06-03（共享主数据 CRUD）
+- 接续共享主数据管理端 CRUD 缺口
+- 后端补齐系统、机房、巡检点、资产的更新/软停用接口
+- 系统更新支持负责人绑定替换与清空；系统列表返回 `is_active`
+- 资产创建、更新、批量导入统一校验系统/机房引用
+- 管理端资产列表新增编辑/停用操作列，资产弹窗复用为新增/编辑两种模式
+- 新增回归测试覆盖系统、机房、巡检点、资产的更新/停用与错误引用拒绝
+- 已跑通：`./.venv/bin/pytest backend/tests/test_rooms_points.py backend/tests/test_admin_assets.py backend/tests/test_admin_systems.py -q`（`13 passed`）
+- 已跑通：`node --check frontend-admin/js/assets.js && node --check frontend-admin/js/modals.js && node --check frontend-admin/app.js`
 
 ### 2026-06-02
 - 接续 `docs/project-progress.md` 中“共享主数据模型收敛 + 管理端承接移动端配置源重构”的第一优先级

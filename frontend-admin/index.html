@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>运维助手 - 管理后台</title>
+  <style>
+    .hidden,
+    [hidden],
+    body:not(.is-authenticated) #appView,
+    body.is-authenticated #loginView,
+    body:not(.is-authenticated) .modal {
+      display: none !important;
+    }
+  </style>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
@@ -19,7 +28,7 @@
     </div>
   </section>
 
-  <div id="appView" class="app-shell hidden">
+  <div id="appView" class="app-shell hidden" hidden aria-hidden="true">
     <aside class="sidebar">
       <div class="sidebar-brand">
         <div class="brand-mark">A</div>
@@ -43,11 +52,9 @@
             <span class="menu-icon">🗂️</span><span class="menu-label">资产与日常运维</span>
           </button>
           <div class="submenu-list">
-            <button class="submenu-btn" data-view="view-ops-workbench">综合工作台</button>
-            <button class="submenu-btn" data-view="view-systems">系统自检配置与记录</button>
-            <button class="submenu-btn" data-view="view-assets">基础数据录入</button>
-            <button class="submenu-btn" data-view="view-users">用户数据维护</button>
-            <button class="submenu-btn" data-view="view-tool-template">模板与快照</button>
+            <button class="submenu-btn" data-view="view-systems">系统</button>
+            <button class="submenu-btn" data-view="view-assets">资产</button>
+            <button class="submenu-btn" data-view="view-users">用户</button>
           </div>
         </div>
 
@@ -81,7 +88,7 @@
     </aside>
 
     <main class="workspace">
-      <header class="workspace-header">
+      <header id="workspaceHeader" class="workspace-header">
         <div>
           <div class="header-eyebrow">Aegis 管理控制台</div>
           <h1>管理工作台 <span class="badge">v2.1 Tech</span></h1>
@@ -94,7 +101,7 @@
         </div>
       </header>
 
-      <section class="control-strip">
+      <section id="controlStrip" class="control-strip">
         <div class="control-chip">
           <span>当前模块</span>
           <strong id="controlStripView">运行总览</strong>
@@ -233,49 +240,46 @@
         </section>
       </section>
 
-      <section id="view-systems" class="view-panel" data-view-title="系统自检配置与记录" data-view-desc="为移动端系统状态、自检提交与异常审阅提供系统主数据配置。">
+      <section id="view-systems" class="view-panel" data-view-title="系统" data-view-desc="维护系统地址、管理员与日志路径，供移动端按权限查看和拉取日志。">
         <section class="card narrow-card">
           <div class="section-head">
             <div>
-              <h2>系统自检配置与记录</h2>
-              <p class="muted">这里维护的系统主数据，直接服务于移动端的系统状态、自检提交、异常分析与助手查询能力。</p>
-            </div>
-            <div class="summary-strip compact-summary-strip">
-              <div class="summary-card"><span>移动端对应</span><strong>系统状态 / 提交自检</strong></div>
-              <div class="summary-card"><span>当前作用</span><strong>系统配置源 + 审阅入口</strong></div>
-              <div class="summary-card"><span>后续补齐</span><strong>负责人 / 频次 / 运行服务器</strong></div>
+              <h2>系统</h2>
+              <p class="muted">系统、管理员和日志路径在这里维护。admin 可查看全部系统，普通移动端用户只看到自己管理的系统。</p>
             </div>
           </div>
-          <div class="search-toolbar">
-            <input id="systemSearchKeyword2" class="search-input" placeholder="搜索系统编号 / 系统名称" />
+          <div class="search-toolbar wide-toolbar">
+            <input id="systemSearchKeyword2" class="search-input" placeholder="搜索编号 / 名称 / 地址" />
+            <select id="systemFilterEnv">
+              <option value="">全部环境</option>
+              <option value="prod">生产</option>
+              <option value="test">测试</option>
+              <option value="dev">开发</option>
+            </select>
+            <select id="systemFilterActive">
+              <option value="">全部状态</option>
+              <option value="true">启用</option>
+              <option value="false">停用</option>
+            </select>
+            <select id="systemSortBy">
+              <option value="updated_at">按更新时间</option>
+              <option value="name">按名称</option>
+              <option value="system_code">按编号</option>
+              <option value="host_address">按地址</option>
+              <option value="env">按环境</option>
+            </select>
+            <select id="systemSortOrder">
+              <option value="desc">降序</option>
+              <option value="asc">升序</option>
+            </select>
             <button id="btnFindSystems" class="toolbar-btn">搜索</button>
-            <button id="btnOpenCreateSystemModal" class="toolbar-btn secondary">新增系统配置</button>
-          </div>
-          <div class="grid2 ops-workbench-guide">
-            <div class="mini-panel">
-              <strong>配置给移动端的关键数据</strong>
-              <ul class="mini-list">
-                <li>系统名称 / 系统编号</li>
-                <li>系统状态页下拉来源</li>
-                <li>自检提交时的系统选择源</li>
-                <li>AI 助手系统查询对象</li>
-              </ul>
-            </div>
-            <div class="mini-panel">
-              <strong>管理端审阅职责</strong>
-              <ul class="mini-list">
-                <li>审阅系统是否已建档</li>
-                <li>审阅系统环境是否正确</li>
-                <li>后续补审负责人 / 服务器绑定</li>
-                <li>为异常处理和预案联动做准备</li>
-              </ul>
-            </div>
+            <button id="btnOpenCreateSystemModal" class="toolbar-btn secondary">新增</button>
           </div>
           <div id="systemListSummary" class="result-line">默认全量查询</div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>环境</th><th>负责人ID</th><th>检查频次</th></tr></thead>
-              <tbody id="systemListTbody"><tr><td colspan="6">暂无数据</td></tr></tbody>
+              <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>地址/IP</th><th>环境</th><th>管理员ID</th><th>日志位置</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="systemListTbody"><tr><td colspan="9">暂无数据</td></tr></tbody>
             </table>
           </div>
         </section>
@@ -320,9 +324,9 @@
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>序号</th><th>资产编码</th><th>资产名称</th><th>分类</th><th>系统ID</th><th>机房ID</th><th>位置</th><th>IP</th><th>状态</th></tr>
+                <tr><th>序号</th><th>资产编码</th><th>资产名称</th><th>分类</th><th>系统ID</th><th>机房ID</th><th>位置</th><th>IP</th><th>状态</th><th>操作</th></tr>
               </thead>
-              <tbody id="assetListTbody"><tr><td colspan="9">暂无资产数据</td></tr></tbody>
+              <tbody id="assetListTbody"><tr><td colspan="10">暂无资产数据</td></tr></tbody>
             </table>
           </div>
 
@@ -880,7 +884,7 @@
     </main>
   </div>
 
-  <div id="createUserModal" class="modal hidden">
+  <div id="createUserModal" class="modal hidden" hidden aria-hidden="true">
     <div class="modal-card">
       <h3>新增用户</h3>
       <label>用户名
@@ -903,15 +907,22 @@
     </div>
   </div>
 
-  <div id="createSystemModal" class="modal hidden">
+  <div id="createSystemModal" class="modal hidden" hidden aria-hidden="true">
     <div class="modal-card">
-      <h3>新增系统</h3>
+      <h3 id="systemModalTitle">新增系统</h3>
       <label>系统编号
         <input id="modalSystemCode" placeholder="请输入系统编号" />
       </label>
       <label>系统名称
         <input id="modalSystemName" placeholder="请输入系统名称" />
       </label>
+      <label>系统地址/IP
+        <input id="modalSystemHostAddress" placeholder="例如 192.168.1.10" />
+      </label>
+      <div class="inline-form-actions">
+        <button id="btnTestSystemHost" class="toolbar-btn ghost" type="button">测试连通性</button>
+        <span id="systemHostTestResult" class="inline-result"></span>
+      </div>
       <label>环境
         <select id="modalSystemEnv">
           <option value="prod">生产</option>
@@ -919,11 +930,22 @@
           <option value="dev">开发</option>
         </select>
       </label>
-      <label>负责人 ID 列表
-        <input id="modalSystemOwnerIds" placeholder="多个用逗号分隔，例如 1,2" />
+      <label>管理员
+        <input id="modalSystemOwnerIds" type="hidden" />
+        <div id="modalSystemOwnerSummary" class="selection-summary">暂未选择管理员</div>
+        <button id="btnOpenSystemOwnerPicker" class="toolbar-btn ghost" type="button">选择管理员</button>
       </label>
       <label>检查频次
-        <input id="modalSystemCheckFrequency" placeholder="例如 daily / weekly" />
+        <select id="modalSystemCheckFrequency">
+          <option value="">不设置</option>
+          <option value="hourly">每小时</option>
+          <option value="daily">每天</option>
+          <option value="weekly">每周</option>
+          <option value="monthly">每月</option>
+        </select>
+      </label>
+      <label>日志位置
+        <textarea id="modalSystemLogConfigs" rows="4" placeholder="每行一条绝对路径，例如：/var/log/nginx/error.log"></textarea>
       </label>
       <label>备注
         <input id="modalSystemRemark" placeholder="补充说明（可选）" />
@@ -935,9 +957,24 @@
     </div>
   </div>
 
-  <div id="createAssetModal" class="modal hidden">
+  <div id="systemOwnerPickerModal" class="modal hidden" hidden aria-hidden="true">
     <div class="modal-card">
-      <h3>新增资产</h3>
+      <h3>选择管理员</h3>
+      <div class="search-toolbar picker-toolbar">
+        <input id="systemOwnerSearchKeyword" class="search-input" placeholder="搜索用户名 / 用户ID" />
+        <button id="btnSearchSystemOwners" class="toolbar-btn" type="button">搜索</button>
+      </div>
+      <div id="systemOwnerPickerList" class="picker-list"></div>
+      <div class="grid2">
+        <button id="btnConfirmSystemOwners" type="button">确认选择</button>
+        <button id="btnCloseSystemOwnerPicker" type="button">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="createAssetModal" class="modal hidden" hidden aria-hidden="true">
+    <div class="modal-card">
+      <h3 id="assetModalTitle">新增资产</h3>
       <label>资产编码
         <input id="modalAssetCode" placeholder="请输入资产编码" />
       </label>
@@ -982,7 +1019,7 @@
     </div>
   </div>
 
-  <div id="assetImportModal" class="modal hidden">
+  <div id="assetImportModal" class="modal hidden" hidden aria-hidden="true">
     <div class="modal-card modal-wide">
       <h3>批量导入资产</h3>
       <p class="muted">当前支持 JSON 数组批量导入，建议导入前先确认字段完整。</p>

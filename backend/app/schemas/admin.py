@@ -22,6 +22,20 @@ class CreateAssetRequest(BaseModel):
     remark: Optional[str] = Field(default=None, max_length=500)
 
 
+class UpdateAssetRequest(BaseModel):
+    asset_code: Optional[str] = Field(default=None, min_length=2, max_length=64)
+    name: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    category: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    system_id: Optional[int] = None
+    room_id: Optional[int] = None
+    location: Optional[str] = Field(default=None, max_length=255)
+    ip_address: Optional[str] = Field(default=None, max_length=64)
+    port: Optional[int] = None
+    connection_type: Optional[str] = Field(default=None, max_length=32)
+    status: Optional[str] = Field(default=None, min_length=1, max_length=32)
+    remark: Optional[str] = Field(default=None, max_length=500)
+
+
 class CreateRoomRequest(BaseModel):
     room_code: str = Field(min_length=1, max_length=64)
     room_name: str = Field(min_length=1, max_length=128)
@@ -30,6 +44,16 @@ class CreateRoomRequest(BaseModel):
     location_detail: Optional[str] = Field(default=None, max_length=255)
     remark: Optional[str] = Field(default=None, max_length=500)
     is_active: bool = True
+
+
+class UpdateRoomRequest(BaseModel):
+    room_code: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    room_name: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    building: Optional[str] = Field(default=None, max_length=128)
+    floor: Optional[str] = Field(default=None, max_length=64)
+    location_detail: Optional[str] = Field(default=None, max_length=255)
+    remark: Optional[str] = Field(default=None, max_length=500)
+    is_active: Optional[bool] = None
 
 
 class CreateInspectionPointRequest(BaseModel):
@@ -42,6 +66,18 @@ class CreateInspectionPointRequest(BaseModel):
     nfc_tag: Optional[str] = Field(default=None, max_length=255)
     location_detail: Optional[str] = Field(default=None, max_length=255)
     is_active: bool = True
+
+
+class UpdateInspectionPointRequest(BaseModel):
+    room_id: Optional[int] = None
+    system_id: Optional[int] = None
+    point_code: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    point_name: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    point_type: Optional[str] = Field(default=None, max_length=32)
+    qr_content: Optional[str] = Field(default=None, max_length=255)
+    nfc_tag: Optional[str] = Field(default=None, max_length=255)
+    location_detail: Optional[str] = Field(default=None, max_length=255)
+    is_active: Optional[bool] = None
 
 
 class BatchCreateAssetsRequest(BaseModel):

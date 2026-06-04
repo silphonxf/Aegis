@@ -195,13 +195,26 @@ def _collect_log_files(source: str) -> list[str]:
     return ordered
 
 
+def _log_file_aliases(file_name: str) -> list[str]:
+    alias_map = {
+        "backend-https.log": ["backend.log"],
+        "frontend-mobile-https.log": ["frontend-mobile.log"],
+        "frontend-admin-https.log": ["frontend-admin.log"],
+        "aegis-backend-https.log": ["backend-https.log", "backend.log"],
+        "aegis-frontend-mobile-5173-https.log": ["frontend-mobile-https.log", "frontend-mobile.log"],
+        "aegis-frontend-admin-5174-https.log": ["frontend-admin-https.log", "frontend-admin.log"],
+    }
+    return [file_name, *alias_map.get(file_name, [])]
+
+
 def _read_selected_logs(source: str, file_name: Optional[str], level: str, start_dt: Optional[datetime], end_dt: Optional[datetime], lines: int) -> Tuple[str, str]:
     candidates = _collect_log_files(source)
     if not candidates:
         return "", "未找到可用日志文件"
 
     if file_name:
-        selected = [path for path in candidates if os.path.basename(path) == file_name]
+        accepted_names = set(_log_file_aliases(file_name))
+        selected = [path for path in candidates if os.path.basename(path) in accepted_names]
         if not selected:
             raise HTTPException(status_code=400, detail={"code": "LOG_FILE_NOT_FOUND", "message": f"未找到日志文件：{file_name}"})
         candidates = selected
@@ -356,7 +369,10 @@ def read_error_logs(
         level=level,
         lines=lines,
     )
-    start_dt, end_dt, range_mode = _resolve_time_range(payload.quick_range, payload.start_at, payload.end_at)
+    if payload.file_name and not payload.start_at and not payload.end_at:
+        start_dt, end_dt, range_mode = None, None, "selected_file"
+    else:
+        start_dt, end_dt, range_mode = _resolve_time_range(payload.quick_range, payload.start_at, payload.end_at)
     logger.info(
         "读取错误日志请求: user=%s source=%s file_name=%s level=%s range_mode=%s lines=%s",
         current_user.username,

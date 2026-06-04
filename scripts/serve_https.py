@@ -5,6 +5,28 @@ import http.server
 import ssl
 
 
+class NoCacheHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
+
+
+class ThreadingHTTPSServer(http.server.ThreadingHTTPServer):
+    daemon_threads = True
+    request_queue_size = 32
+
+    def __init__(self, server_address, handler, context):
+        self.ssl_context = context
+        super().__init__(server_address, handler)
+
+    def get_request(self):
+        sock, address = self.socket.accept()
+        sock.settimeout(10)
+        return self.ssl_context.wrap_socket(sock, server_side=True), address
+
+
 def main():
     parser = argparse.ArgumentParser(description="Serve a directory over HTTPS")
     parser.add_argument("--host", default="0.0.0.0")
@@ -14,11 +36,10 @@ def main():
     parser.add_argument("--key", required=True)
     args = parser.parse_args()
 
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=args.directory)
-    httpd = http.server.ThreadingHTTPServer((args.host, args.port), handler)
+    handler = functools.partial(NoCacheHTTPRequestHandler, directory=args.directory)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(certfile=args.cert, keyfile=args.key)
-    httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
+    httpd = ThreadingHTTPSServer((args.host, args.port), handler, ctx)
 
     print(f"HTTPS serving {args.directory} on https://{args.host}:{args.port}")
     httpd.serve_forever()

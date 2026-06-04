@@ -7,7 +7,7 @@ from .shared_data import EmergencyHost, Room, Runbook
 from .offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from .rule import StatusRule
 from .selfcheck import ChecklistTemplate, SelfcheckRecord
-from .system import System, SystemStatusSnapshot, SystemUserBinding
+from .system import System, SystemLogConfig, SystemStatusSnapshot, SystemUserBinding
 from .tool_task import ToolTask
 from .user import Role, User
 
@@ -18,6 +18,7 @@ __all__ = [
     "System",
     "SystemStatusSnapshot",
     "SystemUserBinding",
+    "SystemLogConfig",
     "InspectionPoint",
     "InspectionRecord",
     "Room",

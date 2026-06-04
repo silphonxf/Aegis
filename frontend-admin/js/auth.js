@@ -2,8 +2,24 @@ window.AegisAdmin = window.AegisAdmin || {};
 
 (function (ns) {
   function setAuthView(isLoggedIn) {
-    document.getElementById('loginView').classList.toggle('hidden', isLoggedIn);
-    document.getElementById('appView').classList.toggle('hidden', !isLoggedIn);
+    const loginView = document.getElementById('loginView');
+    const appView = document.getElementById('appView');
+    document.body.classList.toggle('is-authenticated', Boolean(isLoggedIn));
+
+    loginView?.classList.toggle('hidden', Boolean(isLoggedIn));
+    appView?.classList.toggle('hidden', !isLoggedIn);
+    loginView?.toggleAttribute('hidden', Boolean(isLoggedIn));
+    appView?.toggleAttribute('hidden', !isLoggedIn);
+    loginView?.setAttribute('aria-hidden', String(Boolean(isLoggedIn)));
+    appView?.setAttribute('aria-hidden', String(!isLoggedIn));
+
+    if (!isLoggedIn) {
+      document.querySelectorAll('.modal').forEach((modal) => {
+        modal.classList.add('hidden');
+        modal.setAttribute('hidden', '');
+        modal.setAttribute('aria-hidden', 'true');
+      });
+    }
   }
 
   function forceRelogin(message = '登录已失效，请重新登录') {
@@ -21,6 +37,7 @@ window.AegisAdmin = window.AegisAdmin || {};
       body: JSON.stringify({ username, password }),
     });
     ns.state.token = data.access_token;
+    setAuthView(true);
     return data;
   }
 

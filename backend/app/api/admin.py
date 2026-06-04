@@ -6,7 +6,7 @@ import csv
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import load_workbook
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
@@ -17,7 +17,7 @@ from app.models.asset import Asset
 from app.models.audit import AuditLog
 from app.models.inspection import InspectionPoint
 from app.models.shared_data import Room
-from app.models.system import System, SystemUserBinding
+from app.models.system import System, SystemLogConfig, SystemUserBinding
 from app.models.user import Role, User
 from app.schemas.admin import (
     BatchCreateAssetsRequest,
@@ -28,6 +28,9 @@ from app.schemas.admin import (
     ThreatIntelBlockRequest,
     ThreatIntelQueryRequest,
     ThreatIntelQuickInputRequest,
+    UpdateAssetRequest,
+    UpdateInspectionPointRequest,
+    UpdateRoomRequest,
 )
 from app.schemas.emergency_config import (
     EmergencyDbActionSaveRequest,
@@ -44,7 +47,7 @@ from app.services.emergency_config import (
     upsert_ssh_host,
 )
 from app.services.threatbook import ThreatbookError, batch_query_ip_reputation
-from app.schemas.system import SystemCreate
+from app.schemas.system import SystemCreate, SystemUpdate
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -130,37 +133,51 @@ def create_user(
 def list_systems(
     page: int = 1,
     size: int = 20,
+    keyword: Optional[str] = None,
+    env: Optional[str] = None,
+    owner_user_id: Optional[int] = None,
+    is_active: Optional[bool] = None,
+    sort_by: str = "id",
+    sort_order: str = "asc",
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
-    logger.info("查询系统列表: page=%s size=%s", page, size)
+    logger.info("查询系统列表: page=%s size=%s keyword=%s env=%s owner_user_id=%s", page, size, keyword, env, owner_user_id)
     page = max(page, 1)
     size = min(max(size, 1), 100)
     q = db.query(System)
+    if keyword:
+        like = f"%{keyword}%"
+        q = q.filter(or_(System.system_code.like(like), System.name.like(like), System.host_address.like(like)))
+    if env:
+        q = q.filter(System.env == env)
+    if is_active is not None:
+        q = q.filter(System.is_active.is_(is_active))
+    if owner_user_id is not None:
+        q = q.join(SystemUserBinding, SystemUserBinding.system_id == System.id).filter(
+            SystemUserBinding.binding_role == "owner",
+            SystemUserBinding.user_id == owner_user_id,
+        )
+
+    sort_column = {
+        "id": System.id,
+        "system_code": System.system_code,
+        "name": System.name,
+        "host_address": System.host_address,
+        "env": System.env,
+        "updated_at": System.updated_at,
+    }.get(sort_by, System.id)
+    q = q.order_by(sort_column.desc() if sort_order == "desc" else sort_column.asc())
     total = q.count()
     items = q.offset((page - 1) * size).limit(size).all()
     logger.info("查询系统列表完成: total=%s returned=%s", total, len(items))
-    binding_rows = db.query(SystemUserBinding).filter(SystemUserBinding.binding_role == "owner").all()
-    owner_map = {}
-    for row in binding_rows:
-        owner_map.setdefault(row.system_id, []).append(row.user_id)
+    owner_map = _system_owner_map(db)
+    log_map = _system_log_map(db, [item.id for item in items])
     return {
         "page": page,
         "size": size,
         "total": total,
-        "items": [
-            {
-                "id": i.id,
-                "system_code": i.system_code,
-                "name": i.name,
-                "env": i.env,
-                "owner_user_id": i.owner_user_id,
-                "owner_user_ids": owner_map.get(i.id, []),
-                "check_frequency": getattr(i, "check_frequency", None),
-                "remark": getattr(i, "remark", None),
-            }
-            for i in items
-        ],
+        "items": [_serialize_system(item, owner_map, log_map) for item in items],
     }
 
 
@@ -178,6 +195,7 @@ def create_system(
     system = System(
         system_code=payload.system_code,
         name=payload.name,
+        host_address=payload.host_address,
         owner_user_id=primary_owner_id,
         env=payload.env,
         check_frequency=payload.check_frequency,
@@ -186,23 +204,62 @@ def create_system(
     db.add(system)
     db.flush()
 
-    owner_ids = []
-    for uid in ([primary_owner_id] if primary_owner_id else []) + list(payload.owner_user_ids):
-        if uid and uid not in owner_ids:
-            owner_ids.append(uid)
-    for index, uid in enumerate(owner_ids):
-        db.add(SystemUserBinding(
-            system_id=system.id,
-            user_id=uid,
-            binding_role="owner",
-            is_primary=(index == 0),
-        ))
+    _replace_system_owner_bindings(db, system.id, _normalize_owner_ids(primary_owner_id, payload.owner_user_ids))
+    _replace_system_log_configs(db, system.id, payload.log_configs)
 
     db.commit()
     db.refresh(system)
     logger.info("创建系统成功: system_id=%s system_code=%s", system.id, system.system_code)
     log_action(db, "create_system", "system", current_user, {"system_id": system.id, "system_code": system.system_code})
     return {"id": system.id}
+
+
+@router.put("/systems/{system_id}")
+def update_system(
+    system_id: int,
+    payload: SystemUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    system = db.query(System).filter(System.id == system_id).first()
+    if not system:
+        raise HTTPException(status_code=404, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在"})
+    values = payload.dict(exclude_unset=True)
+    if "system_code" in values and values["system_code"] != system.system_code:
+        if db.query(System).filter(System.system_code == values["system_code"], System.id != system_id).first():
+            raise HTTPException(status_code=409, detail={"code": "SYSTEM_CODE_EXISTS", "message": "系统编号已存在"})
+
+    log_configs_value = values.pop("log_configs", None)
+    owner_ids_value = values.pop("owner_user_ids", None)
+    owner_user_id_value = values.get("owner_user_id") if owner_ids_value is not None else values.get("owner_user_id", system.owner_user_id)
+    if owner_ids_value is not None or "owner_user_id" in values:
+        owner_ids = _normalize_owner_ids(owner_user_id_value, owner_ids_value or [])
+        values["owner_user_id"] = owner_ids[0] if owner_ids else None
+        _replace_system_owner_bindings(db, system.id, owner_ids)
+    if log_configs_value is not None:
+        _replace_system_log_configs(db, system.id, log_configs_value)
+
+    _apply_updates(system, values)
+    db.commit()
+    db.refresh(system)
+    log_action(db, "update_system", "system", current_user, {"system_id": system.id, "system_code": system.system_code})
+    return {"id": system.id}
+
+
+@router.delete("/systems/{system_id}")
+def deactivate_system(
+    system_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    system = db.query(System).filter(System.id == system_id).first()
+    if not system:
+        raise HTTPException(status_code=404, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在"})
+    system.is_active = False
+    system.updated_at = datetime.utcnow()
+    db.commit()
+    log_action(db, "deactivate_system", "system", current_user, {"system_id": system.id, "system_code": system.system_code})
+    return {"id": system.id, "is_active": system.is_active}
 
 
 @router.get("/audit-logs")
@@ -277,6 +334,114 @@ def _asset_query(db: Session, system_id: Optional[int], category: Optional[str],
     if keyword:
         q = q.filter((Asset.asset_code.like(f"%{keyword}%")) | (Asset.name.like(f"%{keyword}%")))
     return q
+
+
+def _validate_asset_refs(db: Session, system_id: Optional[int], room_id: Optional[int]) -> None:
+    if system_id is not None and not db.query(System).filter(System.id == system_id).first():
+        raise HTTPException(status_code=400, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在"})
+    if room_id is not None and not db.query(Room).filter(Room.id == room_id, Room.is_active.is_(True)).first():
+        raise HTTPException(status_code=400, detail={"code": "ROOM_NOT_FOUND", "message": "机房不存在或已停用"})
+
+
+def _validate_inspection_point_refs(db: Session, room_id: Optional[int], system_id: Optional[int]) -> None:
+    if room_id is not None and not db.query(Room).filter(Room.id == room_id, Room.is_active.is_(True)).first():
+        raise HTTPException(status_code=400, detail={"code": "ROOM_NOT_FOUND", "message": "机房不存在或已停用"})
+    if system_id is not None and not db.query(System).filter(System.id == system_id).first():
+        raise HTTPException(status_code=400, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在"})
+
+
+def _apply_updates(instance, values: Dict[str, Any]) -> None:
+    for key, value in values.items():
+        setattr(instance, key, value)
+    if hasattr(instance, "updated_at"):
+        instance.updated_at = datetime.utcnow()
+
+
+def _normalize_owner_ids(owner_user_id: Optional[int], owner_user_ids: Optional[List[int]]) -> List[int]:
+    owner_ids = []
+    for uid in ([owner_user_id] if owner_user_id else []) + list(owner_user_ids or []):
+        if uid and uid not in owner_ids:
+            owner_ids.append(uid)
+    return owner_ids
+
+
+def _replace_system_owner_bindings(db: Session, system_id: int, owner_ids: List[int]) -> None:
+    db.query(SystemUserBinding).filter(
+        SystemUserBinding.system_id == system_id,
+        SystemUserBinding.binding_role == "owner",
+    ).delete()
+    for index, uid in enumerate(owner_ids):
+        db.add(SystemUserBinding(
+            system_id=system_id,
+            user_id=uid,
+            binding_role="owner",
+            is_primary=(index == 0),
+        ))
+
+
+def _replace_system_log_configs(db: Session, system_id: int, log_configs: List[Any]) -> None:
+    db.query(SystemLogConfig).filter(SystemLogConfig.system_id == system_id).delete()
+    for item in log_configs or []:
+        getter = item.get if isinstance(item, dict) else lambda key, default=None: getattr(item, key, default)
+        db.add(SystemLogConfig(
+            system_id=system_id,
+            log_name=getter("log_name"),
+            absolute_path=getter("absolute_path"),
+            log_level=getter("log_level", "warning"),
+            is_active=getter("is_active", True),
+            remark=getter("remark"),
+        ))
+
+
+def _system_owner_map(db: Session) -> Dict[int, List[int]]:
+    binding_rows = db.query(SystemUserBinding).filter(SystemUserBinding.binding_role == "owner").all()
+    owner_map: Dict[int, List[int]] = {}
+    for row in binding_rows:
+        owner_map.setdefault(row.system_id, []).append(row.user_id)
+    return owner_map
+
+
+def _system_log_map(db: Session, system_ids: List[int]) -> Dict[int, List[SystemLogConfig]]:
+    if not system_ids:
+        return {}
+    rows = (
+        db.query(SystemLogConfig)
+        .filter(SystemLogConfig.system_id.in_(system_ids))
+        .order_by(SystemLogConfig.id.asc())
+        .all()
+    )
+    result: Dict[int, List[SystemLogConfig]] = {}
+    for row in rows:
+        result.setdefault(row.system_id, []).append(row)
+    return result
+
+
+def _serialize_log_config(item: SystemLogConfig) -> Dict[str, Any]:
+    return {
+        "id": item.id,
+        "system_id": item.system_id,
+        "log_name": item.log_name,
+        "absolute_path": item.absolute_path,
+        "log_level": item.log_level,
+        "is_active": item.is_active,
+        "remark": item.remark,
+    }
+
+
+def _serialize_system(item: System, owner_map: Dict[int, List[int]], log_map: Dict[int, List[SystemLogConfig]]) -> Dict[str, Any]:
+    return {
+        "id": item.id,
+        "system_code": item.system_code,
+        "name": item.name,
+        "host_address": item.host_address,
+        "env": item.env,
+        "owner_user_id": item.owner_user_id,
+        "owner_user_ids": owner_map.get(item.id, []),
+        "check_frequency": getattr(item, "check_frequency", None),
+        "remark": getattr(item, "remark", None),
+        "is_active": getattr(item, "is_active", True),
+        "log_configs": [_serialize_log_config(log) for log in log_map.get(item.id, [])],
+    }
 
 
 @router.get("/assets")
@@ -401,6 +566,7 @@ def create_asset(
     logger.info("创建资产请求: operator=%s asset_code=%s", current_user.username, payload.asset_code)
     if db.query(Asset).filter(Asset.asset_code == payload.asset_code).first():
         raise HTTPException(status_code=400, detail={"code": "ASSET_EXISTS", "message": "资产编码已存在"})
+    _validate_asset_refs(db, payload.system_id, payload.room_id)
 
     asset = Asset(**payload.dict())
     db.add(asset)
@@ -409,6 +575,47 @@ def create_asset(
     logger.info("创建资产成功: asset_id=%s asset_code=%s", asset.id, asset.asset_code)
     log_action(db, "create_asset", "asset", current_user, {"asset_id": asset.id, "asset_code": asset.asset_code})
     return {"id": asset.id}
+
+
+@router.put("/assets/{asset_id}")
+def update_asset(
+    asset_id: int,
+    payload: UpdateAssetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail={"code": "ASSET_NOT_FOUND", "message": "资产不存在"})
+
+    values = payload.dict(exclude_unset=True)
+    if "asset_code" in values and values["asset_code"] != asset.asset_code:
+        if db.query(Asset).filter(Asset.asset_code == values["asset_code"], Asset.id != asset_id).first():
+            raise HTTPException(status_code=400, detail={"code": "ASSET_EXISTS", "message": "资产编码已存在"})
+    if "system_id" in values or "room_id" in values:
+        _validate_asset_refs(db, values.get("system_id", asset.system_id), values.get("room_id", asset.room_id))
+
+    _apply_updates(asset, values)
+    db.commit()
+    db.refresh(asset)
+    log_action(db, "update_asset", "asset", current_user, {"asset_id": asset.id, "asset_code": asset.asset_code})
+    return {"id": asset.id}
+
+
+@router.delete("/assets/{asset_id}")
+def retire_asset(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail={"code": "ASSET_NOT_FOUND", "message": "资产不存在"})
+    asset.status = "retired"
+    asset.updated_at = datetime.utcnow()
+    db.commit()
+    log_action(db, "retire_asset", "asset", current_user, {"asset_id": asset.id, "asset_code": asset.asset_code})
+    return {"id": asset.id, "status": asset.status}
 
 
 @router.get("/rooms")
@@ -464,6 +671,43 @@ def create_room(
     return {"id": room.id}
 
 
+@router.put("/rooms/{room_id}")
+def update_room(
+    room_id: int,
+    payload: UpdateRoomRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    room = db.query(Room).filter(Room.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail={"code": "ROOM_NOT_FOUND", "message": "机房不存在"})
+    values = payload.dict(exclude_unset=True)
+    if "room_code" in values and values["room_code"] != room.room_code:
+        if db.query(Room).filter(Room.room_code == values["room_code"], Room.id != room_id).first():
+            raise HTTPException(status_code=400, detail={"code": "ROOM_EXISTS", "message": "机房编码已存在"})
+    _apply_updates(room, values)
+    db.commit()
+    db.refresh(room)
+    log_action(db, "update_room", "room", current_user, {"room_id": room.id, "room_code": room.room_code})
+    return {"id": room.id}
+
+
+@router.delete("/rooms/{room_id}")
+def deactivate_room(
+    room_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    room = db.query(Room).filter(Room.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail={"code": "ROOM_NOT_FOUND", "message": "机房不存在"})
+    room.is_active = False
+    room.updated_at = datetime.utcnow()
+    db.commit()
+    log_action(db, "deactivate_room", "room", current_user, {"room_id": room.id, "room_code": room.room_code})
+    return {"id": room.id, "is_active": room.is_active}
+
+
 @router.get("/inspection-points")
 def list_inspection_points(
     db: Session = Depends(get_db),
@@ -497,10 +741,7 @@ def create_inspection_point(
 ):
     if db.query(InspectionPoint).filter(InspectionPoint.point_code == payload.point_code).first():
         raise HTTPException(status_code=400, detail={"code": "POINT_EXISTS", "message": "巡检点编码已存在"})
-    if not db.query(Room).filter(Room.id == payload.room_id, Room.is_active.is_(True)).first():
-        raise HTTPException(status_code=400, detail={"code": "ROOM_NOT_FOUND", "message": "机房不存在或已停用"})
-    if payload.system_id is not None and not db.query(System).filter(System.id == payload.system_id).first():
-        raise HTTPException(status_code=400, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在"})
+    _validate_inspection_point_refs(db, payload.room_id, payload.system_id)
     point = InspectionPoint(
         room_id=payload.room_id,
         system_id=payload.system_id,
@@ -518,6 +759,50 @@ def create_inspection_point(
     db.refresh(point)
     log_action(db, "create_inspection_point", "inspection_point", current_user, {"point_id": point.id, "point_code": point.point_code})
     return {"id": point.id}
+
+
+@router.put("/inspection-points/{point_id}")
+def update_inspection_point(
+    point_id: int,
+    payload: UpdateInspectionPointRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    point = db.query(InspectionPoint).filter(InspectionPoint.id == point_id).first()
+    if not point:
+        raise HTTPException(status_code=404, detail={"code": "POINT_NOT_FOUND", "message": "巡检点不存在"})
+    values = payload.dict(exclude_unset=True)
+    if "point_code" in values and values["point_code"] != point.point_code:
+        if db.query(InspectionPoint).filter(InspectionPoint.point_code == values["point_code"], InspectionPoint.id != point_id).first():
+            raise HTTPException(status_code=400, detail={"code": "POINT_EXISTS", "message": "巡检点编码已存在"})
+    if "qr_content" in values and values["qr_content"] != point.qr_content:
+        if db.query(InspectionPoint).filter(InspectionPoint.qr_content == values["qr_content"], InspectionPoint.id != point_id).first():
+            raise HTTPException(status_code=400, detail={"code": "POINT_QR_EXISTS", "message": "巡检点二维码内容已存在"})
+    if "room_id" in values or "system_id" in values:
+        _validate_inspection_point_refs(db, values.get("room_id", point.room_id), values.get("system_id", point.system_id))
+    if "location_detail" in values:
+        values["location"] = values["location_detail"]
+    _apply_updates(point, values)
+    db.commit()
+    db.refresh(point)
+    log_action(db, "update_inspection_point", "inspection_point", current_user, {"point_id": point.id, "point_code": point.point_code})
+    return {"id": point.id}
+
+
+@router.delete("/inspection-points/{point_id}")
+def deactivate_inspection_point(
+    point_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    point = db.query(InspectionPoint).filter(InspectionPoint.id == point_id).first()
+    if not point:
+        raise HTTPException(status_code=404, detail={"code": "POINT_NOT_FOUND", "message": "巡检点不存在"})
+    point.is_active = False
+    point.updated_at = datetime.utcnow()
+    db.commit()
+    log_action(db, "deactivate_inspection_point", "inspection_point", current_user, {"point_id": point.id, "point_code": point.point_code})
+    return {"id": point.id, "is_active": point.is_active}
 
 
 @router.post("/assets/batch")
@@ -550,6 +835,11 @@ def batch_create_assets(
     for item in items_to_create:
         if item.asset_code in existing_codes:
             skipped.append({"asset_code": item.asset_code, "reason": "ASSET_EXISTS"})
+            continue
+        try:
+            _validate_asset_refs(db, item.system_id, item.room_id)
+        except HTTPException as exc:
+            skipped.append({"asset_code": item.asset_code, "reason": exc.detail.get("code", "INVALID_REF")})
             continue
         asset = Asset(**item.dict())
         db.add(asset)

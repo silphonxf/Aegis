@@ -12,7 +12,7 @@ ss -lntp | grep -E ":(${BACKEND_PORT}|${MOBILE_PORT}|${ADMIN_PORT})\\b" || echo 
 
 echo
 echo "🏥 Health check"
-if curl -fsS "http://127.0.0.1:${BACKEND_PORT}/healthz" >/tmp/aegis_status_health.json 2>/dev/null; then
+if curl -k -fsS "https://127.0.0.1:${BACKEND_PORT}/healthz" >/tmp/aegis_status_health.json 2>/dev/null; then
   cat /tmp/aegis_status_health.json
 else
   echo "backend healthz unavailable"
@@ -20,6 +20,6 @@ fi
 
 echo
 echo "📄 Logs"
-echo "- $LOG_DIR/backend.log"
+echo "- $LOG_DIR/backend-https.log"
 echo "- $LOG_DIR/frontend-mobile.log"
 echo "- $LOG_DIR/frontend-admin.log"

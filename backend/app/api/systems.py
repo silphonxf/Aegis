@@ -1,16 +1,26 @@
 from typing import Any, Dict, List, Optional, Set, Tuple
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.rule import StatusRule
-from app.models.system import System, SystemStatusSnapshot
+from app.models.system import System, SystemLogConfig, SystemStatusSnapshot, SystemUserBinding
 from app.models.user import User
 from app.schemas.system import StatusSnapshotCreate
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/systems", tags=["systems"])
+
+
+def _visible_system_query(db: Session, user: User):
+    q = db.query(System).filter(System.is_active.is_(True))
+    if user.role.code in {"admin", "super_admin"}:
+        return q
+    return q.join(SystemUserBinding, SystemUserBinding.system_id == System.id).filter(
+        SystemUserBinding.binding_role == "owner",
+        SystemUserBinding.user_id == user.id,
+    )
 
 
 def _normalize_metric(value: Optional[int], warn: int, critical: int) -> str:
@@ -35,9 +45,54 @@ def _calc_color(levels: List[str], host_online: str, port_ok: str, last_inspecti
     return "green"
 
 
+@router.get("/accessible")
+def list_accessible_systems(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    systems = _visible_system_query(db, current_user).order_by(System.id.asc()).all()
+    return {
+        "items": [
+            {
+                "system_id": s.id,
+                "system_code": s.system_code,
+                "system_name": s.name,
+                "host_address": s.host_address,
+                "env": s.env,
+            }
+            for s in systems
+        ]
+    }
+
+
+@router.get("/{system_id}/log-configs")
+def list_system_log_configs(system_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    system = _visible_system_query(db, current_user).filter(System.id == system_id).first()
+    if not system:
+        raise HTTPException(status_code=404, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在或无权访问"})
+    rows = (
+        db.query(SystemLogConfig)
+        .filter(SystemLogConfig.system_id == system_id, SystemLogConfig.is_active.is_(True))
+        .order_by(SystemLogConfig.id.asc())
+        .all()
+    )
+    return {
+        "system_id": system.id,
+        "system_name": system.name,
+        "host_address": system.host_address,
+        "items": [
+            {
+                "id": item.id,
+                "log_name": item.log_name,
+                "absolute_path": item.absolute_path,
+                "log_level": item.log_level,
+                "remark": item.remark,
+            }
+            for item in rows
+        ],
+    }
+
+
 @router.get("/status/overview")
-def status_overview(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    systems = db.query(System).all()
+def status_overview(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    systems = _visible_system_query(db, current_user).all()
     items = []
     for s in systems:
         snap = (

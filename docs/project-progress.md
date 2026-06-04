@@ -1,4 +1,4 @@
-# Aegis 项目进度（更新于 2026-05-11）
+# Aegis 项目进度（更新于 2026-06-03）
 
 ## 当前总体状态
 
@@ -6,6 +6,98 @@
 - 当前重点：Aegis AI 能力已从 skeleton/mock 联调推进到真实 OpenClaw 接入，并完成阶段2第一版附件引用式链路与移动端 AI 体验收尾
 - 当前开发路线：`docs/phase1-development-plan.md`
 
+
+## 本次新增进展（2026-06-03）
+
+### 2) 资产与日常运维菜单收敛和系统配置第一版
+
+已完成：
+- 管理端“资产与日常运维”子菜单收敛为：
+  - 系统
+  - 资产
+  - 用户
+- “系统”页面改为直接展示系统列表，列表上方支持：
+  - 关键词搜索
+  - 环境筛选
+  - 启用状态筛选
+  - 排序字段与升降序
+  - 新增系统
+- 系统新增/编辑支持：
+  - 系统地址/IP
+  - 系统名称与编号
+  - 管理员 ID 列表
+  - 多条日志位置配置
+  - 日志位置必须是目标服务器绝对路径
+- 后端新增系统日志配置表与接口返回：
+  - `systems.host_address`
+  - `system_log_configs`
+  - 管理端系统列表返回 `log_configs`
+- 移动端系统可见性收敛：
+  - `admin` / `super_admin` 可查看全部启用系统
+  - 普通用户只查看自己作为管理员绑定的系统
+  - 移动端可通过系统自检日志分析页看到管理端配置的日志绝对路径
+
+验证结果：
+- `./.venv/bin/pytest backend/tests/test_admin_systems.py -q` → `4 passed`
+- `node --check frontend-admin/js/systems.js && node --check frontend-admin/js/modals.js && node --check frontend-admin/app.js && node --check frontend-mobile/app.js` → 通过
+
+当前剩余：
+- 真正通过 SSH 远程拉取目标服务器日志仍需补充目标服务器 SSH 凭据绑定；当前系统配置只保存系统地址、业务管理员和日志绝对路径。
+
+### 1) 移动端错误日志分析恢复可用
+
+已完成：
+- 修复移动端错误日志分析默认文件名：
+  - 默认从旧的 `aegis-backend-https.log` 改为真实可读的 `backend-https.log`
+  - 日志下拉优先展示当前 HTTPS 后端/前端日志文件
+- 后端日志读取接口补齐兼容别名：
+  - `aegis-backend-https.log` → `backend-https.log` / `backend.log`
+  - `aegis-frontend-mobile-5173-https.log` → `frontend-mobile-https.log` / `frontend-mobile.log`
+  - `aegis-frontend-admin-5174-https.log` → `frontend-admin-https.log` / `frontend-admin.log`
+  - `backend-https.log` 不存在时可回退 `backend.log`
+- 本地启动脚本日志文件与 HTTPS 启动方式对齐：
+  - 后端 HTTPS 日志写入 `.logs/backend-https.log`
+  - `dev-status.sh` 展示 `.logs/backend-https.log`
+
+验证结果：
+- `./.venv/bin/pytest backend/tests/test_toolbox.py -q` → `6 passed`
+- `node --check frontend-mobile/app.js && bash -n scripts/dev-up.sh scripts/dev-status.sh` → 通过
+- 当前 HTTPS 后端实测 `GET /api/v1/toolbox/error-logs?source=aegis&file_name=backend-https.log...` → 成功返回日志内容
+
+### 0) 共享主数据 CRUD 第二步补齐
+
+已完成：
+- 管理端系统主数据补齐更新与软停用接口：
+  - `PUT /api/v1/admin/systems/{system_id}`
+  - `DELETE /api/v1/admin/systems/{system_id}`
+  - 系统列表返回 `is_active`
+  - 系统负责人绑定支持更新与清空
+- 管理端机房补齐更新与软停用接口：
+  - `PUT /api/v1/admin/rooms/{room_id}`
+  - `DELETE /api/v1/admin/rooms/{room_id}`
+- 管理端巡检点补齐更新与软停用接口：
+  - `PUT /api/v1/admin/inspection-points/{point_id}`
+  - `DELETE /api/v1/admin/inspection-points/{point_id}`
+  - 更新时同步校验机房/系统引用与二维码唯一性
+- 管理端资产补齐更新与停用接口：
+  - `PUT /api/v1/admin/assets/{asset_id}`
+  - `DELETE /api/v1/admin/assets/{asset_id}`（将状态置为 `retired`）
+  - 资产创建、更新、批量导入统一校验系统/机房引用
+- 管理端资产列表新增操作列，支持从表格直接编辑和停用资产
+- 资产新增弹窗复用为编辑弹窗，编辑时回填系统、机房、IP、端口、状态等共享字段
+- 新增/补强回归测试：
+  - 系统更新、负责人清空、软停用
+  - 机房更新、软停用与默认列表过滤
+  - 巡检点更新、软停用
+  - 资产更新、停用与错误共享引用拒绝
+
+验证结果：
+- `./.venv/bin/pytest backend/tests/test_rooms_points.py backend/tests/test_admin_assets.py backend/tests/test_admin_systems.py -q` → `13 passed`
+- `node --check frontend-admin/js/assets.js && node --check frontend-admin/js/modals.js && node --check frontend-admin/app.js` → 通过
+
+当前剩余：
+- 管理端系统、机房、巡检点页面仍需补表格操作列与编辑弹窗，当前前端只先落地资产编辑/停用
+- 后续将 `emergency_hosts` / `runbooks` 与系统、机房、资产下拉做正式联动
 
 ## 本次新增进展（2026-06-02）
 

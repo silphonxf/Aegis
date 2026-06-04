@@ -44,3 +44,42 @@ def test_admin_asset_batch_create_with_skip(client, admin_headers):
     body = batch.json()
     assert len(body["created"]) == 2
     assert len(body["skipped"]) == 1
+
+
+def test_admin_asset_update_and_retire(client, admin_headers):
+    create = client.post(
+        "/api/v1/admin/assets",
+        headers=admin_headers,
+        json={"asset_code": "ASSET-EDIT-001", "name": "待编辑资产", "category": "server", "system_id": 1},
+    )
+    assert create.status_code == 200, create.text
+    asset_id = create.json()["id"]
+
+    update = client.put(
+        f"/api/v1/admin/assets/{asset_id}",
+        headers=admin_headers,
+        json={"name": "已编辑资产", "ip_address": "10.9.8.7", "port": 443, "status": "repair"},
+    )
+    assert update.status_code == 200, update.text
+
+    listing = client.get("/api/v1/admin/assets?keyword=ASSET-EDIT-001", headers=admin_headers)
+    assert listing.status_code == 200, listing.text
+    item = listing.json()["items"][0]
+    assert item["name"] == "已编辑资产"
+    assert item["ip_address"] == "10.9.8.7"
+    assert item["port"] == 443
+    assert item["status"] == "repair"
+
+    retire = client.delete(f"/api/v1/admin/assets/{asset_id}", headers=admin_headers)
+    assert retire.status_code == 200, retire.text
+    assert retire.json()["status"] == "retired"
+
+
+def test_admin_asset_rejects_missing_shared_refs(client, admin_headers):
+    create = client.post(
+        "/api/v1/admin/assets",
+        headers=admin_headers,
+        json={"asset_code": "ASSET-BAD-REF-001", "name": "错误引用资产", "category": "server", "room_id": 999999},
+    )
+    assert create.status_code == 400
+    assert create.json()["code"] == "ROOM_NOT_FOUND"

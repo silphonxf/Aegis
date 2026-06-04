@@ -70,6 +70,9 @@ const state = {
   profile: JSON.parse(localStorage.getItem('aegis_profile') || '{}'),
   statusSystems: [],
   selectedStatusSystemId: null,
+  logConfigsBySystem: {},
+  selectedLogSystemId: null,
+  selectedLogConfig: null,
   nfcTagText: 'NFC://DEMO-SYS-001/P-002',
   qrScanText: '',
   qrResolvedPoint: null,
@@ -1223,11 +1226,38 @@ function renderStatusSystemOptions() {
   sel.value = String(state.selectedStatusSystemId);
 }
 
+function renderErrorSystemOptions() {
+  const sel = $('errorSystem');
+  if (!sel) return;
+  const current = state.selectedLogSystemId || state.selectedStatusSystemId;
+  sel.innerHTML = '';
+  if (!state.statusSystems.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '暂无系统可选';
+    sel.appendChild(opt);
+    state.selectedLogSystemId = null;
+    return;
+  }
+
+  state.statusSystems.forEach((item) => {
+    const opt = document.createElement('option');
+    opt.value = String(item.system_id);
+    opt.textContent = `${item.system_name}（${item.system_code || 'N/A'}）`;
+    sel.appendChild(opt);
+  });
+  const hasCurrent = state.statusSystems.some((s) => Number(s.system_id) === Number(current));
+  state.selectedLogSystemId = hasCurrent ? Number(current) : Number(state.statusSystems[0].system_id);
+  sel.value = String(state.selectedLogSystemId);
+}
+
 async function refreshStatusBase() {
   try {
     const data = await api('/api/v1/monitoring/overview', { headers: authHeaders() });
     state.statusSystems = Array.isArray(data?.items) ? data.items : [];
     renderStatusSystemOptions();
+    renderErrorSystemOptions();
+    syncLogFileOptions();
 
     const selected = state.statusSystems.find((i) => Number(i.system_id) === Number(state.selectedStatusSystemId));
     const target = selected || state.statusSystems[0] || {};
@@ -1722,29 +1752,52 @@ function switchResultTab(tab) {
   $('resultAnalysisPanel')?.classList.toggle('hidden', tab !== 'analysis');
 }
 
-function syncLogFileOptions() {
+async function loadSystemLogConfigs(systemId) {
+  if (!systemId) return [];
+  if (state.logConfigsBySystem[systemId]) return state.logConfigsBySystem[systemId];
+  const data = await api(`/api/v1/systems/${systemId}/log-configs`, { headers: authHeaders() });
+  const items = Array.isArray(data?.items) ? data.items : [];
+  state.logConfigsBySystem[systemId] = items;
+  return items;
+}
+
+async function syncLogFileOptions() {
   const source = $('errorSource')?.value || 'aegis';
   const select = $('errorFileName');
   if (!select) return;
 
-  const options = source === 'system'
-    ? [
-        { value: 'syslog', label: 'syslog' },
-        { value: 'messages', label: 'messages' },
-      ]
-    : [
-        { value: 'aegis-backend-https.log', label: 'aegis-backend-https.log（当前后端 HTTPS）' },
-        { value: 'aegis-frontend-mobile-5173-https.log', label: 'aegis-frontend-mobile-5173-https.log（当前移动端 HTTPS）' },
-        { value: 'aegis-frontend-admin-5174-https.log', label: 'aegis-frontend-admin-5174-https.log（当前管理端 HTTPS）' },
-        { value: 'backend.log', label: 'backend.log' },
-        { value: 'backend-https.log', label: 'backend-https.log' },
-        { value: 'frontend-mobile.log', label: 'frontend-mobile.log' },
-        { value: 'frontend-mobile-https.log', label: 'frontend-mobile-https.log' },
-        { value: 'frontend-admin.log', label: 'frontend-admin.log' },
-        { value: 'frontend-admin-https.log', label: 'frontend-admin-https.log' },
-      ];
+  let options = [
+    { value: 'backend-https.log', label: 'backend-https.log' },
+    { value: 'backend.log', label: 'backend.log' },
+    { value: 'frontend-mobile-https.log', label: 'frontend-mobile-https.log' },
+    { value: 'frontend-mobile.log', label: 'frontend-mobile.log' },
+    { value: 'frontend-admin-https.log', label: 'frontend-admin-https.log' },
+    { value: 'frontend-admin.log', label: 'frontend-admin.log' },
+  ];
+
+  if (source === 'system') {
+    const systemId = Number($('errorSystem')?.value || state.selectedLogSystemId || state.selectedStatusSystemId || 0);
+    state.selectedLogSystemId = systemId || null;
+    try {
+      const configs = await loadSystemLogConfigs(systemId);
+      options = configs.map((item) => ({
+        value: String(item.id),
+        label: `${item.log_name || '日志'}：${item.absolute_path}`,
+        config: item,
+      }));
+    } catch (e) {
+      options = [];
+      if ($('errorAiStatus')) $('errorAiStatus').textContent = `日志配置读取失败：${e.message}`;
+    }
+  }
 
   select.innerHTML = `<option value="" selected disabled>请选择文件</option>` + options.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
+  if (source === 'system' && options.length) {
+    select.value = options[0].value;
+    state.selectedLogConfig = options[0].config || null;
+  } else {
+    state.selectedLogConfig = null;
+  }
 }
 
 function updateTimeSummary() {
@@ -1817,13 +1870,28 @@ if ($('errorSource')) {
   syncLogFileOptions();
 }
 
+if ($('errorSystem')) {
+  $('errorSystem').addEventListener('change', () => {
+    state.selectedLogSystemId = Number($('errorSystem').value || 0) || null;
+    syncLogFileOptions();
+  });
+}
+
+if ($('errorFileName')) {
+  $('errorFileName').addEventListener('change', () => {
+    const systemId = Number($('errorSystem')?.value || state.selectedLogSystemId || 0);
+    const configs = state.logConfigsBySystem[systemId] || [];
+    state.selectedLogConfig = configs.find((item) => String(item.id) === String($('errorFileName').value)) || null;
+  });
+}
+
 if ($('errorLogLevel')) {
   $('errorLogLevel').value = 'warning';
 }
 if ($('errorSource')) {
   $('errorSource').value = 'aegis';
   syncLogFileOptions();
-  if ($('errorFileName')) $('errorFileName').value = 'aegis-backend-https.log';
+  if ($('errorFileName')) $('errorFileName').value = 'backend-https.log';
 }
 updateTimeSummary();
 document.querySelectorAll('.result-tab-btn').forEach((btn) => {
@@ -1834,12 +1902,18 @@ switchResultTab('logs');
 onClick('btnLoadErrors', async () => {
   try {
     const source = $('errorSource').value;
-    const fileName = $('errorFileName').value;
+    const selectedConfig = source === 'system' ? state.selectedLogConfig : null;
+    const configuredPath = selectedConfig?.absolute_path || '';
+    const fileName = selectedConfig
+      ? (configuredPath.split('/').filter(Boolean).at(-1) || selectedConfig.log_name || $('errorFileName').value)
+      : $('errorFileName').value;
     const level = $('errorLogLevel').value;
     const startAt = $('errorStartAt').value;
     const endAt = $('errorEndAt').value;
     const quickRange = state.selectedQuickRange || '1h';
-    $('errorAiStatus').textContent = `正在提取${source === 'aegis' ? ' Aegis ' : ''}日志，请稍等...`;
+    $('errorAiStatus').textContent = configuredPath
+      ? `正在提取 ${configuredPath}，请稍等...`
+      : `正在提取${source === 'aegis' ? ' Aegis ' : ''}日志，请稍等...`;
     const query = new URLSearchParams({
       source,
       file_name: fileName,
@@ -1852,8 +1926,9 @@ onClick('btnLoadErrors', async () => {
       query.set('end_at', endAt.replace('T', ' '));
     }
     const data = await api(`/api/v1/toolbox/error-logs?${query.toString()}`, { headers: authHeaders() });
+    const prefix = configuredPath ? `管理端配置日志地址：${configuredPath}\n\n` : '';
     state.extractedErrors = String(data.content || '').split('\n').filter(Boolean).slice(0, 5000).map((line) => ({ line }));
-    show('errorLogsView', data.content || '未读取到日志内容。');
+    show('errorLogsView', prefix + (data.content || '未读取到日志内容。'));
     show('errorAiView', '');
     switchResultTab('logs');
     $('errorAiStatus').textContent = `已提取 ${data.line_count || state.extractedErrors.length} 行日志，可继续 AI 分析。`;

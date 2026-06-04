@@ -44,6 +44,10 @@ function formatError(moduleName, e) {
 }
 
 function setHeaderByView(viewId) {
+  const isDashboard = viewId === 'view-dashboard-overview';
+  document.getElementById('workspaceHeader')?.classList.toggle('hidden', !isDashboard);
+  document.getElementById('controlStrip')?.classList.toggle('hidden', !isDashboard);
+
   const panel = document.getElementById(viewId);
   const title = panel?.dataset.viewTitle || '管理工作台';
   const desc = panel?.dataset.viewDesc || '请选择左侧功能继续操作。';
@@ -56,6 +60,11 @@ function setHeaderByView(viewId) {
 }
 
 function switchView(viewId, groupId) {
+  if (!ns.state.token) {
+    ns.auth?.setAuthView?.(false);
+    return;
+  }
+
   ns.state.activeView = viewId;
   ns.state.activeGroup = groupId;
 
@@ -105,8 +114,8 @@ bindClick('btnLogin', async () => {
   try {
     await ns.auth.login($('username').value, $('password').value);
     $('state').textContent = '登录成功';
-    ns.auth.setAuthView(true);
     ns.debug?.syncDebugMeta?.();
+    await ns.sharedData?.hydrateAdminSelectors?.();
     switchView('view-dashboard-overview', 'dashboard');
     await ns.dashboard?.refreshDashboard?.();
   } catch (e) {
@@ -149,7 +158,7 @@ bindClick('btnFindUsers', () => ns.users.findUsers($('userSearchKeyword').value.
 }));
 bindClick('btnFindSystems', () => ns.systems.findSystems($('systemSearchKeyword2').value.trim()).catch((e) => {
   $('systemListSummary').textContent = formatError('系统查询', e);
-  $('systemListTbody').innerHTML = '<tr><td colspan="4">查询失败</td></tr>';
+  $('systemListTbody').innerHTML = '<tr><td colspan="9">查询失败</td></tr>';
 }));
 bindClick('btnLoadRules', () => ns.rulesAudit.loadRules().catch((e) => { $('ruleResult').textContent = formatError('规则配置', e); }));
 bindClick('btnSaveRules', () => ns.rulesAudit.saveRules().catch((e) => { $('ruleResult').textContent = formatError('规则配置', e); }));
@@ -167,9 +176,20 @@ bindClick('btnCreateSnapshot', () => ns.templates.createSnapshot().catch((e) => 
 
 bindClick('btnOpenCreateUserModal', () => ns.modals.openModal('createUserModal'));
 bindClick('btnCloseCreateUserModal', () => ns.modals.closeModal('createUserModal'));
-bindClick('btnOpenCreateSystemModal', () => ns.modals.openModal('createSystemModal'));
+bindClick('btnOpenCreateSystemModal', () => ns.modals.openCreateSystemModal());
 bindClick('btnCloseCreateSystemModal', () => ns.modals.closeModal('createSystemModal'));
-bindClick('btnOpenCreateAssetModal', () => ns.modals.openModal('createAssetModal'));
+bindClick('btnTestSystemHost', () => ns.modals.testSystemHost().catch((e) => {
+  const el = $('systemHostTestResult');
+  if (el) el.textContent = `检测失败：${e.message}`;
+}));
+bindClick('btnOpenSystemOwnerPicker', () => ns.modals.openSystemOwnerPicker().catch((e) => {
+  const el = $('modalSystemOwnerSummary');
+  if (el) el.textContent = `用户列表读取失败：${e.message}`;
+}));
+bindClick('btnSearchSystemOwners', () => ns.modals.renderSystemOwnerPicker($('systemOwnerSearchKeyword')?.value || ''));
+bindClick('btnConfirmSystemOwners', () => ns.modals.confirmSystemOwners());
+bindClick('btnCloseSystemOwnerPicker', () => ns.modals.closeModal('systemOwnerPickerModal'));
+bindClick('btnOpenCreateAssetModal', () => ns.modals.openCreateAssetModal());
 bindClick('btnCloseCreateAssetModal', () => ns.modals.closeModal('createAssetModal'));
 bindClick('btnOpenAssetImportModal', () => ns.modals.openModal('assetImportModal'));
 bindClick('btnCloseAssetImportModal', () => ns.modals.closeModal('assetImportModal'));
@@ -178,8 +198,8 @@ bindClick('btnSubmitCreateUser', () => ns.modals.submitCreateUser().catch((e) =>
   $('userListTbody').innerHTML = '<tr><td colspan="4">操作失败</td></tr>';
 }));
 bindClick('btnSubmitCreateSystem', () => ns.modals.submitCreateSystem().catch((e) => {
-  $('systemListSummary').textContent = formatError('创建系统', e);
-  $('systemListTbody').innerHTML = '<tr><td colspan="4">操作失败</td></tr>';
+  $('systemListSummary').textContent = formatError('系统操作', e);
+  $('systemListTbody').innerHTML = '<tr><td colspan="9">操作失败</td></tr>';
 }));
 bindClick('btnSubmitCreateAsset', () => ns.modals.submitCreateAsset().catch((e) => {
   $('assetResult').textContent = formatError('资产操作', e);
@@ -257,13 +277,3 @@ function safeBoot(task, onError) {
 ns.api.renderHistory();
 safeBoot(() => ns.debug?.syncDebugMeta?.(), console.error);
 safeBoot(() => ns.auth.setAuthView(false), console.error);
-safeBoot(() => openGroup('dashboard'), console.error);
-safeBoot(() => switchView('view-dashboard-overview', 'dashboard'), console.error);
-safeBoot(() => ns.sharedData?.hydrateAdminSelectors?.(), console.error);
-safeBoot(() => ns.users?.findUsers?.(''), () => {});
-safeBoot(() => ns.systems?.findSystems?.(''), () => {});
-safeBoot(() => ns.assets?.listAssets?.(), () => {});
-safeBoot(() => ns.emergencyConfig?.listSshHosts?.(), () => {});
-safeBoot(() => ns.emergencyConfig?.listServerActions?.(), () => {});
-safeBoot(() => ns.emergencyConfig?.listDbActions?.(), () => {});
-safeBoot(() => ns.emergencyConfig?.listProcessActions?.(), () => {});

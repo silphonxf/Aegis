@@ -127,3 +127,72 @@ def test_asset_shared_fields_are_returned_and_exported(client, admin_headers):
     assert export.status_code == 200, export.text
     assert "room_id" in export.text
     assert "10.1.2.3" in export.text
+
+
+def test_update_and_deactivate_room(client, admin_headers):
+    create = client.post(
+        "/api/v1/admin/rooms",
+        headers=admin_headers,
+        json={"room_code": "ROOM-EDIT-001", "room_name": "待编辑机房"},
+    )
+    assert create.status_code == 200, create.text
+    room_id = create.json()["id"]
+
+    update = client.put(
+        f"/api/v1/admin/rooms/{room_id}",
+        headers=admin_headers,
+        json={"room_name": "已编辑机房", "building": "B座", "floor": "9F"},
+    )
+    assert update.status_code == 200, update.text
+
+    listing = client.get("/api/v1/admin/rooms?include_inactive=true", headers=admin_headers)
+    target = next(item for item in listing.json()["items"] if item["id"] == room_id)
+    assert target["room_name"] == "已编辑机房"
+    assert target["building"] == "B座"
+    assert target["floor"] == "9F"
+
+    deactivate = client.delete(f"/api/v1/admin/rooms/{room_id}", headers=admin_headers)
+    assert deactivate.status_code == 200, deactivate.text
+    assert deactivate.json()["is_active"] is False
+
+    active_listing = client.get("/api/v1/admin/rooms", headers=admin_headers)
+    assert all(item["id"] != room_id for item in active_listing.json()["items"])
+
+
+def test_update_and_deactivate_inspection_point(client, admin_headers):
+    room = client.post(
+        "/api/v1/admin/rooms",
+        headers=admin_headers,
+        json={"room_code": "ROOM-POINT-EDIT-001", "room_name": "点位编辑机房"},
+    )
+    assert room.status_code == 200, room.text
+
+    create = client.post(
+        "/api/v1/admin/inspection-points",
+        headers=admin_headers,
+        json={
+            "room_id": room.json()["id"],
+            "point_code": "POINT-EDIT-001",
+            "point_name": "待编辑点位",
+            "location_detail": "旧位置",
+        },
+    )
+    assert create.status_code == 200, create.text
+    point_id = create.json()["id"]
+
+    update = client.put(
+        f"/api/v1/admin/inspection-points/{point_id}",
+        headers=admin_headers,
+        json={"point_name": "已编辑点位", "qr_content": "QR://POINT-EDIT-001", "location_detail": "新位置"},
+    )
+    assert update.status_code == 200, update.text
+
+    listing = client.get("/api/v1/admin/inspection-points", headers=admin_headers)
+    target = next(item for item in listing.json()["items"] if item["id"] == point_id)
+    assert target["point_name"] == "已编辑点位"
+    assert target["qr_content"] == "QR://POINT-EDIT-001"
+    assert target["location_detail"] == "新位置"
+
+    deactivate = client.delete(f"/api/v1/admin/inspection-points/{point_id}", headers=admin_headers)
+    assert deactivate.status_code == 200, deactivate.text
+    assert deactivate.json()["is_active"] is False

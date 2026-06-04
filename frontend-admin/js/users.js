@@ -19,6 +19,7 @@ window.AegisAdmin = window.AegisAdmin || {};
   async function findUsers(keyword) {
     const d = await ns.api.request('/api/v1/admin/users?page=1&size=200', { headers: ns.api.headers() });
     const items = Array.isArray(d.items) ? d.items : [];
+    ns.state.latestUsers = items;
     const filtered = keyword ? items.filter((u) => String(u.username || '').toLowerCase().includes(keyword.toLowerCase())) : items;
     renderUserResultBoard(filtered, `匹配 ${filtered.length} 条`);
     return filtered;

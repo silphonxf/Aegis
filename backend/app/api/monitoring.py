@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.rule import StatusRule
-from app.models.system import System, SystemStatusSnapshot
+from app.models.system import System, SystemStatusSnapshot, SystemUserBinding
 from app.models.user import User
 from app.schemas.rule import StatusRuleUpdate
 from app.services.audit import log_action
@@ -20,8 +20,19 @@ from app.services.audit import log_action
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
 
-def _build_overview(db: Session):
-    systems = db.query(System).all()
+def _visible_systems(db: Session, user: User):
+    q = db.query(System).filter(System.is_active.is_(True))
+    if user.role.code in {"admin", "super_admin"}:
+        return q.all()
+    return (
+        q.join(SystemUserBinding, SystemUserBinding.system_id == System.id)
+        .filter(SystemUserBinding.binding_role == "owner", SystemUserBinding.user_id == user.id)
+        .all()
+    )
+
+
+def _build_overview(db: Session, user: User):
+    systems = _visible_systems(db, user)
 
     items = []
     for s in systems:
@@ -180,8 +191,8 @@ def update_rules(
 
 
 @router.get("/overview")
-def monitoring_overview(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    summary, items, abnormal = _build_overview(db)
+def monitoring_overview(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    summary, items, abnormal = _build_overview(db, current_user)
     return {"summary": summary, "items": items, "abnormal_items": abnormal[:20]}
 
 
@@ -260,8 +271,8 @@ def collect_local_snapshot(
 
 
 @router.get("/abnormal/export")
-def export_abnormal_csv(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    _, _, abnormal = _build_overview(db)
+def export_abnormal_csv(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _, _, abnormal = _build_overview(db, current_user)
 
     output = StringIO()
     writer = csv.writer(output)
