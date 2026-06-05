@@ -20,6 +20,7 @@ _ABNORMAL_KEYWORDS = ["异常系统", "系统异常"]
 _DETAIL_KEYWORDS = ["系统详情", "详情", "详细信息", "详细情况"]
 _INSPECTION_KEYWORDS = ["巡检", "巡检记录", "最近巡检"]
 _SELFCHECK_KEYWORDS = ["自检", "自检记录", "最近自检"]
+_RUN_SELFCHECK_KEYWORDS = ["智能自检", "进行一次自检", "执行自检", "自检报告", "生成自检"]
 _LOG_KEYWORDS = ["日志", "报错", "错误", "异常堆栈", "报异常", "分析这段"]
 _READ_LOG_KEYWORDS = ["最近错误日志", "读取日志", "看看日志", "最近日志"]
 _SYSTEM_LOG_ANALYZE_KEYWORDS = ["系统日志分析", "分析系统日志", "分析错误日志", "分析最近日志"]
@@ -78,6 +79,8 @@ class AssistantRouter:
             return RouteResult(intent="query_system_status", tool="get_system_status_overview", arguments=base_args)
         if _contains_any(text, _INSPECTION_KEYWORDS):
             return RouteResult(intent="query_inspection_records", tool="list_inspection_records", arguments=base_args)
+        if _contains_any(text, _RUN_SELFCHECK_KEYWORDS):
+            return RouteResult(intent="run_system_selfcheck", tool="run_system_selfcheck_report", arguments=base_args)
         if _contains_any(text, _SELFCHECK_KEYWORDS):
             return RouteResult(intent="query_selfcheck_records", tool="list_selfcheck_records", arguments=base_args)
         if _contains_any(text, _READ_LOG_KEYWORDS):
@@ -135,9 +138,9 @@ class AssistantRouter:
             '你是 Aegis 移动端助手的意图路由器。请根据用户输入判断：是否应该直接自然回复，还是调用某个特定功能工具。'
             '只返回 JSON，不要输出任何额外说明。JSON 格式必须为：'
             '{"mode":"reply|tool","intent":"...","reply":"...","tool":"..."}。'
-            '可用 tool 只有：list_accessible_systems,get_system_status_overview,get_system_detail,get_abnormal_systems,list_inspection_records,list_selfcheck_records,analyze_log_text,create_restart_approval。'
+            '可用 tool 只有：list_accessible_systems,get_system_status_overview,get_system_detail,get_abnormal_systems,list_inspection_records,list_selfcheck_records,run_system_selfcheck_report,analyze_ip_reputation,analyze_capture_content,analyze_system_error_logs,analyze_log_text,create_restart_approval。'
             '规则：1) 普通寒暄/闲聊/追问优先 mode=reply，reply 要自然，不能模板化；'
-            '2) 用户明确在查系统列表、状态、详情、巡检、自检、日志分析、重启审批时，用 mode=tool；'
+            '2) 用户明确在查系统列表、状态、详情、巡检、自检、IP恶意研判、抓包分析、日志分析、重启审批时，用 mode=tool；'
             '3) 对于“我现在有哪几个系统/接入了哪些系统”这类问题，优先使用 list_accessible_systems；'
             '4) 不要臆造系统名、记录、状态结果，也不要返回 arguments；参数由后端自行决定。'
             '5) 没有对应能力时应选择 mode=reply 并明确说明当前未接入该能力。\n\n'

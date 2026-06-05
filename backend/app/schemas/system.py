@@ -26,6 +26,7 @@ class SystemCreate(BaseModel):
     owner_user_ids: List[int] = Field(default_factory=list)
     env: str = "prod"
     check_frequency: Optional[str] = None
+    selfcheck_skill: Optional[str] = None
     remark: Optional[str] = None
     log_configs: List[SystemLogConfigSave] = Field(default_factory=list)
 
@@ -38,6 +39,7 @@ class SystemUpdate(BaseModel):
     owner_user_ids: Optional[List[int]] = None
     env: Optional[str] = None
     check_frequency: Optional[str] = None
+    selfcheck_skill: Optional[str] = None
     remark: Optional[str] = None
     is_active: Optional[bool] = None
     log_configs: Optional[List[SystemLogConfigSave]] = None

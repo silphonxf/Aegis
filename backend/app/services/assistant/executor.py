@@ -28,10 +28,19 @@ class AssistantExecutor:
         if tool == "list_accessible_systems":
             extracted_system_name = extract_system_name(message)
             return {"system_name": extracted_system_name} if extracted_system_name else {}
+        if tool == "run_system_selfcheck_report":
+            args = {}
+            system_name = base.get("system_name") or extract_system_name(message)
+            if system_name:
+                args["system_name"] = system_name
+            elif base.get("system_id"):
+                args["system_id"] = base["system_id"]
+            return args
         if tool in {"get_system_status_overview", "get_system_detail", "list_inspection_records", "list_selfcheck_records", "create_restart_approval"}:
             args = {}
-            if base.get("system_name"):
-                args["system_name"] = base["system_name"]
+            system_name = base.get("system_name") or extract_system_name(message)
+            if system_name:
+                args["system_name"] = system_name
             if base.get("system_id"):
                 args["system_id"] = base["system_id"]
             return args

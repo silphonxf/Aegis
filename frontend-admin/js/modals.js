@@ -74,19 +74,25 @@ window.AegisAdmin = window.AegisAdmin || {};
       'modalSystemOwnerIds',
       'modalSystemCheckFrequency',
       'modalSystemLogConfigs',
+      'modalSystemSelfcheckSkill',
       'modalSystemRemark',
+      'modalSystemActive',
     ];
     ids.forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
     const env = document.getElementById('modalSystemEnv');
     if (env) env.value = 'prod';
+    const active = document.getElementById('modalSystemActive');
+    if (active) active.value = 'true';
     const frequency = document.getElementById('modalSystemCheckFrequency');
     if (frequency) frequency.value = '';
     const testResult = document.getElementById('systemHostTestResult');
     if (testResult) testResult.textContent = '';
     const title = document.getElementById('systemModalTitle');
     const submit = document.getElementById('btnSubmitCreateSystem');
+    const deleteBtn = document.getElementById('btnDeleteSystem');
     if (title) title.textContent = '新增系统';
     if (submit) submit.textContent = '确认新增';
+    if (deleteBtn) deleteBtn.classList.add('hidden');
     renderSystemOwnerSummary();
   }
 
@@ -98,6 +104,7 @@ window.AegisAdmin = window.AegisAdmin || {};
       modalAssetNfcTag: '',
       modalAssetCheckItems: '',
       modalAssetRemark: '',
+      modalAssetActive: 'true',
     };
     Object.entries(defaults).forEach(([id, value]) => {
       const el = document.getElementById(id);
@@ -105,8 +112,10 @@ window.AegisAdmin = window.AegisAdmin || {};
     });
     const title = document.getElementById('assetModalTitle');
     const submit = document.getElementById('btnSubmitCreateAsset');
+    const deleteBtn = document.getElementById('btnDeleteAsset');
     if (title) title.textContent = '新增机房';
     if (submit) submit.textContent = '确认新增';
+    if (deleteBtn) deleteBtn.classList.add('hidden');
   }
 
   function openCreateAssetModal() {
@@ -129,15 +138,19 @@ window.AegisAdmin = window.AegisAdmin || {};
     ns.state.editingSystemId = item.id;
     const title = document.getElementById('systemModalTitle');
     const submit = document.getElementById('btnSubmitCreateSystem');
+    const deleteBtn = document.getElementById('btnDeleteSystem');
     if (title) title.textContent = '编辑系统';
     if (submit) submit.textContent = '保存修改';
+    if (deleteBtn) deleteBtn.classList.remove('hidden');
     setValue('modalSystemCode', item.system_code);
     setValue('modalSystemName', item.name);
     setValue('modalSystemHostAddress', item.host_address);
     setValue('modalSystemEnv', item.env || 'prod');
+    setValue('modalSystemActive', item.is_active === false ? 'false' : 'true');
     setSystemOwnerIds(Array.isArray(item.owner_user_ids) ? item.owner_user_ids : []);
     setValue('modalSystemCheckFrequency', item.check_frequency);
     setValue('modalSystemRemark', item.remark);
+    setValue('modalSystemSelfcheckSkill', item.selfcheck_skill);
     const logPaths = Array.isArray(item.log_configs)
       ? item.log_configs.map((cfg) => cfg.absolute_path || '').filter(Boolean).join('\n')
       : '';
@@ -201,13 +214,16 @@ window.AegisAdmin = window.AegisAdmin || {};
     ns.state.editingAssetId = item.id;
     const title = document.getElementById('assetModalTitle');
     const submit = document.getElementById('btnSubmitCreateAsset');
+    const deleteBtn = document.getElementById('btnDeleteAsset');
     if (title) title.textContent = '编辑机房';
     if (submit) submit.textContent = '保存修改';
+    if (deleteBtn) deleteBtn.classList.remove('hidden');
     setValue('modalAssetName', item.room_name);
     setValue('modalAssetQrContent', item.qr_content);
     setValue('modalAssetNfcTag', item.nfc_tag);
     setValue('modalAssetCheckItems', (item.check_items || []).join('\n'));
     setValue('modalAssetRemark', item.remark);
+    setValue('modalAssetActive', item.is_active === false ? 'false' : 'true');
     openModal('createAssetModal');
   }
 
@@ -250,8 +266,10 @@ window.AegisAdmin = window.AegisAdmin || {};
       name: document.getElementById('modalSystemName').value.trim(),
       host_address: hostAddress || null,
       env: document.getElementById('modalSystemEnv').value || 'prod',
+      is_active: document.getElementById('modalSystemActive')?.value !== 'false',
       owner_user_ids: ownerIds,
       check_frequency: document.getElementById('modalSystemCheckFrequency').value.trim() || null,
+      selfcheck_skill: document.getElementById('modalSystemSelfcheckSkill')?.value.trim() || null,
       log_configs: logConfigs,
       remark: document.getElementById('modalSystemRemark').value.trim() || null,
     };
@@ -276,10 +294,27 @@ window.AegisAdmin = window.AegisAdmin || {};
         .map((item) => item.trim())
         .filter(Boolean),
       remark: document.getElementById('modalAssetRemark').value.trim() || null,
+      is_active: document.getElementById('modalAssetActive')?.value !== 'false',
     };
     const d = ns.state.editingAssetId
       ? await ns.assets.updateAsset(ns.state.editingAssetId, payload)
       : await ns.assets.createAsset(payload);
+    closeModal('createAssetModal');
+    resetCreateAssetModal();
+    return d;
+  }
+
+  async function deleteEditingSystem() {
+    if (!ns.state.editingSystemId) return null;
+    const d = await ns.systems.deleteSystem(ns.state.editingSystemId);
+    closeModal('createSystemModal');
+    resetCreateSystemModal();
+    return d;
+  }
+
+  async function deleteEditingAsset() {
+    if (!ns.state.editingAssetId) return null;
+    const d = await ns.assets.retireAsset(ns.state.editingAssetId);
     closeModal('createAssetModal');
     resetCreateAssetModal();
     return d;
@@ -299,6 +334,8 @@ window.AegisAdmin = window.AegisAdmin || {};
     submitCreateUser,
     submitCreateSystem,
     submitCreateAsset,
+    deleteEditingSystem,
+    deleteEditingAsset,
     resetCreateUserModal,
     resetCreateSystemModal,
     resetCreateAssetModal,

@@ -9,6 +9,7 @@ def test_admin_create_and_list_systems(client, admin_headers):
             "env": "test",
             "owner_user_ids": [1],
             "check_frequency": "daily",
+            "selfcheck_skill": "检查 CPU、内存、硬盘和业务端口，发现异常输出处理建议。",
             "log_configs": [
                 {"log_name": "app-error", "absolute_path": "/var/log/aegis/app-error.log", "log_level": "error"},
                 {"log_name": "access", "absolute_path": "/var/log/nginx/access.log", "log_level": "info"},
@@ -27,6 +28,7 @@ def test_admin_create_and_list_systems(client, admin_headers):
     target = next(item for item in listing.json()["items"] if item["id"] == system_id)
     assert target["host_address"] == "192.168.10.11"
     assert target["check_frequency"] == "daily"
+    assert target["selfcheck_skill"] == "检查 CPU、内存、硬盘和业务端口，发现异常输出处理建议。"
     assert 1 in target["owner_user_ids"]
     assert [item["absolute_path"] for item in target["log_configs"]] == [
         "/var/log/aegis/app-error.log",
@@ -52,6 +54,7 @@ def test_admin_update_and_deactivate_system(client, admin_headers):
             "env": "prod",
             "owner_user_ids": [],
             "check_frequency": "weekly",
+            "selfcheck_skill": "编辑后的自检 skill",
             "log_configs": [{"log_name": "secure", "absolute_path": "/var/log/secure", "log_level": "warning"}],
         },
     )
@@ -65,12 +68,17 @@ def test_admin_update_and_deactivate_system(client, admin_headers):
     assert target["env"] == "prod"
     assert target["owner_user_ids"] == []
     assert target["check_frequency"] == "weekly"
+    assert target["selfcheck_skill"] == "编辑后的自检 skill"
     assert len(target["log_configs"]) == 1
     assert target["log_configs"][0]["absolute_path"] == "/var/log/secure"
 
     deactivate = client.delete(f"/api/v1/admin/systems/{system_id}", headers=admin_headers)
     assert deactivate.status_code == 200, deactivate.text
     assert deactivate.json()["is_active"] is False
+
+    reactivate = client.patch(f"/api/v1/admin/systems/{system_id}/active?is_active=true", headers=admin_headers)
+    assert reactivate.status_code == 200, reactivate.text
+    assert reactivate.json()["is_active"] is True
 
 
 def test_system_log_path_requires_absolute_path(client, admin_headers):

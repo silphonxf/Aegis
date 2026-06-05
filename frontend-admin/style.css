@@ -406,6 +406,12 @@ button {
   cursor: pointer;
 }
 button:hover { filter: brightness(1.04); }
+button.danger {
+  background: rgba(255, 107, 107, 0.18);
+  color: #ffb8b8;
+  border: 1px solid rgba(255, 107, 107, .24);
+  box-shadow: none;
+}
 
 pre {
   background: #040d16;

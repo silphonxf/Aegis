@@ -3,14 +3,14 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, Optional
 
-from app.db.session import SessionLocal
+import app.db.session as db_session_module
 from app.models.system import System
 from app.models.tool_task import ToolTask
 from app.services.assistant.schemas import ToolSpec
 
 
 def create_restart_approval(system_name: Optional[str] = None, **_: Any) -> Dict[str, Any]:
-    db = SessionLocal()
+    db = db_session_module.SessionLocal()
     try:
         target = system_name or "local-host"
         if system_name:

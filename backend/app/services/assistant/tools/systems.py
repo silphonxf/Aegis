@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from app.db.session import SessionLocal
+import app.db.session as db_session_module
 from app.models.system import System, SystemStatusSnapshot
 from app.services.assistant.schemas import ToolSpec
 
@@ -42,7 +42,7 @@ def _query_system_items(db, system_name: Optional[str] = None, limit: int = 5) -
 
 
 def list_accessible_systems(system_name: Optional[str] = None, limit: int = 20, **_: Any) -> Dict[str, Any]:
-    db = SessionLocal()
+    db = db_session_module.SessionLocal()
     try:
         items = _query_system_items(db, system_name=system_name, limit=limit)
         if system_name and not items:
@@ -91,7 +91,7 @@ def list_accessible_systems(system_name: Optional[str] = None, limit: int = 20, 
 
 
 def get_system_status_overview(system_name: Optional[str] = None, **_: Any) -> Dict[str, Any]:
-    db = SessionLocal()
+    db = db_session_module.SessionLocal()
     try:
         items = _query_system_items(db, system_name=system_name, limit=5)
 
@@ -123,7 +123,7 @@ def get_system_status_overview(system_name: Optional[str] = None, **_: Any) -> D
 
 
 def get_abnormal_systems(**_: Any) -> Dict[str, Any]:
-    db = SessionLocal()
+    db = db_session_module.SessionLocal()
     try:
         items = _query_system_items(db, limit=20)
         abnormal = [item for item in items if item["status_color"] in {"yellow", "red"}]
@@ -146,7 +146,7 @@ def get_abnormal_systems(**_: Any) -> Dict[str, Any]:
 
 
 def get_system_detail(system_name: Optional[str] = None, **_: Any) -> Dict[str, Any]:
-    db = SessionLocal()
+    db = db_session_module.SessionLocal()
     try:
         system = _match_system(db, system_name)
         if not system:

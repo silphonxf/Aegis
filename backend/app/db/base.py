@@ -3,6 +3,7 @@ from app.models.ai_chat_message import AIChatMessage
 from app.models.ai_chat_summary import AIChatSummary
 from app.models.ai_conversation import AIConversation
 from app.models.ai_diagnosis import AIDiagnosis
+from app.models.ai_external_key import AIExternalApiKey
 from app.models.asset import Asset
 from app.models.audit import AuditLog
 from app.models.inspection import InspectionPoint, InspectionRecord
@@ -29,6 +30,7 @@ __all__ = [
     "Asset",
     "ToolTask",
     "AIDiagnosis",
+    "AIExternalApiKey",
     "AIChatFile",
     "AIChatMessage",
     "AIChatSummary",

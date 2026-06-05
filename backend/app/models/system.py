@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -17,6 +17,7 @@ class System(Base):
     owner_user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     env: Mapped[str] = mapped_column(String(32), default="prod", nullable=False)
     check_frequency: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    selfcheck_skill: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     remark: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

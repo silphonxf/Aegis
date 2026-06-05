@@ -12,6 +12,10 @@ class AssistantChatRequest(BaseModel):
     context: Optional[Dict[str, Any]] = None
 
 
+class ExternalAssistantChatRequest(AssistantChatRequest):
+    apikey: str = Field(..., min_length=20)
+
+
 class AssistantAction(BaseModel):
     type: str
     label: str

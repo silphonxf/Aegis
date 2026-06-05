@@ -54,7 +54,7 @@
                 <strong>3</strong>
                 <span>待巡检</span>
               </button>
-              <button class="summary-card" data-open-page="page-selfcheck-form">
+              <button class="summary-card" data-open-page="page-selfcheck-run">
                 <strong>2</strong>
                 <span>待自检</span>
               </button>
@@ -79,13 +79,9 @@
                 <span class="entry-title">NFC 巡检</span>
                 <span class="entry-desc">碰一碰读取巡检点</span>
               </button>
-              <button class="entry-card" data-open-page="page-selfcheck-form">
-                <span class="entry-title">提交自检</span>
-                <span class="entry-desc">快速上报自检结果</span>
-              </button>
-              <button class="entry-card" data-open-page="page-selfcheck-status">
-                <span class="entry-title">系统状态</span>
-                <span class="entry-desc">查看系统运行趋势</span>
+              <button class="entry-card" data-open-page="page-selfcheck-run">
+                <span class="entry-title">系统自检</span>
+                <span class="entry-desc">查看状态、告警与 AI 自检报告</span>
               </button>
             </div>
           </section>
@@ -170,18 +166,14 @@
           <section class="page-block hero-block">
             <div>
               <h2>自检</h2>
-              <p class="hint">形成“看状态 → 提交自检 → 分析日志”的闭环。</p>
+              <p class="hint">查看系统状态、告警信息与 AI 自检报告。</p>
             </div>
           </section>
           <section class="page-block">
             <div class="entry-grid single-column">
-              <button class="entry-card large" data-open-page="page-selfcheck-status">
-                <span class="entry-title">系统状态</span>
-                <span class="entry-desc">查看 CPU / 内存 / 磁盘趋势与当前系统概况</span>
-              </button>
-              <button class="entry-card large" data-open-page="page-selfcheck-form">
-                <span class="entry-title">提交自检</span>
-                <span class="entry-desc">快速上报日检 / 周检结果</span>
+              <button class="entry-card large" data-open-page="page-selfcheck-run">
+                <span class="entry-title">系统自检</span>
+                <span class="entry-desc">查看状态、告警与 AI 自检报告</span>
               </button>
               <button class="entry-card large" data-open-page="page-selfcheck-errors">
                 <span class="entry-title">错误日志分析</span>
@@ -285,11 +277,10 @@
             <div id="inspectionCheckItems" class="checklist-panel"></div>
             <div id="inspectionMonitoringItem" class="checklist-panel"></div>
             <label class="full">备注<input id="insNote" placeholder="可选" /></label>
-            <div class="actions">
+            <div class="actions one">
               <button id="btnStartQrScan">调用相机扫码</button>
-              <button id="btnStopQrScan" class="secondary">停止扫码</button>
             </div>
-            <div id="qrScanState" class="hint">点击“调用相机扫码”，识别后自动返回。</div>
+            <div id="qrScanState" class="hint">点击“调用相机扫码”，识别后会自动填充机房信息。</div>
             <canvas id="qrCanvas" style="display:none;"></canvas>
             <div class="actions one sticky-actions">
               <button id="btnCreateInspection">提交巡检</button>
@@ -332,38 +323,47 @@
           </div>
         </section>
 
-        <section id="page-selfcheck-status" class="detail-screen hidden">
+        <section id="page-selfcheck-run" class="detail-screen hidden">
           <div class="detail-topbar">
             <button class="ghost small" data-close-page>返回</button>
-            <h2>系统状态</h2>
+            <h2>系统自检</h2>
           </div>
           <div class="detail-body">
             <label class="full">选择系统
               <select id="scStatusSystem"></select>
             </label>
-            <div id="statusSystemHint" class="hint">请先选择系统，再查看状态曲线。</div>
-            <div class="actions one"><button id="btnRefreshStatus">刷新基线数据</button></div>
-            <div class="charts">
-              <div><h3>CPU</h3><canvas id="cpuChart" width="360" height="130"></canvas></div>
-              <div><h3>MEM</h3><canvas id="memChart" width="360" height="130"></canvas></div>
-              <div><h3>DISK</h3><canvas id="diskChart" width="360" height="130"></canvas></div>
-            </div>
-          </div>
-        </section>
-
-        <section id="page-selfcheck-form" class="detail-screen hidden">
-          <div class="detail-topbar">
-            <button class="ghost small" data-close-page>返回</button>
-            <h2>提交自检</h2>
-          </div>
-          <div class="detail-body">
-            <label class="full">自检内容<input id="scSummary" placeholder="输入自检内容" /></label>
-            <label>自检结果
-              <select id="scResult"><option value="normal">正常</option><option value="critical">异常</option></select>
+            <label>时间范围
+              <select id="selfcheckRange">
+                <option value="1">1min</option>
+                <option value="5">5min</option>
+                <option value="15">15min</option>
+                <option value="30">30min</option>
+                <option value="60" selected>1h</option>
+                <option value="180">3h</option>
+                <option value="360">6h</option>
+              </select>
             </label>
-            <label class="full">备注<input id="scNote" placeholder="可选" /></label>
-            <div class="actions one sticky-actions"><button id="btnCreateSelfcheck">提交自检</button></div>
-            <pre id="selfcheckResult"></pre>
+            <div id="statusSystemHint" class="hint">请选择系统并开始自检。</div>
+            <div class="actions one"><button id="btnRunSelfcheck">开始系统自检</button></div>
+            <details id="selfcheckStatusDetails" class="details-block" open>
+              <summary>系统状态</summary>
+              <div class="details-body">
+                <div id="selfcheckStatusSummary" class="checklist-panel"></div>
+                <div class="charts">
+                  <div><h3>CPU</h3><canvas id="cpuChart" width="360" height="130"></canvas></div>
+                  <div><h3>MEM</h3><canvas id="memChart" width="360" height="130"></canvas></div>
+                  <div><h3>DISK</h3><canvas id="diskChart" width="360" height="130"></canvas></div>
+                </div>
+              </div>
+            </details>
+            <section class="log-result-card">
+              <h3>告警信息</h3>
+              <div id="selfcheckAlarmList" class="checklist-panel"></div>
+            </section>
+            <section class="log-result-card analysis">
+              <h3>AI 自检报告</h3>
+              <pre id="selfcheckAiReport"></pre>
+            </section>
           </div>
         </section>
 
@@ -553,43 +553,34 @@
             <h2>应急处置</h2>
           </div>
           <div class="detail-body tool-layout emergency-layout">
+            <section class="card-inline emergency-card" id="emergencyMenuPanel">
+              <div class="section-head compact">
+                <h3>应急处置</h3>
+                <span class="section-meta">管理端配置</span>
+              </div>
+              <div class="actions emergency-actions-grid" id="emergencySubmenuList">
+                <button data-emergency-section="server">系统重启</button>
+                <button data-emergency-section="process" class="secondary">应用重启</button>
+                <button data-emergency-section="database" class="secondary">数据库死锁处理</button>
+              </div>
+              <div id="emergencyMenuHint" class="hint">请选择要处理的应急类型。</div>
+            </section>
             <section class="card-inline emergency-card">
               <div class="section-head compact">
-                <h3>服务器操作</h3>
-                <span class="section-meta">管理端配置 SSH 与脚本</span>
+                <h3>系统重启</h3>
+                <span class="section-meta">管理员可见服务器</span>
               </div>
-              <div class="emergency-table" id="serverEmergencyList">
-                <div class="emergency-table-head">主机名</div>
-                <div class="emergency-table-head">IP</div>
-                <div class="emergency-table-head">操作</div>
-
-                <div class="emergency-table-cell emergency-name-cell">航信应用服务器-01</div>
-                <div class="emergency-table-cell emergency-ip-cell">10.10.1.21</div>
-                <button class="warn-action emergency-table-btn" data-server-restart="航信应用服务器-01">重启</button>
-
-                <div class="emergency-table-cell emergency-name-cell">离港服务服务器-02</div>
-                <div class="emergency-table-cell emergency-ip-cell">10.10.1.35</div>
-                <button class="warn-action emergency-table-btn" data-server-restart="离港服务服务器-02">重启</button>
-
-                <div class="emergency-table-cell emergency-name-cell">测试中间件服务器-03</div>
-                <div class="emergency-table-cell emergency-ip-cell">10.10.9.11</div>
-                <button class="warn-action emergency-table-btn" data-server-restart="测试中间件服务器-03">重启</button>
-              </div>
+              <div class="emergency-table" id="serverEmergencyList"></div>
               <pre id="serverEmergencyResult"></pre>
             </section>
 
             <section class="card-inline emergency-card">
               <div class="section-head compact">
-                <h3>数据库操作</h3>
-                <span class="section-meta">预留管理端命令模板</span>
+                <h3>数据库死锁处理</h3>
+                <span class="section-meta">管理端配置命令</span>
               </div>
-              <div class="actions emergency-actions-grid">
-                <button id="btnOpenFocPasswordQuery">FOC 密码查询</button>
-                <button id="btnFocDeadlockHandle" class="secondary">FOC 死锁处理</button>
-                <button id="btnFocFlashback" class="secondary">FOC 数据库闪回</button>
-                <button id="btnDbTablespace" class="secondary">数据库表空间</button>
-              </div>
-              <div id="dbEmergencyHint" class="hint">数据库动作后续通过管理端配置 SQL / SSH 命令模板执行。</div>
+              <div class="emergency-table" id="dbEmergencyList"></div>
+              <div id="dbEmergencyHint" class="hint">数据库类动作从管理端配置。</div>
               <pre id="dbEmergencyResult"></pre>
             </section>
 
@@ -652,30 +643,10 @@
 
             <section class="card-inline emergency-card">
               <div class="section-head compact">
-                <h3>进程操作</h3>
-                <span class="section-meta">管理端配置进程命令</span>
+                <h3>应用重启</h3>
+                <span class="section-meta">负责系统可见</span>
               </div>
-              <div class="emergency-table process-table" id="processEmergencyList">
-                <div class="emergency-table-head">进程名</div>
-                <div class="emergency-table-head">进程 ID</div>
-                <div class="emergency-table-head">重启</div>
-                <div class="emergency-table-head">关闭</div>
-
-                <div class="emergency-table-cell emergency-name-cell">foc-gateway</div>
-                <div class="emergency-table-cell emergency-id-cell">18231</div>
-                <button class="secondary emergency-table-btn" data-process-restart="foc-gateway">重启</button>
-                <button class="warn-action emergency-table-btn" data-process-stop="foc-gateway">关闭</button>
-
-                <div class="emergency-table-cell emergency-name-cell">dispatch-sync-worker</div>
-                <div class="emergency-table-cell emergency-id-cell">21455</div>
-                <button class="secondary emergency-table-btn" data-process-restart="dispatch-sync-worker">重启</button>
-                <button class="warn-action emergency-table-btn" data-process-stop="dispatch-sync-worker">关闭</button>
-
-                <div class="emergency-table-cell emergency-name-cell">crew-bridge-daemon</div>
-                <div class="emergency-table-cell emergency-id-cell">9311</div>
-                <button class="secondary emergency-table-btn" data-process-restart="crew-bridge-daemon">重启</button>
-                <button class="warn-action emergency-table-btn" data-process-stop="crew-bridge-daemon">关闭</button>
-              </div>
+              <div class="emergency-table process-table" id="processEmergencyList"></div>
               <pre id="processEmergencyResult"></pre>
             </section>
           </div>
@@ -714,6 +685,17 @@
   </div>
 
   <div id="toast" class="app-toast hidden"></div>
+
+  <div id="selfcheckSystemModal" class="sheet-modal hidden">
+    <div class="sheet-backdrop" data-close-selfcheck-system-modal></div>
+    <div class="sheet-panel">
+      <div class="sheet-head">
+        <h3>选择系统</h3>
+        <button type="button" class="ghost small" data-close-selfcheck-system-modal>关闭</button>
+      </div>
+      <div id="selfcheckSystemPickerList" class="system-picker-list"></div>
+    </div>
+  </div>
 
   <div id="qrScannerOverlay" class="scanner-overlay hidden">
     <video id="qrVideo" class="scanner-video" playsinline muted></video>

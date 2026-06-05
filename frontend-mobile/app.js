@@ -71,6 +71,7 @@ const state = {
   profile: JSON.parse(localStorage.getItem('aegis_profile') || '{}'),
   statusSystems: [],
   selectedStatusSystemId: null,
+  pendingSelfcheckPageOpen: false,
   logConfigsBySystem: {},
   selectedLogSystemId: null,
   selectedLogConfig: null,
@@ -87,6 +88,8 @@ const state = {
   aiSidebarCollapsed: loadAiSidebarCollapsed(),
   activeTab: loadActiveTab(),
   activeDetailPage: '',
+  emergencyActions: { server_actions: [], process_actions: [], database_actions: [], submenus: [] },
+  activeEmergencySection: '',
   isAnalyzingErrors: false,
   isAnalyzingCapture: false,
   isSendingAiMessage: false,
@@ -355,7 +358,7 @@ function switchScreen(loggedIn) {
 const TAB_META = {
   'tab-workbench': { title: '工作台', subtitle: '今日待办、快捷操作与辅助工具' },
   'tab-inspection': { title: '巡检', subtitle: '扫码巡检、NFC 巡检与最近记录' },
-  'tab-selfcheck': { title: '自检', subtitle: '系统状态、自检提交与错误日志分析' },
+  'tab-selfcheck': { title: '自检', subtitle: '系统自检与错误日志分析' },
   'tab-me': { title: '我的', subtitle: '账号信息、密码修改与登录设置' },
 };
 
@@ -365,8 +368,7 @@ const DETAIL_PAGE_META = {
   'page-inspection-qr': '扫码巡检',
   'page-inspection-nfc': 'NFC 巡检',
   'page-inspection-records': '最近巡检记录',
-  'page-selfcheck-status': '系统状态',
-  'page-selfcheck-form': '提交自检',
+  'page-selfcheck-run': '系统自检',
   'page-selfcheck-errors': '错误日志分析',
   'page-tool-aiqa': 'AI 问答',
   'page-tool-ping': 'Ping 工具',
@@ -517,7 +519,10 @@ function renderKeyValueRows(items = []) {
 
 function renderAssistantCards(cards = []) {
   if (!Array.isArray(cards) || !cards.length) return '';
-  return `<div class="assistant-cards">${cards.map((card) => {
+  return `<div class="assistant-cards">${cards.map((card, cardIndex) => {
+    const htmlButton = card.html_report
+      ? `<button type="button" class="ghost small ai-html-card-btn" data-ai-html-card="${cardIndex}">打开 HTML 报告</button>`
+      : '';
     if (card.type === 'system_status_overview') {
       const items = (card.items || []).map((item) => `
         <div class="assistant-card-row">
@@ -525,7 +530,7 @@ function renderAssistantCards(cards = []) {
           <span>${escapeHtml(item.status_color || 'unknown')}</span>
         </div>
       `).join('');
-      return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '系统状态')}</div><div class="assistant-card-desc">${escapeHtml(card.summary || '')}</div>${items}</div>`;
+      return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '系统状态')}</div><div class="assistant-card-desc">${escapeHtml(card.summary || '')}</div>${items}${htmlButton}</div>`;
     }
     if (card.type === 'system_detail') {
       const detail = card.detail || {};
@@ -535,17 +540,17 @@ function renderAssistantCards(cards = []) {
         { label: 'CPU', value: snap.cpu_usage ?? '-' },
         { label: '内存', value: snap.mem_usage ?? '-' },
         { label: '磁盘', value: snap.disk_usage ?? '-' },
-      ])}</div>`;
+      ])}${htmlButton}</div>`;
     }
-    if (card.type === 'inspection_records' || card.type === 'selfcheck_records' || card.type === 'log_suggestions' || card.type === 'assistant_capabilities' || card.type === 'log_analysis') {
+    if (card.type === 'inspection_records' || card.type === 'selfcheck_records' || card.type === 'system_selfcheck_report' || card.type === 'log_suggestions' || card.type === 'assistant_capabilities' || card.type === 'log_analysis') {
       const items = renderKeyValueRows(card.items || []);
-      return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '记录')}</div><div class="assistant-card-desc">${escapeHtml(card.summary || '')}</div>${items || '<div class="assistant-card-desc">暂无内容</div>'}</div>`;
+      return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '记录')}</div><div class="assistant-card-desc">${escapeHtml(card.summary || '')}</div>${items || '<div class="assistant-card-desc">暂无内容</div>'}${htmlButton}</div>`;
     }
     if (card.type === 'pending_confirmation' || card.type === 'tool_task') {
       const detail = card.detail || {};
-      return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '任务')}</div><div class="assistant-card-desc">${escapeHtml(JSON.stringify(detail))}</div></div>`;
+      return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '任务')}</div><div class="assistant-card-desc">${escapeHtml(JSON.stringify(detail))}</div>${htmlButton}</div>`;
     }
-    return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '助手卡片')}</div></div>`;
+    return `<div class="assistant-card"><div class="assistant-card-title">${escapeHtml(card.title || '助手卡片')}</div>${htmlButton}</div>`;
   }).join('')}</div>`;
 }
 
@@ -569,7 +574,10 @@ function renderAiMessages() {
       : '';
     const cards = item.role === 'ai' ? renderAssistantCards(item.cards) : '';
     const actions = item.role === 'ai' ? renderAssistantActions(item.actions) : '';
-    return `<div class="chat-bubble ${cls}${welcome}${pending}">${escapeHtml(item.text)}${attachments}${cards}${actions}${retry}</div>`;
+    const htmlReport = item.role === 'ai' && !pending
+      ? `<div class="ai-report-actions"><button type="button" class="ghost small" data-ai-open-html-report="${index}">打开 HTML 报告</button></div>`
+      : '';
+    return `<div class="chat-bubble ${cls}${welcome}${pending}">${escapeHtml(item.text)}${attachments}${cards}${actions}${htmlReport}${retry}</div>`;
   }).join('');
   const retryBtn = $('btnRetryAiMessage');
   if (retryBtn) retryBtn.onclick = retryLastAiMessage;
@@ -589,11 +597,47 @@ function renderAiMessages() {
       }
     };
   });
+  box.querySelectorAll('[data-ai-open-html-report]').forEach((btn) => {
+    btn.onclick = () => {
+      const item = state.aiMessages[Number(btn.dataset.aiOpenHtmlReport)];
+      openAiHtmlReport(item);
+    };
+  });
+  box.querySelectorAll('[data-ai-html-card]').forEach((btn) => {
+    btn.onclick = () => {
+      const bubble = btn.closest('.chat-bubble');
+      const bubbleIndex = Array.from(box.querySelectorAll('.chat-bubble')).indexOf(bubble);
+      const item = state.aiMessages[bubbleIndex];
+      const card = item?.cards?.[Number(btn.dataset.aiHtmlCard)];
+      openHtmlDocument(card?.html_report || buildAiHtmlReport(item));
+    };
+  });
   saveAiMessages();
   updateAiConversationMeta();
   requestAnimationFrame(() => {
     box.scrollTop = box.scrollHeight;
   });
+}
+
+function buildAiHtmlReport(item) {
+  const title = 'Aegis AI 分析报告';
+  const cardHtml = (item?.cards || []).map((card) => {
+    const rows = (card.items || []).map((row) => `<tr><th>${escapeHtml(row.label || row.system_name || row.result || '-')}</th><td>${escapeHtml(row.value || row.status_color || row.inspected_at || row.checked_at || '-')}</td></tr>`).join('');
+    return `<section><h2>${escapeHtml(card.title || '分析卡片')}</h2><p>${escapeHtml(card.summary || '')}</p>${rows ? `<table>${rows}</table>` : ''}</section>`;
+  }).join('');
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;background:#f5f7fb;color:#162b3f}main{max-width:960px;margin:0 auto;padding:24px}section{background:#fff;border:1px solid #dce6f0;border-radius:12px;padding:18px;margin:14px 0}pre{white-space:pre-wrap;line-height:1.7}table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1px solid #edf2f7;padding:10px;vertical-align:top}</style></head><body><main><h1>${title}</h1><section><h2>AI 回复</h2><pre>${escapeHtml(item?.text || '')}</pre></section>${cardHtml}</main></body></html>`;
+}
+
+function openHtmlDocument(html) {
+  const blob = new Blob([html || '<!doctype html><html><body>暂无报告</body></html>'], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+function openAiHtmlReport(item) {
+  const cardWithHtml = (item?.cards || []).find((card) => card.html_report);
+  openHtmlDocument(cardWithHtml?.html_report || buildAiHtmlReport(item));
 }
 
 function renderAiAttachmentList() {
@@ -970,16 +1014,16 @@ function initSubNavigation() {
         state.qrResolvedPoint = null;
         if ($('inspectionPointName')) $('inspectionPointName').value = '';
         renderInspectionChecklist([], null);
-        show('inspectionResult', '可先手动填写巡检点，也可以点击“开始扫码”自动识别。');
+        setQrScanState('点击“调用相机扫码”，识别后会自动填充机房信息。');
+        show('inspectionResult', '');
+      }
+
+      if (pageId === 'page-selfcheck-run') {
+        await beginSelfcheckFlow();
+        return;
       }
 
       openDetailPage(pageId);
-
-      if (pageId === 'page-selfcheck-status') {
-        state.metricSeries = { cpu: [], mem: [], disk: [] };
-        await refreshStatusBase();
-        startStatusLoop();
-      }
 
       if (pageId === 'page-selfcheck-errors') {
         $('errorAiView').textContent = '先加载系统日志，再点击“AI 分析”生成结论与建议。';
@@ -1005,9 +1049,7 @@ function initSubNavigation() {
       }
 
       if (pageId === 'page-tool-emergency') {
-        $('serverEmergencyResult').textContent = '服务器重启、数据库脚本和进程操作将通过管理端配置命令模板执行。';
-        $('dbEmergencyResult').textContent = '数据库动作已预留前端入口，等待管理端配置真实命令。';
-        $('processEmergencyResult').textContent = '进程重启 / 关闭入口已预留，等待管理端配置真实命令。';
+        await loadEmergencyActions();
       }
 
       if (pageId === 'page-tool-tasks') {
@@ -1028,6 +1070,30 @@ function initSubNavigation() {
 }
 
 function bindEmergencyToolActions() {
+  document.querySelectorAll('[data-emergency-section]').forEach((btn) => {
+    btn.addEventListener('click', () => selectEmergencySection(btn.dataset.emergencySection || 'server'));
+  });
+
+  document.addEventListener('click', async (event) => {
+    const btn = event.target.closest('[data-emergency-action-code]');
+    if (!btn) return;
+    const actionCode = btn.dataset.emergencyActionCode;
+    const actionName = btn.dataset.emergencyActionName || actionCode;
+    if (!actionCode) return;
+    if (!window.confirm(`确认发起【${actionName}】？`)) return;
+    try {
+      const data = await api('/api/v1/emergency/actions/execute', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ action_code: actionCode }),
+      });
+      alert(`已提交应急任务\n任务ID：${data.task_id}\n状态：${data.status}\n目标：${data.target || '-'}`);
+      showToast('应急任务已提交', 'success');
+    } catch (e) {
+      alert(`提交失败\n${e.message || e}`);
+    }
+  });
+
   onClick('btnOpenFocPasswordQuery', () => {
     $('focPasswordQueryPanel')?.classList.toggle('hidden');
     $('dbEmergencyHint').textContent = $('focPasswordQueryPanel')?.classList.contains('hidden')
@@ -1086,6 +1152,105 @@ function bindEmergencyToolActions() {
       alert(`查询结果\n系统：${system}\n工号：${emp}\n\n当前为前端演示弹窗。\n后续会通过管理端配置的数据库查询命令返回真实结果。`);
     });
   });
+}
+
+async function loadEmergencyActions() {
+  state.activeEmergencySection = '';
+  setEmergencyCardsVisible('');
+  $('emergencyMenuHint').textContent = '正在加载管理端配置...';
+  try {
+    state.emergencyActions = await api('/api/v1/emergency/actions', { headers: authHeaders() });
+    renderEmergencySubmenus();
+    renderEmergencyLists();
+    $('emergencyMenuHint').textContent = '请选择要处理的应急类型。';
+  } catch (e) {
+    $('emergencyMenuHint').textContent = explainActionError(e, '应急处置配置', 'admin / super_admin');
+  }
+}
+
+function setEmergencyCardsVisible(section) {
+  const serverCard = $('serverEmergencyList')?.closest('.emergency-card');
+  const processCard = $('processEmergencyList')?.closest('.emergency-card');
+  const dbCard = $('dbEmergencyList')?.closest('.emergency-card');
+  if (serverCard) serverCard.classList.toggle('hidden', section !== 'server');
+  if (processCard) processCard.classList.toggle('hidden', section !== 'process');
+  if (dbCard) dbCard.classList.toggle('hidden', section !== 'database');
+}
+
+function selectEmergencySection(section) {
+  state.activeEmergencySection = section;
+  setEmergencyCardsVisible(section);
+  document.querySelectorAll('[data-emergency-section]').forEach((btn) => {
+    btn.classList.toggle('secondary', btn.dataset.emergencySection !== section);
+  });
+}
+
+function renderEmergencySubmenus() {
+  const host = $('emergencySubmenuList');
+  if (!host) return;
+  const submenus = [
+    { section: 'server', label: '系统重启', count: state.emergencyActions.server_actions?.length || 0 },
+    { section: 'process', label: '应用重启', count: state.emergencyActions.process_actions?.length || 0 },
+    { section: 'database', label: '数据库死锁处理', count: state.emergencyActions.database_actions?.length || 0 },
+  ];
+  host.innerHTML = submenus.map((item, index) => `
+    <button type="button" class="${index ? 'secondary' : ''}" data-emergency-section="${item.section}">
+      ${escapeHtml(item.label)}（${item.count}）
+    </button>
+  `).join('');
+  host.querySelectorAll('[data-emergency-section]').forEach((btn) => {
+    btn.addEventListener('click', () => selectEmergencySection(btn.dataset.emergencySection || 'server'));
+  });
+}
+
+function renderEmergencyActionTable(hostId, actions, emptyText, columns) {
+  const host = $(hostId);
+  if (!host) return;
+  if (!actions.length) {
+    host.innerHTML = `<div class="hint">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+  host.innerHTML = `
+    ${columns.map((col) => `<div class="emergency-table-head">${escapeHtml(col.label)}</div>`).join('')}
+    <div class="emergency-table-head">操作</div>
+    ${actions.map((item) => `
+      ${columns.map((col) => `<div class="emergency-table-cell">${escapeHtml(col.value(item) || '-')}</div>`).join('')}
+      <button class="warn-action emergency-table-btn" data-emergency-action-code="${escapeHtml(item.action_code)}" data-emergency-action-name="${escapeHtml(item.action_name)}">执行</button>
+    `).join('')}
+  `;
+}
+
+function renderEmergencyLists() {
+  renderEmergencyActionTable(
+    'serverEmergencyList',
+    state.emergencyActions.server_actions || [],
+    '暂无可执行的系统重启动作。',
+    [
+      { label: '主机名', value: (item) => item.host_name },
+      { label: 'IP', value: (item) => item.host_ip },
+      { label: '命令', value: (item) => item.action_name },
+    ],
+  );
+  renderEmergencyActionTable(
+    'processEmergencyList',
+    state.emergencyActions.process_actions || [],
+    '暂无可执行的应用重启动作。',
+    [
+      { label: '系统', value: (item) => item.system_name },
+      { label: '进程', value: (item) => item.process_name || item.action_name },
+      { label: '主机', value: (item) => item.host_name },
+    ],
+  );
+  renderEmergencyActionTable(
+    'dbEmergencyList',
+    state.emergencyActions.database_actions || [],
+    '暂无可执行的数据库死锁处理动作。',
+    [
+      { label: '系统', value: (item) => item.system_name },
+      { label: '动作', value: (item) => item.action_name },
+      { label: '主机', value: (item) => item.host_name },
+    ],
+  );
 }
 
 function bindCaptureToolActions() {
@@ -1330,6 +1495,7 @@ function renderAccessibleSystems(items, options = {}) {
     system_name: system.system_name,
     host_address: system.host_address,
     env: system.env,
+    selfcheck_skill: system.selfcheck_skill,
   }));
   if (options.replaceLogConfigs) {
     const nextConfigs = {};
@@ -1340,6 +1506,130 @@ function renderAccessibleSystems(items, options = {}) {
   }
   renderStatusSystemOptions();
   renderErrorSystemOptions();
+}
+
+function closeSelfcheckSystemModal() {
+  $('selfcheckSystemModal')?.classList.add('hidden');
+}
+
+function renderSelfcheckSystemPicker() {
+  const host = $('selfcheckSystemPickerList');
+  if (!host) return;
+  host.innerHTML = (state.statusSystems || []).map((item) => `
+    <button type="button" class="system-picker-row" data-selfcheck-system-id="${escapeHtml(item.system_id)}">
+      <strong>${escapeHtml(item.system_name || item.system_code || item.system_id)}</strong>
+      <span>${escapeHtml(item.host_address || '未配置 IP')} · ${escapeHtml(item.env || '-')}</span>
+    </button>
+  `).join('') || '<div class="hint">暂无可选系统</div>';
+}
+
+async function beginSelfcheckFlow() {
+  stopStatusLoop();
+  await refreshStatusBase();
+  if (!state.statusSystems.length) {
+    openDetailPage('page-selfcheck-run');
+    show('selfcheckAiReport', '暂无可用系统，请先在管理端配置系统。');
+    return;
+  }
+  if (state.statusSystems.length === 1) {
+    await openSelfcheckPageForSystem(state.statusSystems[0].system_id);
+    return;
+  }
+  renderSelfcheckSystemPicker();
+  $('selfcheckSystemModal')?.classList.remove('hidden');
+}
+
+async function openSelfcheckPageForSystem(systemId) {
+  closeSelfcheckSystemModal();
+  state.selectedStatusSystemId = Number(systemId) || null;
+  openDetailPage('page-selfcheck-run');
+  renderStatusSystemOptions();
+  if ($('scStatusSystem')) $('scStatusSystem').value = String(state.selectedStatusSystemId || '');
+  await runSystemSelfcheck();
+}
+
+function formatUsage(value) {
+  return value === null || value === undefined ? '-' : `${Math.round(Number(value))}%`;
+}
+
+function renderSelfcheckStatus(data) {
+  const latest = data?.status?.latest || null;
+  const system = data?.system || {};
+  const summary = $('selfcheckStatusSummary');
+  if (summary) {
+    summary.innerHTML = latest ? `
+      <div class="check-row"><span>系统</span><strong>${escapeHtml(system.system_name || '-')}</strong></div>
+      <div class="check-row"><span>IP / 地址</span><strong>${escapeHtml(system.host_address || '未配置')}</strong></div>
+      <div class="check-row"><span>状态</span><strong>${escapeHtml(latest.status_color || 'unknown')}</strong></div>
+      <div class="check-row"><span>CPU</span><strong>${escapeHtml(formatUsage(latest.cpu_usage))}</strong></div>
+      <div class="check-row"><span>内存</span><strong>${escapeHtml(formatUsage(latest.mem_usage))}</strong></div>
+      <div class="check-row"><span>硬盘</span><strong>${escapeHtml(formatUsage(latest.disk_usage))}</strong></div>
+      <div class="check-row"><span>采集时间</span><strong>${escapeHtml(latest.captured_at || '-')}</strong></div>
+    ` : '<div class="hint">当前系统暂无状态快照。</div>';
+  }
+  const series = data?.status?.series || [];
+  state.metricSeries = {
+    cpu: series.map((item) => Number(item.cpu_usage)).filter((v) => Number.isFinite(v)),
+    mem: series.map((item) => Number(item.mem_usage)).filter((v) => Number.isFinite(v)),
+    disk: series.map((item) => Number(item.disk_usage)).filter((v) => Number.isFinite(v)),
+  };
+  renderCharts();
+}
+
+function renderSelfcheckAlarms(alarms = []) {
+  const host = $('selfcheckAlarmList');
+  if (!host) return;
+  host.innerHTML = alarms.length ? alarms.map((item) => `
+    <div class="check-row">
+      <span>${escapeHtml(item.captured_at || '-')}</span>
+      <strong>${escapeHtml((item.reasons || []).join('，') || '告警')}</strong>
+    </div>
+  `).join('') : '<div class="hint">当前时间范围内暂无告警。</div>';
+}
+
+function renderSelfcheckAiReport(data) {
+  const report = data?.ai_report;
+  if (!data?.system?.selfcheck_skill) {
+    show('selfcheckAiReport', '暂未配置ai自检项目');
+    return;
+  }
+  if (!report) {
+    show('selfcheckAiReport', 'AI 自检报告生成失败，请稍后重试。');
+    return;
+  }
+  const suggestions = Array.isArray(report.suggestions) && report.suggestions.length
+    ? `\n\n建议：\n${report.suggestions.map((item, idx) => `${idx + 1}. ${item}`).join('\n')}`
+    : '';
+  show('selfcheckAiReport', `${report.reply || report.summary || 'AI 已返回自检报告。'}${suggestions}`);
+}
+
+async function runSystemSelfcheck() {
+  const systemId = Number($('scStatusSystem')?.value || state.selectedStatusSystemId || 0);
+  if (!systemId) {
+    show('selfcheckAiReport', '请先选择系统。');
+    return null;
+  }
+  state.selectedStatusSystemId = systemId;
+  const range = Number($('selfcheckRange')?.value || 60);
+  const selected = state.statusSystems.find((item) => Number(item.system_id) === Number(systemId));
+  if ($('statusSystemHint')) $('statusSystemHint').textContent = selected
+    ? `当前系统：${selected.system_name || selected.system_code || systemId} · ${selected.host_address || '未配置 IP'}`
+    : '正在读取系统自检数据...';
+  show('selfcheckAiReport', '正在生成自检报告...');
+  renderSelfcheckAlarms([]);
+  setButtonLoading('btnRunSelfcheck', true, '自检中...');
+  try {
+    const data = await api(`/api/v1/selfchecks/run?system_id=${encodeURIComponent(systemId)}&range_minutes=${encodeURIComponent(range)}`, { headers: authHeaders() });
+    renderSelfcheckStatus(data);
+    renderSelfcheckAlarms(data.alarms || []);
+    renderSelfcheckAiReport(data);
+    return data;
+  } catch (e) {
+    show('selfcheckAiReport', explainActionError(e, '系统自检', 'inspector / admin / super_admin'));
+    return null;
+  } finally {
+    setButtonLoading('btnRunSelfcheck', false);
+  }
 }
 
 async function refreshErrorSystems({ force = false } = {}) {
@@ -1536,17 +1826,17 @@ async function startQrScanner() {
 
         if (value) {
           state.qrScanText = value;
-          setQrScanState('扫码成功，正在匹配巡检点...');
+          setQrScanState('正在匹配机房配置...');
           stopQrScanner();
           try {
             await resolveQrPoint(value);
-            setQrScanState('扫码成功，已识别二维码并自动返回。');
+            setQrScanState('已识别机房，请完成检查项并提交。');
           } catch (e) {
             const msg = e?.message || '找不到巡检点';
             if ($('inspectionPointName')) $('inspectionPointName').value = '';
             state.qrResolvedPoint = null;
             show('inspectionResult', msg);
-            setQrScanState(`扫码成功，但匹配失败：${msg}`);
+            setQrScanState(`未匹配到机房配置：${msg}`);
           }
           return;
         }
@@ -1637,7 +1927,7 @@ async function resolveQrPoint(tagText) {
   const roomName = resolved.room_name || resolved.point_name || resolved.location || resolved.point_code || '';
   if ($('inspectionPointName')) $('inspectionPointName').value = roomName;
   renderInspectionChecklist(resolved.check_items || [], resolved.monitoring_confirmation || null);
-  show('inspectionResult', `扫码成功，已定位机房：${roomName || '未命名机房'}。`);
+  show('inspectionResult', '');
   return resolved;
 }
 
@@ -1840,10 +2130,6 @@ Array.from(document.querySelectorAll('.bottom-tab')).forEach((tab) => {
 
 // inspection
 onClick('btnStartQrScan', startQrScanner);
-onClick('btnStopQrScan', () => {
-  stopQrScanner();
-  setQrScanState('已停止扫码。');
-});
 onClick('btnCloseScanner', () => {
   stopQrScanner();
   setQrScanState('已关闭扫码。');
@@ -1868,8 +2154,11 @@ onClick('btnCreateInspection', async () => {
       monitoring_confirmation: monitoringConfirmation,
       inspected_at: new Date().toISOString(),
     };
-    const created = await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
-    show('inspectionResult', `巡检提交成功：${resolved.point_name || resolved.location || resolved.point_code || '当前点位'}。`);
+    await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
+    const targetName = resolved.room_name || resolved.point_name || resolved.location || resolved.point_code || '当前机房';
+    show('inspectionResult', '');
+    setQrScanState('巡检已提交。');
+    window.alert(`巡检提交成功：${targetName}。`);
   } catch (e) { show('inspectionResult', explainActionError(e, '提交巡检记录', 'inspector / admin / super_admin')); }
 });
 
@@ -1901,25 +2190,21 @@ onClick('btnSubmitNfc', async () => {
 if ($('scStatusSystem')) {
   $('scStatusSystem').onchange = () => {
     state.selectedStatusSystemId = Number($('scStatusSystem').value || 0) || null;
-    refreshStatusBase();
+    runSystemSelfcheck();
   };
 }
-onClick('btnRefreshStatus', refreshStatusBase);
+onClick('btnRunSelfcheck', runSystemSelfcheck);
 
-onClick('btnCreateSelfcheck', async () => {
-  try {
-    const content = $('scSummary').value.trim();
-    if (!content) throw new Error('请填写自检内容');
+$('selfcheckSystemPickerList')?.addEventListener('click', (event) => {
+  const btn = event.target.closest('[data-selfcheck-system-id]');
+  if (!btn) return;
+  openSelfcheckPageForSystem(btn.dataset.selfcheckSystemId);
+});
 
-    const payload = {
-      content,
-      result: $('scResult').value,
-      note: $('scNote').value.trim() || null,
-    };
-    await api('/api/v1/selfchecks/records/simple', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
-    show('selfcheckResult', '');
-    showToast('自检提交成功。', 'success');
-  } catch (e) { show('selfcheckResult', e.message); }
+document.querySelectorAll('[data-close-selfcheck-system-modal]').forEach((el) => {
+  el.addEventListener('click', () => {
+    closeSelfcheckSystemModal();
+  });
 });
 
 function formatDateTimeLocalValue(date) {

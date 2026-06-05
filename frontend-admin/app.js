@@ -26,14 +26,15 @@ const VIEW_GROUP_MAP = {
   'view-assets': 'ops-workbench',
   'view-users': 'ops-workbench',
   'view-tool-template': 'ops-workbench',
-  'view-runbook-console': 'runbook',
   'view-emergency-ssh': 'runbook',
   'view-emergency-server': 'runbook',
   'view-emergency-db': 'runbook',
   'view-emergency-process': 'runbook',
+  'view-emergency-custom': 'runbook',
   'view-tool-ops': 'approval-audit',
   'view-tool-rules': 'approval-audit',
   'view-tool-ai': 'approval-audit',
+  'view-ai-external-keys': 'approval-audit',
   'view-tool-threatbook': 'approval-audit',
   'view-tool-debug': 'approval-audit',
 };
@@ -99,6 +100,8 @@ function switchView(viewId, groupId) {
   if (viewId === 'view-emergency-server') ns.emergencyConfig?.listServerActions?.();
   if (viewId === 'view-emergency-db') ns.emergencyConfig?.listDbActions?.();
   if (viewId === 'view-emergency-process') ns.emergencyConfig?.listProcessActions?.();
+  if (viewId === 'view-emergency-custom') ns.emergencyConfig?.listCustomActions?.();
+  if (viewId === 'view-ai-external-keys') ns.rulesAudit?.listAiExternalKeys?.();
 }
 
 function openGroup(groupId) {
@@ -140,6 +143,8 @@ bindClick('btnEmergencyDbMockSave', () => ns.emergencyConfig?.saveDbActionMock?.
 bindClick('btnEmergencyDbMockList', () => ns.emergencyConfig?.listDbActions?.());
 bindClick('btnEmergencyProcessMockSave', () => ns.emergencyConfig?.saveProcessActionMock?.());
 bindClick('btnEmergencyProcessMockList', () => ns.emergencyConfig?.listProcessActions?.());
+bindClick('btnEmergencyCustomSave', () => ns.emergencyConfig?.saveCustomAction?.());
+bindClick('btnEmergencyCustomList', () => ns.emergencyConfig?.listCustomActions?.());
 bindClick('btnToolTaskList', () => ns.toolbox.listTasks().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnToolTaskUpdate', () => ns.toolbox.updateTask().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnListAssets', () => ns.assets.listAssets().catch((e) => { $('assetListResult').textContent = formatError('机房列表', e); }));
@@ -173,6 +178,8 @@ bindClick('btnAuditClear', () => {
   });
   $('audit').textContent = '';
 });
+bindClick('btnListAiExternalKeys', () => ns.rulesAudit.listAiExternalKeys().catch((e) => { $('aiExternalKeyListResult').textContent = formatError('AI 对外 Key 列表', e); }));
+bindClick('btnCreateAiExternalKey', () => ns.rulesAudit.createAiExternalKey().catch((e) => { $('aiExternalKeyCreateResult').textContent = formatError('AI 对外 Key 生成', e); }));
 bindClick('btnCreateTemplate', () => ns.templates.createTemplate().catch((e) => { $('templateCreateResult').textContent = formatError('创建模板', e); }));
 bindClick('btnListTemplates', () => ns.templates.listTemplates().catch((e) => { $('templateListResult').textContent = formatError('模板列表', e); }));
 bindClick('btnCreateSnapshot', () => ns.templates.createSnapshot().catch((e) => { $('snapshotResult').textContent = formatError('状态快照', e); }));
@@ -181,6 +188,9 @@ bindClick('btnOpenCreateUserModal', () => ns.modals.openModal('createUserModal')
 bindClick('btnCloseCreateUserModal', () => ns.modals.closeModal('createUserModal'));
 bindClick('btnOpenCreateSystemModal', () => ns.modals.openCreateSystemModal());
 bindClick('btnCloseCreateSystemModal', () => ns.modals.closeModal('createSystemModal'));
+bindClick('btnDeleteSystem', () => ns.modals.deleteEditingSystem().catch((e) => {
+  $('systemListSummary').textContent = formatError('删除系统', e);
+}));
 bindClick('btnTestSystemHost', () => ns.modals.testSystemHost().catch((e) => {
   const el = $('systemHostTestResult');
   if (el) el.textContent = `检测失败：${e.message}`;
@@ -194,6 +204,9 @@ bindClick('btnConfirmSystemOwners', () => ns.modals.confirmSystemOwners());
 bindClick('btnCloseSystemOwnerPicker', () => ns.modals.closeModal('systemOwnerPickerModal'));
 bindClick('btnOpenCreateAssetModal', () => ns.modals.openCreateAssetModal());
 bindClick('btnCloseCreateAssetModal', () => ns.modals.closeModal('createAssetModal'));
+bindClick('btnDeleteAsset', () => ns.modals.deleteEditingAsset().catch((e) => {
+  $('assetResult').textContent = formatError('删除机房', e);
+}));
 bindClick('btnOpenAssetImportModal', () => ns.modals.openModal('assetImportModal'));
 bindClick('btnCloseAssetImportModal', () => ns.modals.closeModal('assetImportModal'));
 bindClick('btnSubmitCreateUser', () => ns.modals.submitCreateUser().catch((e) => {

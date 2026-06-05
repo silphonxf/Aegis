@@ -120,6 +120,7 @@ def analyze_ip_reputation(ip: Optional[str] = None, **_: Any) -> Dict[str, Any]:
     card_items = []
     for item in items[:10]:
         card_items.append({"label": item.get('ip', '-'), "value": item.get('risk_level', 'unknown')})
+    html = _build_ip_reputation_html(items, summary)
     return {
         "success": True,
         "summary": summary,
@@ -129,11 +130,35 @@ def analyze_ip_reputation(ip: Optional[str] = None, **_: Any) -> Dict[str, Any]:
                 "type": "inspection_records",
                 "title": "IP 恶意地址分析",
                 "summary": summary,
+                "html_report": html,
                 "items": card_items,
             }
         ],
         "actions": [],
     }
+
+
+def _escape_html(value: object) -> str:
+    return str(value or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#39;")
+
+
+def _build_ip_reputation_html(items: list[dict], summary: str) -> str:
+    rows = "".join(
+        "<tr>"
+        f"<td>{_escape_html(item.get('ip'))}</td>"
+        f"<td>{_escape_html(item.get('risk_level'))}</td>"
+        f"<td>{'是' if item.get('is_malicious') else '否'}</td>"
+        f"<td>{_escape_html(item.get('severity') or '-')}</td>"
+        f"<td>{_escape_html(item.get('decision') or '-')}</td>"
+        f"<td>{_escape_html(item.get('summary') or '-')}</td>"
+        "</tr>"
+        for item in items
+    ) or "<tr><td colspan=\"6\">暂无结果</td></tr>"
+    return f"""<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IP 恶意地址分析报告</title>
+<style>body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;background:#f5f7fb;color:#162b3f}}main{{max-width:1080px;margin:0 auto;padding:24px}}section{{background:#fff;border:1px solid #dce6f0;border-radius:12px;padding:18px;margin:14px 0}}table{{width:100%;border-collapse:collapse}}th,td{{border-bottom:1px solid #edf2f7;text-align:left;padding:10px;vertical-align:top}}th{{background:#f8fbff}}</style></head>
+<body><main><h1>IP 恶意地址分析报告</h1><p>{_escape_html(summary)}</p><section><table><thead><tr><th>IP</th><th>风险</th><th>恶意</th><th>严重级别</th><th>处置建议</th><th>说明</th></tr></thead><tbody>{rows}</tbody></table></section></main></body></html>"""
 
 
 

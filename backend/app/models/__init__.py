@@ -1,4 +1,5 @@
 from .ai_diagnosis import AIDiagnosis
+from .ai_external_key import AIExternalApiKey
 from .asset import Asset
 from .audit import AuditLog
 from .base import Base
@@ -33,4 +34,5 @@ __all__ = [
     "Asset",
     "ToolTask",
     "AIDiagnosis",
+    "AIExternalApiKey",
 ]

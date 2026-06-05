@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Optional
 
-from app.db.session import SessionLocal
+import app.db.session as db_session_module
 from app.models.system import System
 
 
@@ -79,7 +79,7 @@ class EntityResolver:
         if not candidate or self._looks_like_system_list_query(candidate):
             return None
 
-        db = SessionLocal()
+        db = db_session_module.SessionLocal()
         try:
             exact = db.query(System).filter(System.name == candidate).order_by(System.id.asc()).first()
             if exact:

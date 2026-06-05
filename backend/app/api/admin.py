@@ -2,7 +2,9 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 from io import BytesIO, StringIO
 import csv
+import hashlib
 import json
+import secrets
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -16,12 +18,14 @@ from app.core.security import get_password_hash
 from app.db.session import get_db
 from app.models.asset import Asset
 from app.models.audit import AuditLog
+from app.models.ai_external_key import AIExternalApiKey
 from app.models.inspection import InspectionPoint
 from app.models.shared_data import Room
 from app.models.system import System, SystemLogConfig, SystemUserBinding
 from app.models.user import Role, User
 from app.schemas.admin import (
     BatchCreateAssetsRequest,
+    CreateAIExternalApiKeyRequest,
     CreateAssetRequest,
     CreateInspectionPointRequest,
     CreateRoomRequest,
@@ -56,6 +60,24 @@ logger = get_logger("admin")
 
 
 IP_HEADER_CANDIDATES = {"ip", "ip地址", "ip_address", "地址", "目标ip", "ipv4", "ipv6"}
+
+
+def _hash_external_api_key(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _serialize_ai_external_key(item: AIExternalApiKey) -> Dict[str, Any]:
+    return {
+        "id": item.id,
+        "name": item.name,
+        "key_prefix": item.key_prefix,
+        "is_active": item.is_active,
+        "remark": item.remark,
+        "created_by": item.created_by,
+        "created_at": item.created_at,
+        "updated_at": item.updated_at,
+        "last_used_at": item.last_used_at,
+    }
 
 
 def _extract_ips_from_excel(content: bytes) -> List[str]:
@@ -130,6 +152,62 @@ def create_user(
     return {"id": user.id}
 
 
+@router.get("/ai-external-keys")
+def list_ai_external_api_keys(
+    page: int = 1,
+    size: int = 50,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    page = max(page, 1)
+    size = min(max(size, 1), 100)
+    q = db.query(AIExternalApiKey)
+    total = q.count()
+    rows = q.order_by(AIExternalApiKey.id.desc()).offset((page - 1) * size).limit(size).all()
+    return {"page": page, "size": size, "total": total, "items": [_serialize_ai_external_key(item) for item in rows]}
+
+
+@router.post("/ai-external-keys")
+def create_ai_external_api_key(
+    payload: CreateAIExternalApiKeyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    api_key = f"aegis_ai_{secrets.token_urlsafe(32)}"
+    row = AIExternalApiKey(
+        name=payload.name.strip(),
+        key_prefix=api_key[:18],
+        key_hash=_hash_external_api_key(api_key),
+        remark=payload.remark,
+        created_by=current_user.username,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    log_action(db, "create_ai_external_api_key", "ai_external_key", current_user, {"key_id": row.id, "name": row.name, "key_prefix": row.key_prefix})
+    data = _serialize_ai_external_key(row)
+    data["apikey"] = api_key
+    return data
+
+
+@router.patch("/ai-external-keys/{key_id}/active")
+def set_ai_external_api_key_active(
+    key_id: int,
+    is_active: bool,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    row = db.query(AIExternalApiKey).filter(AIExternalApiKey.id == key_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail={"code": "AI_EXTERNAL_KEY_NOT_FOUND", "message": "AI 对外接口 Key 不存在"})
+    row.is_active = is_active
+    row.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(row)
+    log_action(db, "set_ai_external_api_key_active", "ai_external_key", current_user, {"key_id": row.id, "is_active": is_active})
+    return _serialize_ai_external_key(row)
+
+
 @router.get("/systems")
 def list_systems(
     page: int = 1,
@@ -200,6 +278,7 @@ def create_system(
         owner_user_id=primary_owner_id,
         env=payload.env,
         check_frequency=payload.check_frequency,
+        selfcheck_skill=payload.selfcheck_skill,
         remark=payload.remark,
     )
     db.add(system)
@@ -260,6 +339,23 @@ def deactivate_system(
     system.updated_at = datetime.utcnow()
     db.commit()
     log_action(db, "deactivate_system", "system", current_user, {"system_id": system.id, "system_code": system.system_code})
+    return {"id": system.id, "is_active": system.is_active}
+
+
+@router.patch("/systems/{system_id}/active")
+def set_system_active(
+    system_id: int,
+    is_active: bool,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    system = db.query(System).filter(System.id == system_id).first()
+    if not system:
+        raise HTTPException(status_code=404, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在"})
+    system.is_active = is_active
+    system.updated_at = datetime.utcnow()
+    db.commit()
+    log_action(db, "set_system_active", "system", current_user, {"system_id": system.id, "system_code": system.system_code, "is_active": is_active})
     return {"id": system.id, "is_active": system.is_active}
 
 
@@ -492,6 +588,7 @@ def _serialize_system(item: System, owner_map: Dict[int, List[int]], log_map: Di
         "owner_user_id": item.owner_user_id,
         "owner_user_ids": owner_map.get(item.id, []),
         "check_frequency": getattr(item, "check_frequency", None),
+        "selfcheck_skill": getattr(item, "selfcheck_skill", None),
         "remark": getattr(item, "remark", None),
         "is_active": getattr(item, "is_active", True),
         "log_configs": [_serialize_log_config(log) for log in log_map.get(item.id, [])],
@@ -797,6 +894,24 @@ def deactivate_room(
         point.updated_at = datetime.utcnow()
     db.commit()
     log_action(db, "deactivate_room", "room", current_user, {"room_id": room.id, "room_code": room.room_code})
+    return {"id": room.id, "is_active": room.is_active}
+
+
+@router.patch("/rooms/{room_id}/active")
+def set_room_active(
+    room_id: int,
+    is_active: bool,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    room = db.query(Room).filter(Room.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail={"code": "ROOM_NOT_FOUND", "message": "机房不存在"})
+    room.is_active = is_active
+    room.updated_at = datetime.utcnow()
+    _ensure_room_inspection_point(db, room)
+    db.commit()
+    log_action(db, "set_room_active", "room", current_user, {"room_id": room.id, "room_code": room.room_code, "is_active": is_active})
     return {"id": room.id, "is_active": room.is_active}
 
 

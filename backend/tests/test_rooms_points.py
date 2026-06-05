@@ -72,6 +72,31 @@ def test_room_config_resolves_for_mobile_inspection(client, admin_headers):
     assert "温湿度" in target["note"]
 
 
+def test_numeric_room_qr_takes_priority_over_legacy_system_id(client, admin_headers):
+    create = client.post(
+        "/api/v1/admin/rooms",
+        headers=admin_headers,
+        json={
+            "room_name": "001 数据中心机房",
+            "qr_content": "001",
+            "check_items": ["门禁状态"],
+        },
+    )
+    assert create.status_code == 200, create.text
+    room_id = create.json()["id"]
+
+    resolved = client.get(
+        "/api/v1/inspections/points/resolve",
+        headers=admin_headers,
+        params={"qr_content": "001"},
+    )
+    assert resolved.status_code == 200, resolved.text
+    body = resolved.json()
+    assert body["room_id"] == room_id
+    assert body["room_name"] == "001 数据中心机房"
+    assert body["point_name"] == "001 数据中心机房"
+
+
 def test_create_and_list_inspection_points(client, admin_headers):
     room = client.post(
         "/api/v1/admin/rooms",
@@ -214,6 +239,13 @@ def test_update_and_deactivate_room(client, admin_headers):
 
     active_listing = client.get("/api/v1/admin/rooms", headers=admin_headers)
     assert all(item["id"] != room_id for item in active_listing.json()["items"])
+
+    reactivate = client.patch(f"/api/v1/admin/rooms/{room_id}/active?is_active=true", headers=admin_headers)
+    assert reactivate.status_code == 200, reactivate.text
+    assert reactivate.json()["is_active"] is True
+
+    active_listing = client.get("/api/v1/admin/rooms", headers=admin_headers)
+    assert any(item["id"] == room_id for item in active_listing.json()["items"])
 
 
 def test_update_and_deactivate_inspection_point(client, admin_headers):

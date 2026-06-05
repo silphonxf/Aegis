@@ -79,11 +79,11 @@
             <span class="menu-icon">🚨</span><span class="menu-label">应急预案配置</span>
           </button>
           <div class="submenu-list">
-            <button class="submenu-btn" data-view="view-runbook-console">预案脚本库总览</button>
-            <button class="submenu-btn" data-view="view-emergency-ssh">SSH 主机配置</button>
-            <button class="submenu-btn" data-view="view-emergency-server">服务器动作配置</button>
+            <button class="submenu-btn" data-view="view-emergency-ssh">SSH 主机</button>
+            <button class="submenu-btn" data-view="view-emergency-server">重启主机</button>
+            <button class="submenu-btn" data-view="view-emergency-process">重启进程</button>
+            <button class="submenu-btn" data-view="view-emergency-custom">自定义命令</button>
             <button class="submenu-btn" data-view="view-emergency-db">数据库动作配置</button>
-            <button class="submenu-btn" data-view="view-emergency-process">进程动作配置</button>
           </div>
         </div>
 
@@ -95,6 +95,7 @@
             <button class="submenu-btn" data-view="view-tool-ops">运维审批</button>
             <button class="submenu-btn" data-view="view-tool-rules">规则与审计</button>
             <button class="submenu-btn" data-view="view-tool-ai">AI诊断</button>
+            <button class="submenu-btn" data-view="view-ai-external-keys">AI 对外接口 Key</button>
             <button class="submenu-btn" data-view="view-tool-threatbook">高危IP研判</button>
             <button class="submenu-btn" data-view="view-tool-debug">调试与错误码</button>
           </div>
@@ -213,12 +214,6 @@
           <div class="section-head">
             <div>
               <h2>用户与角色配置</h2>
-              <p class="muted">这里维护的是移动端与管理端共用的一张用户表。后续负责人分配、审批人、巡检/自检填报人都应从这里统一取数。</p>
-            </div>
-            <div class="summary-strip compact-summary-strip">
-              <div class="summary-card"><span>移动端对应</span><strong>登录 / 填报人 / 负责人</strong></div>
-              <div class="summary-card"><span>管理端对应</span><strong>配置 / 审阅 / 审批</strong></div>
-              <div class="summary-card"><span>共享主数据</span><strong>同一张用户表</strong></div>
             </div>
           </div>
           <div class="search-toolbar">
@@ -226,27 +221,7 @@
             <button id="btnFindUsers" class="toolbar-btn">搜索</button>
             <button id="btnOpenCreateUserModal" class="toolbar-btn secondary">新增用户配置</button>
           </div>
-          <div class="grid2 ops-workbench-guide">
-            <div class="mini-panel">
-              <strong>给移动端提供的用户数据</strong>
-              <ul class="mini-list">
-                <li>登录账号</li>
-                <li>巡检 / 自检填报人</li>
-                <li>系统负责人 / 审批相关人</li>
-                <li>后续联系方式展示</li>
-              </ul>
-            </div>
-            <div class="mini-panel">
-              <strong>管理端审阅与配置职责</strong>
-              <ul class="mini-list">
-                <li>维护系统角色</li>
-                <li>后续维护负责系统范围</li>
-                <li>支持交接与权限调整</li>
-                <li>作为审批流人员来源</li>
-              </ul>
-            </div>
-          </div>
-          <div id="userListSummary" class="result-line">默认全量查询</div>
+          <div id="userListSummary" class="result-line"></div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>序号</th><th>用户名</th><th>角色</th><th>ID</th></tr></thead>
@@ -291,7 +266,7 @@
             <button id="btnFindSystems" class="toolbar-btn">搜索</button>
             <button id="btnOpenCreateSystemModal" class="toolbar-btn secondary">新增</button>
           </div>
-          <div id="systemListSummary" class="result-line">默认全量查询</div>
+          <div id="systemListSummary" class="result-line"></div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>地址/IP</th><th>环境</th><th>管理员ID</th><th>日志位置</th><th>状态</th><th>操作</th></tr></thead>
@@ -332,7 +307,7 @@
           <div class="list-toolbar">
             <button id="btnAssetExport" class="toolbar-btn ghost hidden" type="button">导出当前结果</button>
             <button id="btnOpenAssetImportModal" class="toolbar-btn ghost hidden" type="button">导入机房</button>
-            <span id="assetListSummary" class="result-line inline-result">默认全量查询</span>
+            <span id="assetListSummary" class="result-line inline-result"></span>
           </div>
 
           <div class="table-wrap">
@@ -410,24 +385,6 @@
                 </div>
                 <button class="toolbar-btn" type="button" data-jump-view="view-tool-template">进入承接页</button>
               </div>
-              <div class="grid2">
-                <div class="mini-panel">
-                  <strong>对移动端提供的数据</strong>
-                  <ul class="mini-list">
-                    <li>机房 / 区域基础信息</li>
-                    <li>二维码 / NFC 对应点位</li>
-                    <li>巡检记录审阅入口</li>
-                  </ul>
-                </div>
-                <div class="mini-panel">
-                  <strong>共享主数据原则</strong>
-                  <ul class="mini-list">
-                    <li>管理端配置机房/点位</li>
-                    <li>移动端扫码/NFC 直接消费</li>
-                    <li>两端共用同一套机房与巡检点数据</li>
-                  </ul>
-                </div>
-              </div>
             </section>
 
             <section class="guide-card ops-section-card">
@@ -460,45 +417,6 @@
                 </div>
               </div>
             </section>
-          </div>
-        </section>
-      </section>
-
-      <section id="view-runbook-console" class="view-panel" data-view-title="应急预案配置" data-view-desc="统一承接 SSH、服务器、数据库、进程动作配置，逐步收敛为预案脚本库。">
-        <section class="card">
-          <div class="section-head">
-            <div>
-              <h2>Runbook 预案脚本库总览</h2>
-              <p class="muted">当前先复用已有 4 类配置页，后续再合并成真正的“预案脚本库”。</p>
-            </div>
-          </div>
-          <div class="summary-strip">
-            <div class="summary-card"><span>主机凭据</span><strong>SSH 主机配置</strong></div>
-            <div class="summary-card"><span>服务器预案</span><strong>重启等高危动作</strong></div>
-            <div class="summary-card"><span>数据库预案</span><strong>SQL / Shell 模板</strong></div>
-            <div class="summary-card"><span>进程预案</span><strong>重启 / 关闭动作</strong></div>
-          </div>
-          <div class="ops-workbench-guide runbook-guide-grid">
-            <div class="guide-card">
-              <h3>SSH 主机配置</h3>
-              <p>维护主机连接与认证方式，作为其他预案动作的底层依赖。</p>
-              <button class="toolbar-btn" type="button" data-jump-view="view-emergency-ssh">进入 SSH 配置</button>
-            </div>
-            <div class="guide-card">
-              <h3>服务器动作配置</h3>
-              <p>先承接服务器重启等动作，后续收敛为标准 Runbook。</p>
-              <button class="toolbar-btn" type="button" data-jump-view="view-emergency-server">进入服务器动作</button>
-            </div>
-            <div class="guide-card">
-              <h3>数据库动作配置</h3>
-              <p>维护 SQL / shell 模板，覆盖查询、解锁、闪回等动作。</p>
-              <button class="toolbar-btn" type="button" data-jump-view="view-emergency-db">进入数据库动作</button>
-            </div>
-            <div class="guide-card">
-              <h3>进程动作配置</h3>
-              <p>管理进程重启/关闭动作，后续支持动态 PID 解析与高危审批。</p>
-              <button class="toolbar-btn" type="button" data-jump-view="view-emergency-process">进入进程动作</button>
-            </div>
           </div>
         </section>
       </section>
@@ -548,33 +466,26 @@
           <div class="section-head">
             <div>
               <h2>SSH 主机配置</h2>
-              <p class="muted">维护主机名、IP、端口、认证方式与启用状态。密码 / 私钥字段后续需加密存储且默认不回显。</p>
             </div>
             <div class="action-row compact">
-              <button id="btnEmergencySshMockSave">保存主机配置</button>
-              <button id="btnEmergencySshMockList" class="toolbar-btn secondary">刷新列表</button>
-              <button id="btnEmergencyImportJson" class="toolbar-btn ghost">导入 JSON 到数据库</button>
+              <button id="btnEmergencySshMockSave">保存</button>
+              <button id="btnEmergencySshMockList" class="toolbar-btn secondary">刷新</button>
             </div>
           </div>
           <div class="grid4 emergency-admin-grid">
-            <input id="emgSshHostCode" placeholder="host_code，如 foc-app-01" />
+            <input id="emgSshHostCode" placeholder="主机编码" />
             <input id="emgSshHostName" placeholder="主机名" />
             <input id="emgSshHostIp" placeholder="IP 地址" />
             <input id="emgSshPort" placeholder="SSH 端口，默认 22" value="22" />
-            <input id="emgSshUser" placeholder="SSH 用户名" />
-            <select id="emgSshAuthType"><option value="password">password</option><option value="private_key">private_key</option></select>
-            <input id="emgSshSecret" placeholder="密码或私钥（演示占位）" />
+            <input id="emgSshUser" placeholder="登录用户名" />
+            <input id="emgSshSecret" type="password" placeholder="密码（仅首次或重置时输入）" autocomplete="new-password" />
+            <select id="emgSshSystemId"></select>
             <input id="emgSshRemark" placeholder="备注（可选）" />
-          </div>
-          <div class="summary-strip emergency-tip-strip">
-            <div class="summary-card"><span>敏感字段</span><strong>必须加密存储</strong></div>
-            <div class="summary-card"><span>展示规则</span><strong>默认不回显原文</strong></div>
-            <div class="summary-card"><span>执行方向</span><strong>后续复用到三类动作</strong></div>
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>host_code</th><th>主机名</th><th>IP</th><th>端口</th><th>认证方式</th><th>状态</th></tr></thead>
-              <tbody id="emgSshTbody"><tr><td colspan="6">暂无 SSH 主机配置</td></tr></tbody>
+              <thead><tr><th>主机编码</th><th>主机名</th><th>IP</th><th>端口</th><th>用户名</th><th>密码</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="emgSshTbody"><tr><td colspan="8">暂无 SSH 主机配置</td></tr></tbody>
             </table>
           </div>
           <pre id="emgSshResult"></pre>
@@ -586,24 +497,25 @@
           <div class="section-head">
             <div>
               <h2>服务器动作配置</h2>
-              <p class="muted">当前优先支持“服务器重启”。后续由管理端配置脚本模板，移动端只展示主机名、IP、重启按钮。</p>
             </div>
             <div class="action-row compact">
-              <button id="btnEmergencyServerMockSave">保存服务器动作</button>
-              <button id="btnEmergencyServerMockList" class="toolbar-btn secondary">刷新列表</button>
+              <button id="btnEmergencyServerMockSave">保存</button>
+              <button id="btnEmergencyServerMockList" class="toolbar-btn secondary">刷新</button>
             </div>
           </div>
           <div class="grid4 emergency-admin-grid">
-            <input id="emgServerActionCode" placeholder="action_code，如 reboot-server" />
-            <input id="emgServerActionName" placeholder="动作名称，如 服务器重启" />
-            <input id="emgServerHostCode" placeholder="target_host_code" />
+            <input id="emgServerActionCode" placeholder="动作编码" />
+            <input id="emgServerActionName" placeholder="命令名称，如 重启主机" />
+            <select id="emgServerHostCode"></select>
+            <select id="emgServerSystemId"></select>
+            <select id="emgServerAdminUserId"></select>
             <input id="emgServerConfirmText" placeholder="确认文案" />
           </div>
-          <textarea id="emgServerScript" rows="6" placeholder="脚本内容 / shell 模板，例如 sudo systemctl reboot"></textarea>
+          <textarea id="emgServerScript" rows="6" placeholder="需要运行的命令，例如 sudo reboot"></textarea>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>action_code</th><th>动作名称</th><th>主机编码</th><th>脚本类型</th><th>状态</th></tr></thead>
-              <tbody id="emgServerTbody"><tr><td colspan="5">暂无服务器动作配置</td></tr></tbody>
+              <thead><tr><th>动作编码</th><th>命令名称</th><th>主机</th><th>系统</th><th>管理员</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="emgServerTbody"><tr><td colspan="7">暂无服务器动作配置</td></tr></tbody>
             </table>
           </div>
           <pre id="emgServerResult"></pre>
@@ -615,7 +527,6 @@
           <div class="section-head">
             <div>
               <h2>数据库动作配置</h2>
-              <p class="muted">支持 SQL / shell 两类模板，当前重点面向 FOC 密码查询、死锁处理、数据库闪回、表空间查询。</p>
             </div>
             <div class="action-row compact">
               <button id="btnEmergencyDbMockSave">保存数据库动作</button>
@@ -626,7 +537,9 @@
             <input id="emgDbActionCode" placeholder="action_code" />
             <input id="emgDbActionName" placeholder="动作名称" />
             <select id="emgDbType"><option value="oracle">oracle</option><option value="dameng">dameng</option><option value="shell_proxy">shell_proxy</option></select>
-            <input id="emgDbHostCode" placeholder="target_host_code（可选）" />
+            <select id="emgDbHostCode"></select>
+            <select id="emgDbSystemId"></select>
+            <select id="emgDbAdminUserId"></select>
           </div>
           <input id="emgDbParamSchema" placeholder='参数定义 JSON，如 [{"name":"employee_id"}]' />
           <textarea id="emgDbScript" rows="7" placeholder="脚本 / SQL 模板，支持 {{system_code}} / {{employee_id}} 之类占位符"></textarea>
@@ -645,31 +558,61 @@
           <div class="section-head">
             <div>
               <h2>进程动作配置</h2>
-              <p class="muted">当前移动端只需要进程名、进程 ID、重启按钮、关闭按钮；后续建议由脚本动态解析 PID，避免误杀。</p>
             </div>
             <div class="action-row compact">
-              <button id="btnEmergencyProcessMockSave">保存进程动作</button>
-              <button id="btnEmergencyProcessMockList" class="toolbar-btn secondary">刷新列表</button>
+              <button id="btnEmergencyProcessMockSave">保存</button>
+              <button id="btnEmergencyProcessMockList" class="toolbar-btn secondary">刷新</button>
             </div>
           </div>
           <div class="grid4 emergency-admin-grid">
-            <input id="emgProcActionCode" placeholder="action_code" />
-            <input id="emgProcActionName" placeholder="动作名称，如 重启 foc-gateway" />
-            <input id="emgProcHostCode" placeholder="target_host_code" />
+            <input id="emgProcActionCode" placeholder="动作编码" />
+            <input id="emgProcActionName" placeholder="命令名称，如 重启 foc-gateway" />
+            <select id="emgProcHostCode"></select>
+            <select id="emgProcSystemId"></select>
+            <select id="emgProcAdminUserId"></select>
             <input id="emgProcName" placeholder="process_name" />
             <select id="emgProcIdSource"><option value="runtime_detect">runtime_detect</option><option value="fixed">fixed</option></select>
             <input id="emgProcDefaultPid" placeholder="default_process_id（可选）" />
-            <input id="emgProcStopActionCode" placeholder="关闭动作编码（可选说明）" />
             <input id="emgProcRemark" placeholder="备注（可选）" />
           </div>
-          <textarea id="emgProcScript" rows="7" placeholder="脚本模板，例如 systemctl restart foc-gateway 或按进程名查 PID 后 kill"></textarea>
+          <textarea id="emgProcScript" rows="7" placeholder="需要运行的命令，例如 systemctl restart foc-gateway"></textarea>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>action_code</th><th>进程名</th><th>主机编码</th><th>PID 来源</th><th>状态</th></tr></thead>
-              <tbody id="emgProcTbody"><tr><td colspan="5">暂无进程动作配置</td></tr></tbody>
+              <thead><tr><th>动作编码</th><th>命令名称</th><th>进程名</th><th>主机</th><th>系统</th><th>管理员</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="emgProcTbody"><tr><td colspan="8">暂无进程动作配置</td></tr></tbody>
             </table>
           </div>
           <pre id="emgProcResult"></pre>
+        </section>
+      </section>
+
+      <section id="view-emergency-custom" class="view-panel" data-view-title="自定义命令配置" data-view-desc="维护自定义服务器命令，并绑定目标 SSH 主机、系统与管理员。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>自定义命令配置</h2>
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencyCustomSave">保存</button>
+              <button id="btnEmergencyCustomList" class="toolbar-btn secondary">刷新</button>
+            </div>
+          </div>
+          <div class="grid4 emergency-admin-grid">
+            <input id="emgCustomActionCode" placeholder="动作编码" />
+            <input id="emgCustomActionName" placeholder="命令名称" />
+            <select id="emgCustomHostCode"></select>
+            <select id="emgCustomSystemId"></select>
+            <select id="emgCustomAdminUserId"></select>
+            <input id="emgCustomRemark" placeholder="备注（可选）" />
+          </div>
+          <textarea id="emgCustomScript" rows="7" placeholder="需要运行的命令"></textarea>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>动作编码</th><th>命令名称</th><th>主机</th><th>系统</th><th>管理员</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="emgCustomTbody"><tr><td colspan="7">暂无自定义命令配置</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="emgCustomResult"></pre>
         </section>
       </section>
 
@@ -691,17 +634,44 @@
         </section>
       </section>
 
+      <section id="view-ai-external-keys" class="view-panel" data-view-title="AI 对外接口 Key" data-view-desc="生成和停用免登录调用 AI 对话接口使用的 apikey。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>AI 对外接口 Key</h2>
+              <p class="muted">外部系统调用 AI 对话接口时，在请求体传入 apikey；Key 明文只在生成后显示一次。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnListAiExternalKeys">刷新 Key 列表</button>
+            </div>
+          </div>
+          <div class="form-section">
+            <h3>生成 Key</h3>
+            <div class="grid2">
+              <input id="aiExternalKeyName" placeholder="Key 名称，例如：外部监控平台" />
+              <input id="aiExternalKeyRemark" placeholder="备注（可选）" />
+            </div>
+            <div class="action-row compact">
+              <button id="btnCreateAiExternalKey">生成 apikey</button>
+            </div>
+            <pre id="aiExternalKeyCreateResult"></pre>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>名称</th><th>Key 前缀</th><th>状态</th><th>创建人</th><th>最后使用</th><th>操作</th></tr></thead>
+              <tbody id="aiExternalKeyTbody"><tr><td colspan="7">暂无数据</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="aiExternalKeyListResult"></pre>
+        </section>
+      </section>
+
       <section id="view-tool-template" class="view-panel" data-view-title="机房巡检配置与记录（承接页）" data-view-desc="当前先承接移动端巡检/自检相关配置与审阅能力，后续再拆成独立机房巡检页。">
         <section class="card">
           <div class="section-head">
             <div>
               <h2>机房巡检配置与记录（承接页）</h2>
               <p class="muted">当前先承接移动端巡检、自检和状态审阅所需的模板与快照能力，后续会继续拆成“机房/二维码配置 + 巡检历史”双栏结构。</p>
-            </div>
-            <div class="summary-strip compact-summary-strip">
-              <div class="summary-card"><span>移动端对应</span><strong>扫码巡检 / NFC 巡检</strong></div>
-              <div class="summary-card"><span>当前承接</span><strong>模板 / 状态快照 / 审阅入口</strong></div>
-              <div class="summary-card"><span>后续补齐</span><strong>机房 / 二维码 / 巡检记录</strong></div>
             </div>
           </div>
           <div class="form-section">
@@ -944,6 +914,12 @@
           <option value="dev">开发</option>
         </select>
       </label>
+      <label>启用状态
+        <select id="modalSystemActive">
+          <option value="true">启用</option>
+          <option value="false">停用</option>
+        </select>
+      </label>
       <label>管理员
         <input id="modalSystemOwnerIds" type="hidden" />
         <div id="modalSystemOwnerSummary" class="selection-summary">暂未选择管理员</div>
@@ -961,6 +937,9 @@
       <label>日志位置
         <textarea id="modalSystemLogConfigs" rows="4" placeholder="每行一条绝对路径，例如：/var/log/nginx/error.log"></textarea>
       </label>
+      <label>自检 skill
+        <textarea id="modalSystemSelfcheckSkill" rows="5" placeholder="配置该系统的 AI 自检要求，例如检查哪些服务、指标阈值、常见告警处理步骤"></textarea>
+      </label>
       <label>备注
         <input id="modalSystemRemark" placeholder="补充说明（可选）" />
       </label>
@@ -968,6 +947,7 @@
         <button id="btnSubmitCreateSystem">确认新增</button>
         <button id="btnCloseCreateSystemModal" type="button">取消</button>
       </div>
+      <button id="btnDeleteSystem" class="danger hidden" type="button">删除系统</button>
     </div>
   </div>
 
@@ -1001,6 +981,12 @@
       <label>机房检查项
         <textarea id="modalAssetCheckItems" rows="6" placeholder="每行一个检查项，例如&#10;门禁状态&#10;温湿度&#10;UPS 状态"></textarea>
       </label>
+      <label>启用状态
+        <select id="modalAssetActive">
+          <option value="true">启用</option>
+          <option value="false">停用</option>
+        </select>
+      </label>
       <label>备注
         <input id="modalAssetRemark" placeholder="补充说明（可选）" />
       </label>
@@ -1008,6 +994,7 @@
         <button id="btnSubmitCreateAsset">确认新增</button>
         <button id="btnCloseCreateAssetModal" type="button">取消</button>
       </div>
+      <button id="btnDeleteAsset" class="danger hidden" type="button">删除机房</button>
     </div>
   </div>
 

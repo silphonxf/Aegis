@@ -51,5 +51,87 @@ window.AegisAdmin = window.AegisAdmin || {};
     return data;
   }
 
-  ns.rulesAudit = { buildAuditQuery, loadRules, saveRules, loadAudit };
+  function renderAiExternalKeys(items) {
+    const tbody = document.getElementById('aiExternalKeyTbody');
+    if (!tbody) return;
+    const rows = (items || []).map((item) => {
+      const active = item.is_active !== false;
+      return `
+        <tr>
+          <td>${ns.toolbox.escapeHtml(item.id)}</td>
+          <td>${ns.toolbox.escapeHtml(item.name || '-')}</td>
+          <td>${ns.toolbox.escapeHtml(item.key_prefix || '-')}</td>
+          <td>${active ? '启用' : '停用'}</td>
+          <td>${ns.toolbox.escapeHtml(item.created_by || '-')}</td>
+          <td>${ns.toolbox.escapeHtml(item.last_used_at || '-')}</td>
+          <td>
+            <button class="table-action-btn" type="button" data-ai-key-action="toggle" data-ai-key-id="${ns.toolbox.escapeHtml(item.id)}" data-ai-key-active="${active ? 'false' : 'true'}">${active ? '停用' : '启用'}</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    tbody.innerHTML = rows || '<tr><td colspan="7">暂无 Key</td></tr>';
+  }
+
+  async function listAiExternalKeys() {
+    const data = await ns.api.request('/api/v1/admin/ai-external-keys?page=1&size=100', { headers: ns.api.headers() });
+    renderAiExternalKeys(data.items || []);
+    const result = document.getElementById('aiExternalKeyListResult');
+    if (result) result.textContent = `共 ${data.total ?? data.items?.length ?? 0} 条`;
+    return data;
+  }
+
+  async function createAiExternalKey() {
+    const payload = {
+      name: document.getElementById('aiExternalKeyName')?.value.trim(),
+      remark: document.getElementById('aiExternalKeyRemark')?.value.trim() || null,
+    };
+    if (!payload.name) throw new Error('请填写 Key 名称');
+    const data = await ns.api.request('/api/v1/admin/ai-external-keys', {
+      method: 'POST',
+      headers: ns.api.headers(),
+      body: JSON.stringify(payload),
+    });
+    const result = document.getElementById('aiExternalKeyCreateResult');
+    if (result) {
+      result.textContent = [
+        'apikey 已生成，请立即保存，后续不会再次展示明文：',
+        data.apikey,
+        '',
+        '调用地址：POST /api/v1/assistant/external/chat',
+        '请求体示例：',
+        JSON.stringify({ apikey: data.apikey, message: '有哪些系统' }, null, 2),
+      ].join('\n');
+    }
+    await listAiExternalKeys();
+    return data;
+  }
+
+  async function setAiExternalKeyActive(keyId, isActive) {
+    const data = await ns.api.request(`/api/v1/admin/ai-external-keys/${keyId}/active?is_active=${isActive ? 'true' : 'false'}`, {
+      method: 'PATCH',
+      headers: ns.api.headers(),
+    });
+    await listAiExternalKeys();
+    return data;
+  }
+
+  document.getElementById('aiExternalKeyTbody')?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-ai-key-action]');
+    if (!btn) return;
+    setAiExternalKeyActive(btn.dataset.aiKeyId, btn.dataset.aiKeyActive === 'true').catch((e) => {
+      const result = document.getElementById('aiExternalKeyListResult');
+      if (result) result.textContent = e.message;
+    });
+  });
+
+  ns.rulesAudit = {
+    buildAuditQuery,
+    loadRules,
+    saveRules,
+    loadAudit,
+    listAiExternalKeys,
+    createAiExternalKey,
+    setAiExternalKeyActive,
+  };
 })(window.AegisAdmin);

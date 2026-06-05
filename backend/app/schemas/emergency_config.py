@@ -7,6 +7,7 @@ AuthType = Literal["password", "private_key"]
 ScriptType = Literal["shell", "sql"]
 DbType = Literal["oracle", "dameng", "mysql", "shell_proxy"]
 ProcessIdSource = Literal["fixed", "runtime_detect"]
+ActionCategory = Literal["reboot_host", "restart_process", "custom_command"]
 
 
 class EmergencySshHostItem(BaseModel):
@@ -20,8 +21,11 @@ class EmergencySshHostItem(BaseModel):
     private_key_ciphertext: Optional[str] = Field(default=None, max_length=20000)
     private_key_passphrase_ciphertext: Optional[str] = Field(default=None, max_length=5000)
     connect_timeout_ms: int = Field(default=5000, ge=100, le=60000)
+    system_id: Optional[int] = None
     enabled: bool = True
     remark: Optional[str] = Field(default=None, max_length=500)
+    has_password: bool = False
+    has_private_key: bool = False
 
 
 class EmergencyServerActionItem(BaseModel):
@@ -29,6 +33,9 @@ class EmergencyServerActionItem(BaseModel):
     action_name: str = Field(min_length=1, max_length=120)
     target_host_code: str = Field(min_length=1, max_length=64)
     module_type: Literal["server"] = "server"
+    action_category: ActionCategory = "reboot_host"
+    system_id: Optional[int] = None
+    admin_user_id: Optional[int] = None
     script_type: Literal["shell"] = "shell"
     script_body: str = Field(min_length=1, max_length=20000)
     confirm_text: Optional[str] = Field(default=None, max_length=500)
@@ -41,6 +48,8 @@ class EmergencyDbActionItem(BaseModel):
     action_name: str = Field(min_length=1, max_length=120)
     module_type: Literal["database"] = "database"
     db_type: DbType = "oracle"
+    system_id: Optional[int] = None
+    admin_user_id: Optional[int] = None
     target_host_code: Optional[str] = Field(default=None, max_length=64)
     script_type: ScriptType = "sql"
     script_body: str = Field(min_length=1, max_length=30000)
@@ -54,6 +63,9 @@ class EmergencyProcessActionItem(BaseModel):
     action_code: str = Field(min_length=1, max_length=64)
     action_name: str = Field(min_length=1, max_length=120)
     module_type: Literal["process"] = "process"
+    action_category: Literal["restart_process", "custom_command"] = "restart_process"
+    system_id: Optional[int] = None
+    admin_user_id: Optional[int] = None
     target_host_code: str = Field(min_length=1, max_length=64)
     process_name: str = Field(min_length=1, max_length=120)
     process_id_source: ProcessIdSource = "runtime_detect"
@@ -87,3 +99,8 @@ class EmergencyDbActionSaveRequest(EmergencyDbActionItem):
 
 class EmergencyProcessActionSaveRequest(EmergencyProcessActionItem):
     pass
+
+
+class EmergencyActionExecuteRequest(BaseModel):
+    action_code: str = Field(min_length=1, max_length=64)
+    confirm_text: Optional[str] = Field(default=None, max_length=500)

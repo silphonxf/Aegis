@@ -29,7 +29,8 @@ window.AegisAdmin = window.AegisAdmin || {};
         <td>${item.is_active ? '启用' : '停用'}</td>
         <td>
           <button class="table-action-btn" type="button" data-asset-action="edit" data-asset-id="${ns.toolbox.escapeHtml(item.id)}">编辑</button>
-          <button class="table-action-btn danger" type="button" data-asset-action="retire" data-asset-id="${ns.toolbox.escapeHtml(item.id)}">停用</button>
+          <button class="table-action-btn" type="button" data-asset-action="toggle" data-asset-id="${ns.toolbox.escapeHtml(item.id)}" data-asset-active="${item.is_active ? 'false' : 'true'}">${item.is_active ? '停用' : '启用'}</button>
+          <button class="table-action-btn danger" type="button" data-asset-action="retire" data-asset-id="${ns.toolbox.escapeHtml(item.id)}">删除</button>
         </td>
       </tr>
     `).join('');
@@ -67,13 +68,24 @@ window.AegisAdmin = window.AegisAdmin || {};
   }
 
   async function retireAsset(assetId) {
-    if (!window.confirm('确认停用该机房？')) return null;
+    if (!window.confirm('确认删除该机房？当前会执行停用，数据保留用于历史追溯。')) return null;
     const d = await ns.api.request(`/api/v1/admin/rooms/${assetId}`, {
       method: 'DELETE',
       headers: ns.api.headers(),
     });
     const el = document.getElementById('assetResult');
     if (el) el.textContent = `已停用\n${JSON.stringify(d, null, 2)}`;
+    await listAssets();
+    return d;
+  }
+
+  async function setAssetActive(assetId, isActive) {
+    const d = await ns.api.request(`/api/v1/admin/rooms/${assetId}/active?is_active=${isActive ? 'true' : 'false'}`, {
+      method: 'PATCH',
+      headers: ns.api.headers(),
+    });
+    const el = document.getElementById('assetResult');
+    if (el) el.textContent = `${isActive ? '已启用' : '已停用'}\n${JSON.stringify(d, null, 2)}`;
     await listAssets();
     return d;
   }
@@ -100,11 +112,15 @@ window.AegisAdmin = window.AegisAdmin || {};
     if (!btn) return;
     const assetId = btn.dataset.assetId;
     if (btn.dataset.assetAction === 'edit') openEditAsset(assetId);
+    if (btn.dataset.assetAction === 'toggle') setAssetActive(assetId, btn.dataset.assetActive === 'true').catch((e) => {
+      const el = document.getElementById('assetResult');
+      if (el) el.textContent = e.message;
+    });
     if (btn.dataset.assetAction === 'retire') retireAsset(assetId).catch((e) => {
       const el = document.getElementById('assetResult');
       if (el) el.textContent = e.message;
     });
   });
 
-  ns.assets = { buildAssetQuery, renderAssetTable, listAssets, createAsset, updateAsset, retireAsset, clearFilters };
+  ns.assets = { buildAssetQuery, renderAssetTable, listAssets, createAsset, updateAsset, retireAsset, setAssetActive, clearFilters };
 })(window.AegisAdmin);

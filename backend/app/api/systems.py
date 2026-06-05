@@ -56,6 +56,7 @@ def list_accessible_systems(db: Session = Depends(get_db), current_user: User = 
                 "system_name": s.name,
                 "host_address": s.host_address,
                 "env": s.env,
+                "selfcheck_skill": getattr(s, "selfcheck_skill", None),
             }
             for s in systems
         ]
@@ -85,6 +86,7 @@ def list_accessible_system_log_configs(db: Session = Depends(get_db), current_us
                 "system_name": s.name,
                 "host_address": s.host_address,
                 "env": s.env,
+                "selfcheck_skill": getattr(s, "selfcheck_skill", None),
                 "log_configs": [
                     {
                         "id": item.id,

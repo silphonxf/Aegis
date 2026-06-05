@@ -4,7 +4,7 @@ import socket
 import time
 from typing import Any, Dict, Optional
 
-from app.db.session import SessionLocal
+import app.db.session as db_session_module
 from app.models.tool_task import ToolTask
 from app.models.system import System
 from app.services.assistant.schemas import ToolSpec
@@ -13,7 +13,7 @@ from app.api.toolbox import _read_selected_logs, _resolve_time_range
 
 
 def get_monitoring_overview(**_: Any) -> Dict[str, Any]:
-    db = SessionLocal()
+    db = db_session_module.SessionLocal()
     try:
         summary, items, abnormal = _build_overview(db)
         text = f"当前共 {summary.get('total', 0)} 个系统，绿色 {summary.get('green', 0)} 个，黄色 {summary.get('yellow', 0)} 个，红色 {summary.get('red', 0)} 个。"
@@ -130,7 +130,7 @@ def read_recent_error_logs(source: str = 'aegis', level: str = 'warning', quick_
 
 
 def list_tool_tasks(status: Optional[str] = None, **_: Any) -> Dict[str, Any]:
-    db = SessionLocal()
+    db = db_session_module.SessionLocal()
     try:
         q = db.query(ToolTask)
         if status:

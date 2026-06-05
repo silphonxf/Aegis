@@ -8,6 +8,11 @@ class CreateUserRequest(BaseModel):
     role_code: str
 
 
+class CreateAIExternalApiKeyRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    remark: Optional[str] = Field(default=None, max_length=500)
+
+
 class CreateAssetRequest(BaseModel):
     asset_code: str = Field(min_length=2, max_length=64)
     name: str = Field(min_length=1, max_length=128)

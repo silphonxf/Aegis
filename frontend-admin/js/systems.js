@@ -53,7 +53,11 @@ window.AegisAdmin = window.AegisAdmin || {};
         <td>${ns.toolbox.escapeHtml(ownerText)}</td>
         <td>${renderLogConfigs(s.log_configs)}</td>
         <td>${s.is_active === false ? '停用' : '启用'}</td>
-        <td><button class="table-action-btn" type="button" data-system-action="edit" data-system-id="${ns.toolbox.escapeHtml(s.id)}">编辑</button></td>
+        <td>
+          <button class="table-action-btn" type="button" data-system-action="edit" data-system-id="${ns.toolbox.escapeHtml(s.id)}">编辑</button>
+          <button class="table-action-btn" type="button" data-system-action="toggle" data-system-id="${ns.toolbox.escapeHtml(s.id)}" data-system-active="${s.is_active === false ? 'true' : 'false'}">${s.is_active === false ? '启用' : '停用'}</button>
+          <button class="table-action-btn danger" type="button" data-system-action="delete" data-system-id="${ns.toolbox.escapeHtml(s.id)}">删除</button>
+        </td>
       </tr>
     `}).join('');
     if (summary) summary.textContent = message || `匹配 ${list.length} 条`;
@@ -77,11 +81,38 @@ window.AegisAdmin = window.AegisAdmin || {};
     ns.modals?.openEditSystemModal?.(item);
   }
 
+  async function setSystemActive(systemId, isActive) {
+    const d = await ns.api.request(`/api/v1/admin/systems/${systemId}/active?is_active=${isActive ? 'true' : 'false'}`, {
+      method: 'PATCH',
+      headers: ns.api.headers(),
+    });
+    await findSystems();
+    return d;
+  }
+
+  async function deleteSystem(systemId) {
+    if (!window.confirm('确认删除该系统？当前会执行停用，数据保留用于历史追溯。')) return null;
+    const d = await ns.api.request(`/api/v1/admin/systems/${systemId}`, {
+      method: 'DELETE',
+      headers: ns.api.headers(),
+    });
+    await findSystems();
+    return d;
+  }
+
   document.getElementById('systemListTbody')?.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-system-action]');
     if (!btn) return;
     if (btn.dataset.systemAction === 'edit') openEditSystem(btn.dataset.systemId);
+    if (btn.dataset.systemAction === 'toggle') setSystemActive(btn.dataset.systemId, btn.dataset.systemActive === 'true').catch((e) => {
+      const el = document.getElementById('systemListSummary');
+      if (el) el.textContent = e.message;
+    });
+    if (btn.dataset.systemAction === 'delete') deleteSystem(btn.dataset.systemId).catch((e) => {
+      const el = document.getElementById('systemListSummary');
+      if (el) el.textContent = e.message;
+    });
   });
 
-  ns.systems = { buildSystemQuery, renderSystemResultBoard, findSystems, findSystem, openEditSystem };
+  ns.systems = { buildSystemQuery, renderSystemResultBoard, findSystems, findSystem, openEditSystem, setSystemActive, deleteSystem };
 })(window.AegisAdmin);

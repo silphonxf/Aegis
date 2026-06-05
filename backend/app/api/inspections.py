@@ -64,7 +64,29 @@ def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User 
     qr_text = (qr_content or "").strip()
     logger.info("解析巡检点: qr_content=%s", qr_text)
 
-    # 新逻辑：二维码为系统ID（纯数字）时，按 system_id 定位系统与巡检点
+    # 管理端配置的机房二维码/NFC 优先级最高，即使值是 "001" 这类纯数字也应按机房解析。
+    room = (
+        db.query(Room)
+        .filter(
+            Room.is_active.is_(True),
+            (Room.qr_content == qr_text) | (Room.nfc_tag == qr_text),
+        )
+        .first()
+    )
+    if room:
+        point = (
+            db.query(InspectionPoint)
+            .filter(InspectionPoint.room_id == room.id, InspectionPoint.is_active.is_(True))
+            .order_by(InspectionPoint.id.asc())
+            .first()
+        )
+        if point:
+            logger.info("解析机房二维码成功: room_id=%s point_id=%s", room.id, point.id)
+            return _serialize_resolved_point(point, db)
+        logger.warning("解析机房二维码失败: room_id=%s 未找到巡检点", room.id)
+        raise HTTPException(status_code=404, detail="未找到对应机房巡检点")
+
+    # 兼容旧逻辑：二维码为系统ID（纯数字）时，按 system_id 定位系统与巡检点
     if qr_text.isdigit():
         system_id = int(qr_text)
         system = db.query(System).filter(System.id == system_id).first()

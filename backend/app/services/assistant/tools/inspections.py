@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from app.db.session import SessionLocal
+import app.db.session as db_session_module
 from app.models.inspection import InspectionRecord
 from app.models.system import System
 from app.services.assistant.schemas import ToolSpec
 
 
 def list_inspection_records(system_name: Optional[str] = None, **_: Any) -> Dict[str, Any]:
-    db = SessionLocal()
+    db = db_session_module.SessionLocal()
     try:
         q = db.query(InspectionRecord)
         matched_system = None
