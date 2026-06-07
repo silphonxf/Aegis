@@ -23,7 +23,6 @@ const VIEW_GROUP_MAP = {
   'view-dashboard-overview': 'dashboard',
   'view-ops-workbench': 'ops-workbench',
   'view-systems': 'ops-workbench',
-  'view-assets': 'ops-workbench',
   'view-inspection-points': 'ops-workbench',
   'view-users': 'ops-workbench',
   'view-tool-template': 'ops-workbench',
@@ -149,14 +148,11 @@ bindClick('btnEmergencyCustomSave', () => ns.emergencyConfig?.saveCustomAction?.
 bindClick('btnEmergencyCustomList', () => ns.emergencyConfig?.listCustomActions?.());
 bindClick('btnToolTaskList', () => ns.toolbox.listTasks().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnToolTaskUpdate', () => ns.toolbox.updateTask().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
-bindClick('btnListAssets', () => ns.assets.listAssets().catch((e) => { $('assetListResult').textContent = formatError('机房列表', e); }));
 bindClick('btnListInspectionPoints', () => ns.inspectionPoints.listInspectionPoints().catch((e) => {
   $('pointListSummary').textContent = formatError('巡检点列表', e);
-  $('pointListTbody').innerHTML = '<tr><td colspan="11">查询失败</td></tr>';
+  $('pointListTbody').innerHTML = '<tr><td colspan="9">查询失败</td></tr>';
 }));
-bindClick('btnOpenCreatePointModal', () => ns.inspectionPoints.openCreatePointModal().catch((e) => {
-  $('pointListSummary').textContent = formatError('巡检点表单', e);
-}));
+bindClick('btnOpenCreatePointModal', () => ns.inspectionPoints.openCreatePointModal());
 bindClick('btnCloseCreatePointModal', () => ns.modals.closeModal('createPointModal'));
 bindClick('btnSubmitPoint', () => ns.inspectionPoints.submitPoint().catch((e) => {
   $('pointListSummary').textContent = formatError('巡检点操作', e);
@@ -164,18 +160,6 @@ bindClick('btnSubmitPoint', () => ns.inspectionPoints.submitPoint().catch((e) =>
 bindClick('btnDeletePoint', () => ns.inspectionPoints.deletePoint().catch((e) => {
   $('pointListSummary').textContent = formatError('停用巡检点', e);
 }));
-bindClick('btnAssetFilterClear', () => {
-  ns.assets?.clearFilters?.();
-  ns.assets?.listAssets?.().catch((e) => { $('assetListResult').textContent = formatError('机房列表', e); });
-});
-bindClick('btnAssetExport', async () => {
-  try {
-    const url = `${ns.api.base()}/api/v1/admin/assets/export?${ns.assets.buildAssetQuery()}`;
-    window.open(url, '_blank', 'noopener');
-  } catch (e) {
-    $('assetResult').textContent = formatError('机房导出', e);
-  }
-});
 bindClick('btnFindUsers', () => ns.users.findUsers($('userSearchKeyword').value.trim()).catch((e) => {
   $('userListSummary').textContent = formatError('用户查询', e);
   $('userListTbody').innerHTML = '<tr><td colspan="4">查询失败</td></tr>';
@@ -218,13 +202,6 @@ bindClick('btnOpenSystemOwnerPicker', () => ns.modals.openSystemOwnerPicker().ca
 bindClick('btnSearchSystemOwners', () => ns.modals.renderSystemOwnerPicker($('systemOwnerSearchKeyword')?.value || ''));
 bindClick('btnConfirmSystemOwners', () => ns.modals.confirmSystemOwners());
 bindClick('btnCloseSystemOwnerPicker', () => ns.modals.closeModal('systemOwnerPickerModal'));
-bindClick('btnOpenCreateAssetModal', () => ns.modals.openCreateAssetModal());
-bindClick('btnCloseCreateAssetModal', () => ns.modals.closeModal('createAssetModal'));
-bindClick('btnDeleteAsset', () => ns.modals.deleteEditingAsset().catch((e) => {
-  $('assetResult').textContent = formatError('删除机房', e);
-}));
-bindClick('btnOpenAssetImportModal', () => ns.modals.openModal('assetImportModal'));
-bindClick('btnCloseAssetImportModal', () => ns.modals.closeModal('assetImportModal'));
 bindClick('btnSubmitCreateUser', () => ns.modals.submitCreateUser().catch((e) => {
   $('userListSummary').textContent = formatError('创建用户', e);
   $('userListTbody').innerHTML = '<tr><td colspan="4">操作失败</td></tr>';
@@ -232,12 +209,6 @@ bindClick('btnSubmitCreateUser', () => ns.modals.submitCreateUser().catch((e) =>
 bindClick('btnSubmitCreateSystem', () => ns.modals.submitCreateSystem().catch((e) => {
   $('systemListSummary').textContent = formatError('系统操作', e);
   $('systemListTbody').innerHTML = '<tr><td colspan="9">操作失败</td></tr>';
-}));
-bindClick('btnSubmitCreateAsset', () => ns.modals.submitCreateAsset().catch((e) => {
-  $('assetResult').textContent = formatError('机房操作', e);
-}));
-bindClick('btnBatchAssets', () => ns.assets.batchAssets().catch((e) => {
-  $('assetResult').textContent = formatError('机房导入', e);
 }));
 
 bindClick('btnRefreshHistory', () => ns.api.renderHistory());

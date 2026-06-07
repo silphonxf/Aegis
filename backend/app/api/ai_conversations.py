@@ -54,8 +54,16 @@ def list_conversations(
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
     rows = db.query(AIConversation).order_by(AIConversation.updated_at.desc(), AIConversation.id.desc()).limit(20).all()
-    return AIConversationListResponse(
-        items=[
+    items = []
+    for row in rows:
+        message_count = db.query(AIChatMessage).filter(AIChatMessage.conversation_id == row.conversation_id).count()
+        last_message = (
+            db.query(AIChatMessage)
+            .filter(AIChatMessage.conversation_id == row.conversation_id)
+            .order_by(AIChatMessage.created_at.desc(), AIChatMessage.id.desc())
+            .first()
+        )
+        items.append(
             AIConversationItem(
                 conversation_id=row.conversation_id,
                 title=row.title,
@@ -63,10 +71,13 @@ def list_conversations(
                 status=row.status,
                 created_at=row.created_at,
                 updated_at=row.updated_at,
+                message_count=message_count,
+                last_message=(last_message.content[:120] if last_message else None),
             )
-            for row in rows
-        ],
-        total=len(rows),
+        )
+    return AIConversationListResponse(
+        items=items,
+        total=len(items),
     )
 
 

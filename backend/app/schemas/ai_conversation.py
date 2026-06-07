@@ -16,6 +16,8 @@ class AIConversationItem(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    message_count: int = 0
+    last_message: Optional[str] = None
 
 
 class AIConversationDetail(AIConversationItem):

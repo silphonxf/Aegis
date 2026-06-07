@@ -22,23 +22,6 @@ window.AegisAdmin = window.AegisAdmin || {};
     if (deleteBtn) deleteBtn.classList.toggle('hidden', !item);
   }
 
-  async function hydratePointSelectors() {
-    const [rooms, systems] = await Promise.all([
-      ns.api.loadOptions('/api/v1/admin/rooms?include_inactive=true&page=1&size=500'),
-      ns.api.loadOptions('/api/v1/admin/systems?page=1&size=200'),
-    ]).catch(() => [[], []]);
-
-    const roomOptions = ['<option value="">不绑定机房</option>']
-      .concat(rooms.map((item) => `<option value="${escape(item.id)}">${escape(item.room_code || item.id)} / ${escape(item.room_name || '-')}</option>`));
-    const systemOptions = ['<option value="">不绑定系统</option>']
-      .concat(systems.map((item) => `<option value="${escape(item.id)}">${escape(item.system_code || item.id)} / ${escape(item.name || '-')}</option>`));
-
-    const roomEl = document.getElementById('modalPointRoomId');
-    const systemEl = document.getElementById('modalPointSystemId');
-    if (roomEl) roomEl.innerHTML = roomOptions.join('');
-    if (systemEl) systemEl.innerHTML = systemOptions.join('');
-  }
-
   function resetPointModal() {
     setModalMode(null);
     [
@@ -48,26 +31,20 @@ window.AegisAdmin = window.AegisAdmin || {};
       'modalPointNfcTag',
       'modalPointLocationDetail',
     ].forEach((id) => setValue(id, ''));
-    setValue('modalPointType', 'room');
-    setValue('modalPointRoomId', '');
-    setValue('modalPointSystemId', '');
+    setValue('modalPointType', 'point');
     setValue('modalPointActive', 'true');
   }
 
-  async function openCreatePointModal() {
+  function openCreatePointModal() {
     resetPointModal();
-    await hydratePointSelectors();
     ns.modals.openModal('createPointModal');
   }
 
-  async function openEditPointModal(item) {
-    await hydratePointSelectors();
+  function openEditPointModal(item) {
     setModalMode(item);
     setValue('modalPointCode', item.point_code);
     setValue('modalPointName', item.point_name);
-    setValue('modalPointType', item.point_type || 'room');
-    setValue('modalPointRoomId', item.room_id);
-    setValue('modalPointSystemId', item.system_id);
+    setValue('modalPointType', item.point_type || 'point');
     setValue('modalPointQrContent', item.qr_content);
     setValue('modalPointNfcTag', item.nfc_tag);
     setValue('modalPointLocationDetail', item.location_detail);
@@ -80,9 +57,9 @@ window.AegisAdmin = window.AegisAdmin || {};
     return {
       point_code: pointCode,
       point_name: document.getElementById('modalPointName')?.value.trim(),
-      point_type: document.getElementById('modalPointType')?.value || 'room',
-      room_id: Number(document.getElementById('modalPointRoomId')?.value || 0) || null,
-      system_id: Number(document.getElementById('modalPointSystemId')?.value || 0) || null,
+      point_type: document.getElementById('modalPointType')?.value || 'point',
+      room_id: null,
+      system_id: null,
       qr_content: document.getElementById('modalPointQrContent')?.value.trim() || pointCode,
       nfc_tag: document.getElementById('modalPointNfcTag')?.value.trim() || null,
       location_detail: document.getElementById('modalPointLocationDetail')?.value.trim() || null,
@@ -109,8 +86,6 @@ window.AegisAdmin = window.AegisAdmin || {};
         <td>${escape(item.point_code || '-')}</td>
         <td>${escape(item.point_name || '-')}</td>
         <td>${escape(item.point_type || '-')}</td>
-        <td>${escape(item.room_id ?? '-')}</td>
-        <td>${escape(item.system_id ?? '-')}</td>
         <td>${escape(item.qr_content || '-')}</td>
         <td>${escape(item.nfc_tag || '-')}</td>
         <td>${escape(item.location_detail || '-')}</td>
@@ -121,7 +96,7 @@ window.AegisAdmin = window.AegisAdmin || {};
         </td>
       </tr>
     `).join('');
-    if (tbody) tbody.innerHTML = rows || '<tr><td colspan="11">暂无巡检点数据</td></tr>';
+    if (tbody) tbody.innerHTML = rows || '<tr><td colspan="9">暂无巡检点数据</td></tr>';
   }
 
   async function listInspectionPoints() {
@@ -172,10 +147,7 @@ window.AegisAdmin = window.AegisAdmin || {};
     const pointId = btn.dataset.pointId;
     if (btn.dataset.pointAction === 'edit') {
       const point = findPoint(pointId);
-      if (point) openEditPointModal(point).catch((e) => {
-        const el = document.getElementById('pointListSummary');
-        if (el) el.textContent = e.message;
-      });
+      if (point) openEditPointModal(point);
     }
     if (btn.dataset.pointAction === 'delete') {
       deletePoint(pointId).catch((e) => {
@@ -186,7 +158,6 @@ window.AegisAdmin = window.AegisAdmin || {};
   });
 
   ns.inspectionPoints = {
-    hydratePointSelectors,
     listInspectionPoints,
     openCreatePointModal,
     openEditPointModal,

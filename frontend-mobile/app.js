@@ -786,7 +786,9 @@ async function refreshAiConversationList() {
       headers: authHeaders(),
       timeoutMs: 15000,
     });
-    state.aiConversationItems = Array.isArray(result.items) ? result.items : [];
+    state.aiConversationItems = Array.isArray(result.items)
+      ? result.items.filter((item) => Number(item.message_count || 0) > 0)
+      : [];
     renderAiConversationList();
     return result.items || [];
   } catch (e) {
@@ -932,29 +934,12 @@ async function sendAiQuestion(reusePayload = null) {
       uploadedFiles,
     };
     $('aiQaResult').textContent = 'AI 回复中，请稍等...';
-    const useAssistant = !uploadedFiles.length;
-    const result = useAssistant
-      ? await api('/api/v1/assistant/chat', {
-          method: 'POST',
-          headers: authHeaders(),
-          body: JSON.stringify({
-            conversation_id: state.aiConversationId,
-            message: question,
-            attachments: [],
-            context: { page: 'mobile' },
-          }),
-          timeoutMs: 45000,
-        })
-      : await api('/api/v1/ai/chat/v2', {
-          method: 'POST',
-          headers: authHeaders(),
-          body: JSON.stringify(payload),
-          timeoutMs: 45000,
-        });
-
-    if (useAssistant && result.conversation_id) {
-      state.aiConversationId = result.conversation_id;
-    }
+    const result = await api('/api/v1/ai/chat/v2', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+      timeoutMs: 45000,
+    });
     const reply = formatAiReply(result);
     state.aiMessages = state.aiMessages.filter((item) => !item.pending);
     const hasUserBubble = state.aiMessages.some((item) => item.role === 'user' && item.text === (question || '请帮我分析这些附件。'));
@@ -969,7 +954,7 @@ async function sendAiQuestion(reusePayload = null) {
       data: result.data || {},
     });
     renderAiMessages();
-    $('aiQaResult').textContent = useAssistant ? '助手已返回结构化结果。' : 'AI 已返回结果。';
+    $('aiQaResult').textContent = 'AI 已返回结果。';
     state.aiAttachments.forEach((item) => item.previewUrl && URL.revokeObjectURL(item.previewUrl));
     state.aiAttachments = [];
     renderAiAttachmentList();

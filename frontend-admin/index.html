@@ -69,7 +69,6 @@
           </button>
           <div class="submenu-list">
             <button class="submenu-btn" data-view="view-systems">系统</button>
-            <button class="submenu-btn" data-view="view-assets">机房</button>
             <button class="submenu-btn" data-view="view-inspection-points">巡检点</button>
             <button class="submenu-btn" data-view="view-users">用户</button>
           </div>
@@ -277,67 +276,12 @@
         </section>
       </section>
 
-      <section id="view-assets" class="view-panel" data-view-title="机房管理" data-view-desc="维护移动端巡检依赖的机房、二维码、NFC 与检查项配置。">
-        <section class="card narrow-card">
-          <div class="section-head">
-            <div>
-              <h2>机房数据</h2>
-              <p class="muted">维护机房名称、二维码、NFC 与检查项，移动端扫码后会自动填充这些巡检配置。</p>
-            </div>
-          </div>
-
-          <div class="search-toolbar asset-toolbar wide-toolbar">
-            <input id="assetFilterKeyword" class="search-input" placeholder="搜索机房名称 / 二维码 / NFC" />
-            <button id="btnListAssets" class="toolbar-btn">搜索</button>
-            <button id="btnOpenCreateAssetModal" class="toolbar-btn secondary">新增</button>
-            <button id="btnToggleAssetAdvanced" class="toolbar-btn ghost">更多筛选</button>
-          </div>
-
-          <details id="assetAdvancedFilters" class="details-block">
-            <summary>高级筛选</summary>
-            <div class="details-body">
-              <div class="grid3">
-                <input disabled placeholder="机房筛选已收敛到关键字搜索" />
-              </div>
-              <div class="action-row compact">
-                <button id="btnAssetFilterClear">清空筛选</button>
-              </div>
-            </div>
-          </details>
-
-          <div class="list-toolbar">
-            <button id="btnAssetExport" class="toolbar-btn ghost hidden" type="button">导出当前结果</button>
-            <button id="btnOpenAssetImportModal" class="toolbar-btn ghost hidden" type="button">导入机房</button>
-            <span id="assetListSummary" class="result-line inline-result"></span>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>序号</th><th>机房名称</th><th>二维码值</th><th>NFC 值</th><th>机房检查项</th><th>状态</th><th>操作</th></tr>
-              </thead>
-              <tbody id="assetListTbody"><tr><td colspan="7">暂无机房数据</td></tr></tbody>
-            </table>
-          </div>
-
-          <details class="details-block">
-            <summary>查看机房接口原始返回</summary>
-            <pre id="assetListResult"></pre>
-          </details>
-          <details class="details-block">
-            <summary>查看新增/导入操作结果</summary>
-            <pre id="assetResult"></pre>
-          </details>
-        </section>
-      </section>
-
-
-      <section id="view-inspection-points" class="view-panel" data-view-title="巡检点管理" data-view-desc="维护移动端扫码 / NFC 巡检使用的点位、系统与机房绑定关系。">
+      <section id="view-inspection-points" class="view-panel" data-view-title="巡检点管理" data-view-desc="维护移动端扫码 / NFC 巡检使用的点位配置。">
         <section class="card narrow-card">
           <div class="section-head">
             <div>
               <h2>巡检点</h2>
-              <p class="muted">机房保存时会自动同步基础点位；这里用于维护额外点位、系统绑定和点位启停。</p>
+              <p class="muted">统一维护移动端扫码 / NFC 巡检点、二维码、NFC 与位置说明。</p>
             </div>
           </div>
           <div class="search-toolbar wide-toolbar">
@@ -354,9 +298,9 @@
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>序号</th><th>点位编号</th><th>点位名称</th><th>类型</th><th>机房ID</th><th>系统ID</th><th>二维码</th><th>NFC</th><th>位置</th><th>状态</th><th>操作</th></tr>
+                <tr><th>序号</th><th>点位编号</th><th>点位名称</th><th>类型</th><th>二维码</th><th>NFC</th><th>位置</th><th>状态</th><th>操作</th></tr>
               </thead>
-              <tbody id="pointListTbody"><tr><td colspan="11">暂无巡检点数据</td></tr></tbody>
+              <tbody id="pointListTbody"><tr><td colspan="9">暂无巡检点数据</td></tr></tbody>
             </table>
           </div>
           <details class="details-block">
@@ -375,13 +319,13 @@
           </div>
           <div class="ops-tabs">
             <button class="ops-tab active" type="button" data-target-view="view-systems">系统自检配置与记录</button>
-            <button class="ops-tab" type="button" data-target-view="view-inspection-points">机房巡检配置与记录</button>
-            <button class="ops-tab" type="button" data-target-view="view-assets">基础数据录入</button>
+            <button class="ops-tab" type="button" data-target-view="view-inspection-points">巡检点配置与记录</button>
+            <button class="ops-tab" type="button" data-target-view="view-users">用户配置</button>
           </div>
           <div class="summary-strip">
             <div class="summary-card"><span>Tab 1</span><strong>系统自检配置与记录</strong></div>
-            <div class="summary-card"><span>Tab 2</span><strong>机房巡检配置与记录</strong></div>
-            <div class="summary-card"><span>Tab 3</span><strong>基础数据录入</strong></div>
+            <div class="summary-card"><span>Tab 2</span><strong>巡检点配置与记录</strong></div>
+            <div class="summary-card"><span>Tab 3</span><strong>用户配置</strong></div>
           </div>
           <div class="ops-workbench-sections">
             <section class="guide-card ops-section-card">
@@ -415,7 +359,7 @@
             <section class="guide-card ops-section-card">
               <div class="section-head">
                 <div>
-                  <h3>机房巡检配置与记录</h3>
+                  <h3>巡检点配置与记录</h3>
                   <p>这一块最终要给移动端的扫码巡检、NFC 巡检和巡检记录审阅提供配置与审阅能力。</p>
                 </div>
                 <button class="toolbar-btn" type="button" data-jump-view="view-inspection-points">进入巡检点配置</button>
@@ -425,11 +369,10 @@
             <section class="guide-card ops-section-card">
               <div class="section-head">
                 <div>
-                  <h3>基础数据录入</h3>
-                  <p>优先集中用户与资产数据，后续再补服务器/IP 录入、Excel 模板导入与角色联动。</p>
+                  <h3>用户配置</h3>
+                  <p>维护移动端与管理端共用的用户主数据、角色和后续负责人配置。</p>
                 </div>
                 <div class="action-row compact">
-                  <button class="toolbar-btn" type="button" data-jump-view="view-assets">进入资产数据</button>
                   <button class="toolbar-btn secondary" type="button" data-jump-view="view-users">进入用户数据</button>
                 </div>
               </div>
@@ -437,7 +380,6 @@
                 <div class="mini-panel">
                   <strong>当前承接能力</strong>
                   <ul class="mini-list">
-                    <li>机房列表 / 新增 / 编辑 / 启停</li>
                     <li>用户列表 / 新增用户</li>
                     <li>基础查询与筛选</li>
                   </ul>
@@ -1001,53 +943,6 @@
     </div>
   </div>
 
-  <div id="createAssetModal" class="modal hidden" hidden aria-hidden="true">
-    <div class="modal-card">
-      <h3 id="assetModalTitle">新增机房</h3>
-      <label>机房名称
-        <input id="modalAssetName" placeholder="请输入机房名称" />
-      </label>
-      <label>二维码值
-        <input id="modalAssetQrContent" placeholder="扫码后匹配的二维码内容，必填" />
-      </label>
-      <label>NFC 值
-        <input id="modalAssetNfcTag" placeholder="可选，NFC 标签内容" />
-      </label>
-      <label>机房检查项
-        <textarea id="modalAssetCheckItems" rows="6" placeholder="每行一个检查项，例如&#10;门禁状态&#10;温湿度&#10;UPS 状态"></textarea>
-      </label>
-      <label>启用状态
-        <select id="modalAssetActive">
-          <option value="true">启用</option>
-          <option value="false">停用</option>
-        </select>
-      </label>
-      <label>备注
-        <input id="modalAssetRemark" placeholder="补充说明（可选）" />
-      </label>
-      <div class="grid2">
-        <button id="btnSubmitCreateAsset">确认新增</button>
-        <button id="btnCloseCreateAssetModal" type="button">取消</button>
-      </div>
-      <button id="btnDeleteAsset" class="danger hidden" type="button">删除机房</button>
-    </div>
-  </div>
-
-  <div id="assetImportModal" class="modal hidden" hidden aria-hidden="true">
-    <div class="modal-card modal-wide">
-      <h3>批量导入资产</h3>
-      <p class="muted">当前支持 JSON 数组批量导入，建议导入前先确认字段完整。</p>
-      <textarea id="assetBatchJson" rows="8" style="width:100%;padding:10px;">[
-  {"asset_code":"AST-001","name":"应用服务器01","category":"server","system_id":1,"location":"机房A","status":"in_use"}
-]</textarea>
-      <div class="grid2">
-        <button id="btnBatchAssets">开始导入</button>
-        <button id="btnCloseAssetImportModal" type="button">取消</button>
-      </div>
-    </div>
-  </div>
-
-
   <div id="createPointModal" class="modal hidden" hidden aria-hidden="true">
     <div class="modal-card">
       <h3 id="pointModalTitle">新增巡检点</h3>
@@ -1059,17 +954,11 @@
       </label>
       <label>点位类型
         <select id="modalPointType">
-          <option value="room">机房</option>
+          <option value="point">巡检点</option>
           <option value="system">系统</option>
           <option value="device">设备</option>
           <option value="area">区域</option>
         </select>
-      </label>
-      <label>所属机房
-        <select id="modalPointRoomId"></select>
-      </label>
-      <label>关联系统
-        <select id="modalPointSystemId"></select>
       </label>
       <label>二维码值
         <input id="modalPointQrContent" placeholder="为空时默认使用点位编号" />
@@ -1097,7 +986,6 @@
   <script defer src="./js/auth.js"></script>
   <script defer src="./js/dashboard.js"></script>
   <script defer src="./js/toolbox.js"></script>
-  <script defer src="./js/assets.js"></script>
   <script defer src="./js/inspection-points.js"></script>
   <script defer src="./js/users.js"></script>
   <script defer src="./js/systems.js"></script>

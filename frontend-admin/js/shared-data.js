@@ -15,10 +15,7 @@ window.AegisAdmin = window.AegisAdmin || {};
   }
 
   async function hydrateAdminSelectors() {
-    await Promise.all([
-      fillSelect('modalAssetSystemId', '/api/v1/admin/systems?page=1&size=200', (item) => `${item.system_code} / ${item.name}`),
-      fillSelect('modalAssetRoomId', '/api/v1/admin/rooms', (item) => `${item.room_code} / ${item.room_name}`),
-    ]).catch(() => {});
+    return [];
   }
 
   ns.sharedData = { fillSelect, hydrateAdminSelectors };

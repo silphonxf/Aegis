@@ -63,7 +63,9 @@ def test_ai_conversation_restore_flow(client, admin_headers):
     listed = client.get("/api/v1/ai/conversations", headers=admin_headers)
     assert listed.status_code == 200, listed.text
     items = listed.json()["items"]
-    assert any(item["conversation_id"] == conversation_id for item in items)
+    listed_item = next(item for item in items if item["conversation_id"] == conversation_id)
+    assert listed_item["message_count"] == 2
+    assert listed_item["last_message"]
 
 
 def test_ai_conversation_rename(client, admin_headers):
