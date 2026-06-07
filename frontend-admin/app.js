@@ -24,6 +24,7 @@ const VIEW_GROUP_MAP = {
   'view-ops-workbench': 'ops-workbench',
   'view-systems': 'ops-workbench',
   'view-assets': 'ops-workbench',
+  'view-inspection-points': 'ops-workbench',
   'view-users': 'ops-workbench',
   'view-tool-template': 'ops-workbench',
   'view-emergency-ssh': 'runbook',
@@ -96,6 +97,7 @@ function switchView(viewId, groupId) {
     ns.dashboard?.stopDashboardAutoRefresh?.();
   }
 
+  if (viewId === 'view-inspection-points') ns.inspectionPoints?.listInspectionPoints?.();
   if (viewId === 'view-emergency-ssh') ns.emergencyConfig?.listSshHosts?.();
   if (viewId === 'view-emergency-server') ns.emergencyConfig?.listServerActions?.();
   if (viewId === 'view-emergency-db') ns.emergencyConfig?.listDbActions?.();
@@ -148,6 +150,20 @@ bindClick('btnEmergencyCustomList', () => ns.emergencyConfig?.listCustomActions?
 bindClick('btnToolTaskList', () => ns.toolbox.listTasks().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnToolTaskUpdate', () => ns.toolbox.updateTask().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnListAssets', () => ns.assets.listAssets().catch((e) => { $('assetListResult').textContent = formatError('机房列表', e); }));
+bindClick('btnListInspectionPoints', () => ns.inspectionPoints.listInspectionPoints().catch((e) => {
+  $('pointListSummary').textContent = formatError('巡检点列表', e);
+  $('pointListTbody').innerHTML = '<tr><td colspan="11">查询失败</td></tr>';
+}));
+bindClick('btnOpenCreatePointModal', () => ns.inspectionPoints.openCreatePointModal().catch((e) => {
+  $('pointListSummary').textContent = formatError('巡检点表单', e);
+}));
+bindClick('btnCloseCreatePointModal', () => ns.modals.closeModal('createPointModal'));
+bindClick('btnSubmitPoint', () => ns.inspectionPoints.submitPoint().catch((e) => {
+  $('pointListSummary').textContent = formatError('巡检点操作', e);
+}));
+bindClick('btnDeletePoint', () => ns.inspectionPoints.deletePoint().catch((e) => {
+  $('pointListSummary').textContent = formatError('停用巡检点', e);
+}));
 bindClick('btnAssetFilterClear', () => {
   ns.assets?.clearFilters?.();
   ns.assets?.listAssets?.().catch((e) => { $('assetListResult').textContent = formatError('机房列表', e); });

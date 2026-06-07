@@ -332,7 +332,7 @@
             <label class="full">选择系统
               <select id="scStatusSystem"></select>
             </label>
-            <label>时间范围
+            <label>自检数据范围
               <select id="selfcheckRange">
                 <option value="1">1min</option>
                 <option value="5">5min</option>
@@ -343,8 +343,27 @@
                 <option value="360">6h</option>
               </select>
             </label>
-            <div id="statusSystemHint" class="hint">请选择系统并开始自检。</div>
-            <div class="actions one"><button id="btnRunSelfcheck">开始系统自检</button></div>
+            <div id="statusSystemHint" class="hint">请选择系统后，点击“开始 AI 自检”才会生成报告。</div>
+            <div class="actions one"><button id="btnRunSelfcheck">开始 AI 自检</button></div>
+            <section class="log-result-card">
+              <h3>定时 AI 自检</h3>
+              <div class="grid two compact-grid">
+                <label>定时间隔
+                  <select id="selfcheckTimerInterval">
+                    <option value="0">关闭</option>
+                    <option value="60">每 1 小时</option>
+                    <option value="180">每 3 小时</option>
+                    <option value="360">每 6 小时</option>
+                    <option value="720">每 12 小时</option>
+                  </select>
+                </label>
+                <label>下次执行
+                  <input id="selfcheckTimerNextAt" type="datetime-local" />
+                </label>
+              </div>
+              <div class="actions one compact-actions"><button id="btnSaveSelfcheckTimer" class="secondary">保存定时配置</button></div>
+              <div id="selfcheckTimerHint" class="hint">定时配置保存在当前移动端浏览器；到点后会自动发起所选系统的 AI 自检。</div>
+            </section>
             <details id="selfcheckStatusDetails" class="details-block" open>
               <summary>系统状态</summary>
               <div class="details-body">
@@ -359,6 +378,23 @@
             <section class="log-result-card">
               <h3>告警信息</h3>
               <div id="selfcheckAlarmList" class="checklist-panel"></div>
+            </section>
+            <section class="log-result-card">
+              <h3>自检报告记录</h3>
+              <div id="selfcheckRecentHint" class="hint">默认展示最近 6 小时内的 AI 自检报告。</div>
+              <div id="selfcheckReportList" class="activity-list"></div>
+              <div class="grid two compact-grid">
+                <label>开始日期
+                  <input id="selfcheckReportStart" type="datetime-local" />
+                </label>
+                <label>结束日期
+                  <input id="selfcheckReportEnd" type="datetime-local" />
+                </label>
+              </div>
+              <div class="actions compact-actions">
+                <button id="btnSearchSelfcheckReports" class="secondary">搜索固定日期报告</button>
+                <button id="btnLoadRecentSelfcheckReports" class="ghost">最近 6 小时</button>
+              </div>
             </section>
             <section class="log-result-card analysis">
               <h3>AI 自检报告</h3>

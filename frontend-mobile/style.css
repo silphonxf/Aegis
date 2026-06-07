@@ -1088,3 +1088,18 @@ textarea {
     grid-auto-flow: row;
   }
 }
+
+#selfcheckReportList {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 12px;
+}
+
+#selfcheckReportList .activity-item span {
+  word-break: break-all;
+}
+
+#selfcheckTimerHint,
+#selfcheckRecentHint {
+  line-height: 1.55;
+}

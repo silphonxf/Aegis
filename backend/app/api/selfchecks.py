@@ -1,4 +1,7 @@
 from typing import Any, Dict, List, Optional, Set, Tuple
+import json
+import re
+from pathlib import Path
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,6 +20,90 @@ from app.services.ai_provider import run_chat
 
 router = APIRouter(prefix="/selfchecks", tags=["selfchecks"])
 logger = get_logger("selfchecks")
+
+REPORT_DIR = Path(__file__).resolve().parents[2] / "selfcheck_reports"
+REPORT_RETENTION_DAYS = 7
+DEFAULT_REPORT_LOOKBACK_HOURS = 6
+
+
+def _safe_file_part(value: str) -> str:
+    cleaned = re.sub(r"[^0-9A-Za-z._-]+", "-", (value or "").strip())
+    return cleaned.strip(".-_") or "system"
+
+
+def _cleanup_old_reports(now: Optional[datetime] = None) -> int:
+    now = now or datetime.utcnow()
+    cutoff = now - timedelta(days=REPORT_RETENTION_DAYS)
+    if not REPORT_DIR.exists():
+        return 0
+    deleted = 0
+    for path in REPORT_DIR.glob("*.json"):
+        try:
+            if datetime.utcfromtimestamp(path.stat().st_mtime) < cutoff:
+                path.unlink()
+                deleted += 1
+        except OSError:
+            logger.warning("清理过期 AI 自检报告失败: path=%s", path)
+    return deleted
+
+
+def _serialize_report_file(path: Path) -> Dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        data = {}
+    checked_at = data.get("checked_at")
+    if not checked_at:
+        checked_at = datetime.utcfromtimestamp(path.stat().st_mtime).isoformat()
+    system = data.get("system") or {}
+    ai_report = data.get("ai_report") or {}
+    return {
+        "file_name": path.name,
+        "file_path": str(path),
+        "system_id": system.get("system_id"),
+        "system_code": system.get("system_code"),
+        "system_name": system.get("system_name"),
+        "checked_at": checked_at,
+        "range_minutes": data.get("range_minutes"),
+        "alarm_count": len(data.get("alarms") or []),
+        "summary": data.get("summary") or ai_report.get("summary") or ai_report.get("reply"),
+    }
+
+def _save_selfcheck_report(payload: Dict[str, Any]) -> Dict[str, Any]:
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    checked_at = datetime.utcnow()
+    system = payload.get("system") or {}
+    system_part = _safe_file_part(f"{system.get('system_code') or system.get('system_id')}-{system.get('system_name') or ''}")
+    timestamp = checked_at.strftime("%Y%m%d%H%M%S")
+    file_name = f"{system_part}_{timestamp}.json"
+    report = dict(payload)
+    report["checked_at"] = checked_at.isoformat()
+    report["summary"] = (payload.get("ai_report") or {}).get("reply") or (payload.get("ai_report") or {}).get("summary") or ""
+    path = REPORT_DIR / file_name
+    path.write_text(json.dumps(report, ensure_ascii=False, default=str, indent=2), encoding="utf-8")
+    return _serialize_report_file(path)
+
+
+def _list_report_files(system_id: Optional[int], start_at: Optional[datetime], end_at: Optional[datetime]) -> List[Dict[str, Any]]:
+    _cleanup_old_reports()
+    if not REPORT_DIR.exists():
+        return []
+    rows = []
+    for path in REPORT_DIR.glob("*.json"):
+        item = _serialize_report_file(path)
+        checked_at_raw = item.get("checked_at")
+        try:
+            checked_at = datetime.fromisoformat(str(checked_at_raw).replace("Z", "+00:00")).replace(tzinfo=None)
+        except Exception:
+            checked_at = datetime.utcfromtimestamp(path.stat().st_mtime)
+        if system_id is not None and item.get("system_id") != system_id:
+            continue
+        if start_at and checked_at < start_at.replace(tzinfo=None):
+            continue
+        if end_at and checked_at > end_at.replace(tzinfo=None):
+            continue
+        rows.append(item)
+    return sorted(rows, key=lambda item: str(item.get("checked_at") or ""), reverse=True)
 
 
 def _visible_system_query(db: Session, user: User):
@@ -147,7 +234,7 @@ def run_system_selfcheck(
         prompt = _build_selfcheck_prompt(system, range_minutes, latest, alarms)
         report = run_chat(ChatRequest(message=prompt, conversation_id=f"selfcheck-{system.id}"))
     log_action(db, "run_system_selfcheck", "selfcheck", current_user, {"system_id": system.id, "range_minutes": range_minutes, "alarm_count": len(alarms)})
-    return {
+    response_payload = {
         "system": {
             "system_id": system.id,
             "system_code": system.system_code,
@@ -165,7 +252,40 @@ def run_system_selfcheck(
         "alarms": alarms,
         "ai_report": report,
     }
+    response_payload["report_file"] = _save_selfcheck_report(response_payload)
+    _cleanup_old_reports()
+    return response_payload
 
+@router.get("/reports")
+def list_selfcheck_reports(
+    system_id: Optional[int] = None,
+    start_at: Optional[datetime] = None,
+    end_at: Optional[datetime] = None,
+    page: int = 1,
+    size: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    page = max(page, 1)
+    size = min(max(size, 1), 100)
+    visible_ids = {row.id for row in _visible_system_query(db, current_user).all()}
+    if system_id is not None and system_id not in visible_ids:
+        raise HTTPException(status_code=404, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在或无权访问"})
+    if start_at is None and end_at is None:
+        start_at = datetime.utcnow() - timedelta(hours=DEFAULT_REPORT_LOOKBACK_HOURS)
+    items = _list_report_files(system_id, start_at, end_at)
+    if system_id is None:
+        items = [item for item in items if item.get("system_id") in visible_ids]
+    total = len(items)
+    page_items = items[(page - 1) * size: page * size]
+    return {
+        "page": page,
+        "size": size,
+        "total": total,
+        "retention_days": REPORT_RETENTION_DAYS,
+        "default_lookback_hours": DEFAULT_REPORT_LOOKBACK_HOURS,
+        "items": page_items,
+    }
 
 @router.get("/templates")
 def list_templates(

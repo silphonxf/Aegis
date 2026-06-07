@@ -70,6 +70,7 @@
           <div class="submenu-list">
             <button class="submenu-btn" data-view="view-systems">系统</button>
             <button class="submenu-btn" data-view="view-assets">机房</button>
+            <button class="submenu-btn" data-view="view-inspection-points">巡检点</button>
             <button class="submenu-btn" data-view="view-users">用户</button>
           </div>
         </div>
@@ -330,6 +331,40 @@
         </section>
       </section>
 
+
+      <section id="view-inspection-points" class="view-panel" data-view-title="巡检点管理" data-view-desc="维护移动端扫码 / NFC 巡检使用的点位、系统与机房绑定关系。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>巡检点</h2>
+              <p class="muted">机房保存时会自动同步基础点位；这里用于维护额外点位、系统绑定和点位启停。</p>
+            </div>
+          </div>
+          <div class="search-toolbar wide-toolbar">
+            <input id="pointFilterKeyword" class="search-input" placeholder="搜索点位编号 / 名称 / 二维码 / NFC" />
+            <select id="pointFilterActive">
+              <option value="">全部状态</option>
+              <option value="true">启用</option>
+              <option value="false">停用</option>
+            </select>
+            <button id="btnListInspectionPoints" class="toolbar-btn">搜索</button>
+            <button id="btnOpenCreatePointModal" class="toolbar-btn secondary">新增</button>
+          </div>
+          <div id="pointListSummary" class="result-line"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>序号</th><th>点位编号</th><th>点位名称</th><th>类型</th><th>机房ID</th><th>系统ID</th><th>二维码</th><th>NFC</th><th>位置</th><th>状态</th><th>操作</th></tr>
+              </thead>
+              <tbody id="pointListTbody"><tr><td colspan="11">暂无巡检点数据</td></tr></tbody>
+            </table>
+          </div>
+          <details class="details-block">
+            <summary>查看巡检点接口原始返回</summary>
+            <pre id="pointListResult"></pre>
+          </details>
+        </section>
+      </section>
       <section id="view-ops-workbench" class="view-panel" data-view-title="资产与日常运维" data-view-desc="以三 Tab 工作台整合系统自检、机房巡检与基础数据录入。">
         <section class="card">
           <div class="section-head">
@@ -340,7 +375,7 @@
           </div>
           <div class="ops-tabs">
             <button class="ops-tab active" type="button" data-target-view="view-systems">系统自检配置与记录</button>
-            <button class="ops-tab" type="button" data-target-view="view-tool-template">机房巡检配置与记录</button>
+            <button class="ops-tab" type="button" data-target-view="view-inspection-points">机房巡检配置与记录</button>
             <button class="ops-tab" type="button" data-target-view="view-assets">基础数据录入</button>
           </div>
           <div class="summary-strip">
@@ -383,7 +418,7 @@
                   <h3>机房巡检配置与记录</h3>
                   <p>这一块最终要给移动端的扫码巡检、NFC 巡检和巡检记录审阅提供配置与审阅能力。</p>
                 </div>
-                <button class="toolbar-btn" type="button" data-jump-view="view-tool-template">进入承接页</button>
+                <button class="toolbar-btn" type="button" data-jump-view="view-inspection-points">进入巡检点配置</button>
               </div>
             </section>
 
@@ -402,7 +437,7 @@
                 <div class="mini-panel">
                   <strong>当前承接能力</strong>
                   <ul class="mini-list">
-                    <li>资产列表 / 导入导出</li>
+                    <li>机房列表 / 新增 / 编辑 / 启停</li>
                     <li>用户列表 / 新增用户</li>
                     <li>基础查询与筛选</li>
                   </ul>
@@ -1012,11 +1047,58 @@
     </div>
   </div>
 
+
+  <div id="createPointModal" class="modal hidden" hidden aria-hidden="true">
+    <div class="modal-card">
+      <h3 id="pointModalTitle">新增巡检点</h3>
+      <label>点位编号
+        <input id="modalPointCode" placeholder="请输入点位编号" />
+      </label>
+      <label>点位名称
+        <input id="modalPointName" placeholder="请输入点位名称" />
+      </label>
+      <label>点位类型
+        <select id="modalPointType">
+          <option value="room">机房</option>
+          <option value="system">系统</option>
+          <option value="device">设备</option>
+          <option value="area">区域</option>
+        </select>
+      </label>
+      <label>所属机房
+        <select id="modalPointRoomId"></select>
+      </label>
+      <label>关联系统
+        <select id="modalPointSystemId"></select>
+      </label>
+      <label>二维码值
+        <input id="modalPointQrContent" placeholder="为空时默认使用点位编号" />
+      </label>
+      <label>NFC 值
+        <input id="modalPointNfcTag" placeholder="可选，NFC 标签内容" />
+      </label>
+      <label>位置说明
+        <input id="modalPointLocationDetail" placeholder="例如 A 栋 3 层核心机房门口" />
+      </label>
+      <label>启用状态
+        <select id="modalPointActive">
+          <option value="true">启用</option>
+          <option value="false">停用</option>
+        </select>
+      </label>
+      <div class="grid2">
+        <button id="btnSubmitPoint">确认新增</button>
+        <button id="btnCloseCreatePointModal" type="button">取消</button>
+      </div>
+      <button id="btnDeletePoint" class="danger hidden" type="button">删除巡检点</button>
+    </div>
+  </div>
   <script defer src="./js/api.js"></script>
   <script defer src="./js/auth.js"></script>
   <script defer src="./js/dashboard.js"></script>
   <script defer src="./js/toolbox.js"></script>
   <script defer src="./js/assets.js"></script>
+  <script defer src="./js/inspection-points.js"></script>
   <script defer src="./js/users.js"></script>
   <script defer src="./js/systems.js"></script>
   <script defer src="./js/rules-audit.js"></script>

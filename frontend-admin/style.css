@@ -680,6 +680,9 @@ th { background: #113654; color: #7dd3fc; }
   border: 1px solid #1f3a53;
   border-radius: 14px;
   padding: 14px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .modal-card h3 { margin: 0 0 10px; color: #9dd6f5; }
 
@@ -699,4 +702,13 @@ th { background: #113654; color: #7dd3fc; }
   .grid2, .grid3, .grid4, .kpis, .tech-metrics, .debug-grid, .summary-strip, .search-toolbar, .wide-toolbar, .ops-workbench-guide, .runbook-guide-grid, .ops-workbench-sections { grid-template-columns: 1fr; }
   .action-row.compact button, .toolbar-btn { width: 100%; }
   .inline-result { margin-left: 0; width: 100%; }
+}
+
+#createSystemModal .modal-card {
+  width: min(560px, calc(100vw - 24px));
+  height: min(760px, calc(100vh - 48px));
+}
+
+#createSystemModal .modal-card textarea {
+  resize: vertical;
 }

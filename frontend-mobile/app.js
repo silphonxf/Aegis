@@ -14,6 +14,7 @@ const AI_CHAT_SIDEBAR_COLLAPSED_KEY = 'aegis_ai_chat_sidebar_collapsed';
 const ACTIVE_TAB_KEY = 'aegis_mobile_active_tab';
 const API_BASE_KEY = 'aegis_mobile_api_base';
 const AUTH_TOKEN_KEY = 'aegis_mobile_token';
+const AI_SELFCHECK_TIMER_KEY = 'aegis_mobile_ai_selfcheck_timer';
 const AI_MAX_ATTACHMENTS = 4;
 const AI_MAX_FILE_SIZE = 2 * 1024 * 1024;
 const DEFAULT_AI_MESSAGES = [
@@ -93,6 +94,10 @@ const state = {
   isAnalyzingErrors: false,
   isAnalyzingCapture: false,
   isSendingAiMessage: false,
+  aiSelfcheckTimer: null,
+  aiSelfcheckTimerHandle: null,
+  isRunningScheduledSelfcheck: false,
+  latestSelfcheckReports: [],
   lastAiRequestPayload: null,
 };
 
@@ -1545,7 +1550,9 @@ async function openSelfcheckPageForSystem(systemId) {
   openDetailPage('page-selfcheck-run');
   renderStatusSystemOptions();
   if ($('scStatusSystem')) $('scStatusSystem').value = String(state.selectedStatusSystemId || '');
-  await runSystemSelfcheck();
+  show('selfcheckAiReport', '请选择系统后点击“开始 AI 自检”生成报告。');
+  syncSelfcheckTimerUi();
+  await loadSelfcheckReports({ recent: true }).catch(() => {});
 }
 
 function formatUsage(value) {
@@ -1603,19 +1610,113 @@ function renderSelfcheckAiReport(data) {
   show('selfcheckAiReport', `${report.reply || report.summary || 'AI 已返回自检报告。'}${suggestions}`);
 }
 
-async function runSystemSelfcheck() {
+function loadSelfcheckTimerConfig() {
+  try {
+    const data = JSON.parse(localStorage.getItem(AI_SELFCHECK_TIMER_KEY) || 'null');
+    if (data && typeof data === 'object') return data;
+  } catch {}
+  return { interval_minutes: 0, next_at: '', system_id: null, range_minutes: 60 };
+}
+
+function saveSelfcheckTimerConfig(config) {
+  state.aiSelfcheckTimer = config;
+  localStorage.setItem(AI_SELFCHECK_TIMER_KEY, JSON.stringify(config));
+  syncSelfcheckTimerUi();
+  startSelfcheckTimerLoop();
+}
+
+function syncSelfcheckTimerUi() {
+  const config = state.aiSelfcheckTimer || loadSelfcheckTimerConfig();
+  state.aiSelfcheckTimer = config;
+  if ($('selfcheckTimerInterval')) $('selfcheckTimerInterval').value = String(config.interval_minutes || 0);
+  if ($('selfcheckTimerNextAt')) $('selfcheckTimerNextAt').value = config.next_at || '';
+  const hint = $('selfcheckTimerHint');
+  if (!hint) return;
+  if (!config.interval_minutes) {
+    hint.textContent = '定时 AI 自检已关闭。';
+    return;
+  }
+  hint.textContent = `定时 AI 自检已开启：每 ${config.interval_minutes} 分钟执行一次，下次执行 ${config.next_at || '待设置'}。`;
+}
+
+function readSelfcheckTimerForm() {
+  const interval = Number($('selfcheckTimerInterval')?.value || 0);
+  const nextAt = $('selfcheckTimerNextAt')?.value || '';
+  const range = Number(options.rangeMinutes || $('selfcheckRange')?.value || 60);
+  return {
+    interval_minutes: interval,
+    next_at: interval ? (nextAt || formatDateTimeLocalValue(new Date(Date.now() + interval * 60000))) : '',
+    system_id: Number($('scStatusSystem')?.value || state.selectedStatusSystemId || 0) || null,
+    range_minutes: range,
+  };
+}
+
+function startSelfcheckTimerLoop() {
+  if (state.aiSelfcheckTimerHandle) clearInterval(state.aiSelfcheckTimerHandle);
+  state.aiSelfcheckTimerHandle = setInterval(checkScheduledSelfcheck, 30000);
+}
+
+async function checkScheduledSelfcheck() {
+  const config = state.aiSelfcheckTimer || loadSelfcheckTimerConfig();
+  if (!config.interval_minutes || !config.next_at || state.isRunningScheduledSelfcheck) return;
+  const dueAt = new Date(config.next_at).getTime();
+  if (!Number.isFinite(dueAt) || Date.now() < dueAt) return;
+  const systemId = Number(config.system_id || state.selectedStatusSystemId || 0);
+  if (!systemId || !state.token) return;
+  state.isRunningScheduledSelfcheck = true;
+  try {
+    if ($('scStatusSystem')) $('scStatusSystem').value = String(systemId);
+    state.selectedStatusSystemId = systemId;
+    await runSystemSelfcheck({ scheduled: true, rangeMinutes: Number(config.range_minutes || 60) });
+    config.next_at = formatDateTimeLocalValue(new Date(Date.now() + Number(config.interval_minutes) * 60000));
+    saveSelfcheckTimerConfig(config);
+  } finally {
+    state.isRunningScheduledSelfcheck = false;
+  }
+}
+
+function renderSelfcheckReportList(items = []) {
+  const host = $('selfcheckReportList');
+  if (!host) return;
+  state.latestSelfcheckReports = items;
+  host.innerHTML = items.length ? items.map((item) => `
+    <div class="activity-item">
+      <strong>${escapeHtml(item.system_name || item.system_code || item.file_name || 'AI 自检报告')}</strong>
+      <span>${escapeHtml(item.checked_at || '-')} · 告警 ${escapeHtml(item.alarm_count ?? 0)} 条 · ${escapeHtml(item.file_name || '-')}</span>
+    </div>
+  `).join('') : '<div class="hint">暂无匹配的 AI 自检报告。</div>';
+}
+
+async function loadSelfcheckReports({ recent = true } = {}) {
+  const params = new URLSearchParams({ page: '1', size: '50' });
+  const systemId = Number($('scStatusSystem')?.value || state.selectedStatusSystemId || 0);
+  if (systemId) params.set('system_id', String(systemId));
+  if (!recent) {
+    const start = $('selfcheckReportStart')?.value;
+    const end = $('selfcheckReportEnd')?.value;
+    if (start) params.set('start_at', new Date(start).toISOString());
+    if (end) params.set('end_at', new Date(end).toISOString());
+  }
+  const data = await api(`/api/v1/selfchecks/reports?${params.toString()}`, { headers: authHeaders() });
+  renderSelfcheckReportList(data.items || []);
+  const hint = $('selfcheckRecentHint');
+  if (hint) hint.textContent = recent ? `最近 6 小时内共 ${data.total || 0} 条 AI 自检报告。` : `搜索到 ${data.total || 0} 条 AI 自检报告。`;
+  return data;
+}
+
+async function runSystemSelfcheck(options = {}) {
   const systemId = Number($('scStatusSystem')?.value || state.selectedStatusSystemId || 0);
   if (!systemId) {
     show('selfcheckAiReport', '请先选择系统。');
     return null;
   }
   state.selectedStatusSystemId = systemId;
-  const range = Number($('selfcheckRange')?.value || 60);
+  const range = Number(options.rangeMinutes || $('selfcheckRange')?.value || 60);
   const selected = state.statusSystems.find((item) => Number(item.system_id) === Number(systemId));
   if ($('statusSystemHint')) $('statusSystemHint').textContent = selected
     ? `当前系统：${selected.system_name || selected.system_code || systemId} · ${selected.host_address || '未配置 IP'}`
     : '正在读取系统自检数据...';
-  show('selfcheckAiReport', '正在生成自检报告...');
+  show('selfcheckAiReport', options.scheduled ? '定时 AI 自检正在生成报告...' : '正在生成自检报告...');
   renderSelfcheckAlarms([]);
   setButtonLoading('btnRunSelfcheck', true, '自检中...');
   try {
@@ -1623,6 +1724,7 @@ async function runSystemSelfcheck() {
     renderSelfcheckStatus(data);
     renderSelfcheckAlarms(data.alarms || []);
     renderSelfcheckAiReport(data);
+    await loadSelfcheckReports({ recent: true }).catch(() => {});
     return data;
   } catch (e) {
     show('selfcheckAiReport', explainActionError(e, '系统自检', 'inspector / admin / super_admin'));
@@ -2190,10 +2292,24 @@ onClick('btnSubmitNfc', async () => {
 if ($('scStatusSystem')) {
   $('scStatusSystem').onchange = () => {
     state.selectedStatusSystemId = Number($('scStatusSystem').value || 0) || null;
-    runSystemSelfcheck();
+    show('selfcheckAiReport', '已切换系统，点击“开始 AI 自检”后生成新报告。');
+    loadSelfcheckReports({ recent: true }).catch(() => {});
   };
 }
 onClick('btnRunSelfcheck', runSystemSelfcheck);
+onClick('btnSaveSelfcheckTimer', () => {
+  const config = readSelfcheckTimerForm();
+  saveSelfcheckTimerConfig(config);
+  showToast(config.interval_minutes ? '定时 AI 自检配置已保存' : '定时 AI 自检已关闭');
+});
+onClick('btnSearchSelfcheckReports', () => loadSelfcheckReports({ recent: false }).catch((e) => {
+  const hint = $('selfcheckRecentHint');
+  if (hint) hint.textContent = explainActionError(e, '搜索自检报告', 'inspector / admin / super_admin');
+}));
+onClick('btnLoadRecentSelfcheckReports', () => loadSelfcheckReports({ recent: true }).catch((e) => {
+  const hint = $('selfcheckRecentHint');
+  if (hint) hint.textContent = explainActionError(e, '读取自检报告', 'inspector / admin / super_admin');
+}));
 
 $('selfcheckSystemPickerList')?.addEventListener('click', (event) => {
   const btn = event.target.closest('[data-selfcheck-system-id]');
@@ -2521,4 +2637,7 @@ closeDetailPages();
 switchTab('tab-workbench');
 setLoginState(state.token ? '正在恢复登录...' : '未登录');
 switchScreen(Boolean(state.token));
+state.aiSelfcheckTimer = loadSelfcheckTimerConfig();
+syncSelfcheckTimerUi();
+startSelfcheckTimerLoop();
 restoreSession();

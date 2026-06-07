@@ -95,6 +95,27 @@ Aegis 是一个运维助手系统，包含：
 
 ## 7. 最近更新记录（倒序）
 
+### 2026-06-07（移动端 AI 自检触发、报告文件与定时配置）
+- 移动端系统自检页不再在打开页面或切换系统时自动发起 AI 自检
+- 新增“开始 AI 自检”按钮，只有点击后才调用 `/api/v1/selfchecks/run`
+- 新增移动端定时 AI 自检配置：间隔、下次执行时间、本地保存，浏览器运行期间到点自动触发所选系统自检
+- AI 自检执行后后端保存 JSON 报告文件到 `backend/selfcheck_reports/`
+- 报告文件名使用系统编号/名称与 UTC 时间：`<system>_<YYYYmmddHHMMSS>.json`
+- 新增 `GET /api/v1/selfchecks/reports`，默认返回最近 6 小时报告，支持 `system_id/start_at/end_at` 查询
+- 报告查询按当前用户可见系统过滤；普通用户不能读取无权系统报告
+- 报告清理策略：运行/查询时清理超过 7 天的报告文件
+- 已跑通：`node --check frontend-mobile/app.js` 与 `python3 -m py_compile backend/app/api/selfchecks.py`（通过 `/tmp` 副本检查）
+- 未跑通：pytest 被当前沙箱 `bwrap: loopback: Failed RTM_NEWADDR` 拦截
+
+### 2026-06-07（管理端巡检点配置接续）
+- 接续资产与日常运维后台配置闭环
+- 管理端侧边栏新增“巡检点”入口，工作台“机房巡检配置与记录”跳转到巡检点配置页
+- 新增 `frontend-admin/js/inspection-points.js`，接入已有后端 `GET/POST/PUT/DELETE /api/v1/admin/inspection-points`
+- 巡检点页面支持关键词/启用状态筛选、列表、编辑、新增、停用
+- 巡检点表单支持绑定机房和系统，下拉数据来自管理端共享主数据接口
+- 已跑通：`node --check frontend-admin/js/inspection-points.js` 与 `node --check frontend-admin/app.js`（通过 `/tmp` 副本绕开隐藏路径检查限制）
+- 剩余：巡检记录审阅页、巡检点重新启用接口/按钮、机房/巡检点命名从旧 asset 模块进一步收敛
+
 
 ### 2026-06-03（系统配置与移动端日志路径）
 - 管理端“资产与日常运维”子菜单收敛为“系统 / 资产 / 用户”
