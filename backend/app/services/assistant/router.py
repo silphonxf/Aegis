@@ -32,6 +32,44 @@ _TASK_KEYWORDS = ["工具任务", "任务列表", "最近任务"]
 _LOCAL_COLLECT_KEYWORDS = ["采集本机状态", "采集状态", "本机状态"]
 _RESTART_KEYWORDS = ["重启"]
 _APPROVAL_KEYWORDS = ["审批", "发起", "申请"]
+_ALLOWED_TOOLS = {
+    "list_accessible_systems",
+    "get_system_status_overview",
+    "get_system_detail",
+    "get_abnormal_systems",
+    "get_monitoring_overview",
+    "list_inspection_records",
+    "list_selfcheck_records",
+    "run_system_selfcheck_report",
+    "analyze_ip_reputation",
+    "analyze_capture_content",
+    "analyze_system_error_logs",
+    "analyze_log_text",
+    "run_ping_check",
+    "run_port_check",
+    "read_recent_error_logs",
+    "list_tool_tasks",
+    "collect_local_status_snapshot",
+    "create_restart_approval",
+}
+
+_TOOL_ARGUMENT_ALLOWLIST = {
+    "list_accessible_systems": {"system_name", "limit"},
+    "get_system_status_overview": {"system_name", "system_id"},
+    "get_system_detail": {"system_name", "system_id"},
+    "list_inspection_records": {"system_name", "system_id"},
+    "list_selfcheck_records": {"system_name", "system_id"},
+    "run_system_selfcheck_report": {"system_name", "system_id", "range_minutes"},
+    "analyze_ip_reputation": {"ip"},
+    "analyze_capture_content": {"url", "severity", "note"},
+    "analyze_system_error_logs": {"source", "level", "quick_range"},
+    "analyze_log_text": {"text", "system_name", "system_id"},
+    "run_ping_check": {"host"},
+    "run_port_check": {"host", "port"},
+    "read_recent_error_logs": {"source", "level", "quick_range"},
+    "list_tool_tasks": {"status"},
+    "create_restart_approval": {"system_name", "system_id"},
+}
 
 
 def _extract_system_name(text: str) -> Optional[str]:
@@ -144,13 +182,17 @@ class AssistantRouter:
         return (
             '你是 Aegis 移动端助手的意图路由器。请根据用户输入判断：是否应该直接自然回复，还是调用某个特定功能工具。'
             '只返回 JSON，不要输出任何额外说明。JSON 格式必须为：'
-            '{"mode":"reply|tool","intent":"...","reply":"...","tool":"..."}。'
-            '可用 tool 只有：list_accessible_systems,get_system_status_overview,get_system_detail,get_abnormal_systems,list_inspection_records,list_selfcheck_records,run_system_selfcheck_report,analyze_ip_reputation,analyze_capture_content,analyze_system_error_logs,analyze_log_text,create_restart_approval。'
+            '{"mode":"reply|tool","intent":"...","reply":"...","tool":"...","arguments":{...}}。'
+            '可用 tool 只有：list_accessible_systems,get_system_status_overview,get_system_detail,get_abnormal_systems,get_monitoring_overview,'
+            'list_inspection_records,list_selfcheck_records,run_system_selfcheck_report,analyze_ip_reputation,analyze_capture_content,'
+            'analyze_system_error_logs,analyze_log_text,run_ping_check,run_port_check,read_recent_error_logs,list_tool_tasks,collect_local_status_snapshot,create_restart_approval。'
             '规则：1) 普通寒暄/闲聊/追问优先 mode=reply，reply 要自然，不能模板化；'
-            '2) 用户明确在查系统列表、状态、详情、巡检、自检、IP恶意研判、抓包分析、日志分析、重启审批时，用 mode=tool；'
+            '2) 用户明确在查系统列表、状态、详情、巡检、自检、IP恶意研判、抓包分析、日志分析、Ping、端口、工具任务、重启审批时，用 mode=tool；'
             '3) 对于“我现在有哪几个系统/接入了哪些系统”这类问题，优先使用 list_accessible_systems；'
-            '4) 不要臆造系统名、记录、状态结果，也不要返回 arguments；参数由后端自行决定。'
-            '5) 没有对应能力时应选择 mode=reply 并明确说明当前未接入该能力。\n\n'
+            '4) 如果用户给出参数，请放入 arguments：system_name、system_id、url、ip、host、port、level、quick_range、text、note。'
+            '5) 抓包/URL 分析必须把 URL 从自然语言里拆出来，用户写成 http//example.com 时按 http://example.com 理解；不要把“这个地址/帮我/抓包”等说明文字放进 url。'
+            '6) 不要臆造系统名、记录、状态结果；没有提到的参数不要编造。'
+            '7) 没有对应能力时应选择 mode=reply 并明确说明当前未接入该能力。\n\n'
             f'用户输入：{text}'
         )
 
@@ -175,9 +217,13 @@ class AssistantRouter:
         intent = str(payload.get('intent') or 'general_chat').strip() or 'general_chat'
         if mode == 'tool':
             tool = str(payload.get('tool') or '').strip()
-            if not tool:
+            if not tool or tool not in _ALLOWED_TOOLS:
                 return None
-            return RouteResult(intent=intent, tool=tool, arguments={})
+            arguments = payload.get('arguments') if isinstance(payload.get('arguments'), dict) else {}
+            allowed_args = _TOOL_ARGUMENT_ALLOWLIST.get(tool)
+            if allowed_args is not None:
+                arguments = {k: v for k, v in arguments.items() if k in allowed_args and v not in (None, "")}
+            return RouteResult(intent=intent, tool=tool, arguments=arguments)
 
         reply = str(payload.get('reply') or '').strip()
         if reply:

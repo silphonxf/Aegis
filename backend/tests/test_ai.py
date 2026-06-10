@@ -79,6 +79,42 @@ def test_assistant_capture_url_extraction_trims_chinese_suffix():
     from app.services.assistant.executor import _extract_url_from_message
 
     assert _extract_url_from_message("帮我抓包分析一下http://baidu.com这个地址") == "http://baidu.com"
+    assert _extract_url_from_message("抓包一下http//baidu.com") == "http://baidu.com"
+    assert _extract_url_from_message("帮我分析 baidu.com 这个地址") == "https://baidu.com"
+
+
+def test_assistant_tool_arguments_use_ai_extracted_arguments():
+    from app.services.assistant.executor import AssistantExecutor
+
+    executor = AssistantExecutor()
+
+    capture_args = executor._build_tool_arguments(
+        "analyze_capture_content",
+        "抓包一下这个地址",
+        {},
+        [],
+        {"url": "http//baidu.com", "note": "用户要求抓包"},
+    )
+    assert capture_args["url"] == "http://baidu.com"
+    assert capture_args["note"] == "用户要求抓包"
+
+    ping_args = executor._build_tool_arguments(
+        "run_ping_check",
+        "测一下连通性",
+        {},
+        [],
+        {"host": "baidu.com"},
+    )
+    assert ping_args == {"host": "baidu.com"}
+
+    port_args = executor._build_tool_arguments(
+        "run_port_check",
+        "测一下端口",
+        {},
+        [],
+        {"host": "baidu.com", "port": "443"},
+    )
+    assert port_args == {"host": "baidu.com", "port": 443}
 
 
 def test_external_assistant_chat_uses_admin_generated_apikey(client, admin_headers):

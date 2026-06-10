@@ -21,17 +21,37 @@ def _extract_url_from_message(message: str) -> str | None:
     import re
     from urllib.parse import urlparse
 
-    match = re.search(r'(https?://[^\s]+)', message, flags=re.I)
+    text = (message or "").strip()
+    if not text:
+        return None
+
+    patterns = [
+        r'https?\s*:?//[^\s，。；;、,]+',
+        r'(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?::\d{2,5})?(?:/[^\s，。；;、,]*)?',
+    ]
+    match = None
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.I)
+        if match:
+            break
     if not match:
         return None
-    candidate = match.group(1).strip('，。；;、,')
+
+    candidate = match.group(0).strip('，。；;、,')
+    candidate = re.sub(r'^(https?)\s*:?//', r'\1://', candidate, flags=re.I)
+    if candidate.lower().startswith("http//"):
+        candidate = "http://" + candidate[6:]
+    elif candidate.lower().startswith("https//"):
+        candidate = "https://" + candidate[7:]
+    elif not re.match(r'^https?://', candidate, flags=re.I):
+        candidate = "https://" + candidate
+
     parsed = urlparse(candidate)
     netloc = parsed.netloc
     if netloc and re.search(r'[\u4e00-\u9fff]', netloc):
         trimmed_netloc = re.split(r'[\u4e00-\u9fff]', netloc, maxsplit=1)[0]
         if "." in trimmed_netloc:
-            remainder = candidate[match.start(1) + len(parsed.scheme) + 3 + len(netloc) - match.start(1):]
-            candidate = f"{parsed.scheme}://{trimmed_netloc}{remainder}"
+            candidate = f"{parsed.scheme}://{trimmed_netloc}"
     return candidate
 
 
@@ -39,12 +59,23 @@ class AssistantExecutor:
     def __init__(self) -> None:
         self.router = AssistantRouter()
 
-    def _build_tool_arguments(self, tool: str | None, message: str, ctx: dict, attachments: list[dict]) -> dict:
+    def _build_tool_arguments(self, tool: str | None, message: str, ctx: dict, attachments: list[dict], route_arguments: dict | None = None) -> dict:
         if not tool:
             return {}
-        base = entity_resolver.resolve(message, ctx, {})
+        route_args = dict(route_arguments or {})
+        system_aware_tools = {
+            "list_accessible_systems",
+            "run_system_selfcheck_report",
+            "get_system_status_overview",
+            "get_system_detail",
+            "list_inspection_records",
+            "list_selfcheck_records",
+            "create_restart_approval",
+            "analyze_log_text",
+        }
+        base = entity_resolver.resolve(message, ctx, route_args) if tool in system_aware_tools else route_args
         if tool == "list_accessible_systems":
-            extracted_system_name = extract_system_name(message)
+            extracted_system_name = base.get("system_name") or extract_system_name(message)
             return {"system_name": extracted_system_name} if extracted_system_name else {}
         if tool == "run_system_selfcheck_report":
             args = {}
@@ -53,6 +84,8 @@ class AssistantExecutor:
                 args["system_name"] = system_name
             elif base.get("system_id"):
                 args["system_id"] = base["system_id"]
+            if base.get("range_minutes"):
+                args["range_minutes"] = base["range_minutes"]
             return args
         if tool in {"get_system_status_overview", "get_system_detail", "list_inspection_records", "list_selfcheck_records", "create_restart_approval"}:
             args = {}
@@ -62,36 +95,53 @@ class AssistantExecutor:
             if base.get("system_id"):
                 args["system_id"] = base["system_id"]
             return args
-        if tool in {"get_abnormal_systems", "get_monitoring_overview", "collect_local_status_snapshot", "read_recent_error_logs", "list_tool_tasks", "analyze_system_error_logs"}:
+        if tool in {"get_abnormal_systems", "get_monitoring_overview", "collect_local_status_snapshot"}:
             return {}
+        if tool in {"read_recent_error_logs", "analyze_system_error_logs"}:
+            return {k: base[k] for k in ("source", "level", "quick_range") if base.get(k)}
+        if tool == "list_tool_tasks":
+            return {"status": base["status"]} if base.get("status") else {}
         if tool == "run_ping_check":
             args = {}
-            lower = message.lower()
-            host_match = None
             import re
             host_match = re.search(r'((?:\d{1,3}\.){3}\d{1,3}|[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|localhost)', message)
+            if base.get("host"):
+                args["host"] = str(base["host"])
             if host_match:
-                args["host"] = host_match.group(1)
+                args.setdefault("host", host_match.group(1))
             return args
         if tool == "analyze_capture_content":
             args = {}
-            url = _extract_url_from_message(message)
+            url_candidate = str(base.get("url") or "").strip()
+            url = _extract_url_from_message(url_candidate) if url_candidate else _extract_url_from_message(message)
             if url:
                 args["url"] = url
+            if base.get("severity"):
+                args["severity"] = str(base["severity"])
+            if base.get("note"):
+                args["note"] = str(base["note"])
             return args
         if tool == "analyze_ip_reputation":
             import re
-            ips = re.findall(r'(?:\d{1,3}\.){3}\d{1,3}', message)
+            explicit_ip = str(base.get("ip") or "").strip()
+            ips = re.findall(r'(?:\d{1,3}\.){3}\d{1,3}', explicit_ip or message)
             return {"ip": ','.join(ips)} if ips else {}
         if tool == "run_port_check":
             args = {}
             import re
             host_match = re.search(r'((?:\d{1,3}\.){3}\d{1,3}|[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|localhost)', message)
             port_match = re.search(r'(?:端口|port)\s*[:：]?\s*(\d{2,5})', lower if 'lower' in locals() else message.lower())
+            if base.get("host"):
+                args["host"] = str(base["host"])
+            if base.get("port"):
+                try:
+                    args["port"] = int(base["port"])
+                except (TypeError, ValueError):
+                    pass
             if host_match:
-                args["host"] = host_match.group(1)
+                args.setdefault("host", host_match.group(1))
             if port_match:
-                args["port"] = int(port_match.group(1))
+                args.setdefault("port", int(port_match.group(1)))
             return args
         if tool == "analyze_log_text":
             attachment_text = "\n\n".join(
@@ -99,7 +149,8 @@ class AssistantExecutor:
                 for item in attachments
                 if isinstance(item, dict) and (item.get("extracted_text") or "").strip()
             ).strip()
-            args = {"text": "\n\n".join(part for part in [message, attachment_text] if part).strip()}
+            explicit_text = str(base.get("text") or "").strip()
+            args = {"text": "\n\n".join(part for part in [explicit_text or message, attachment_text] if part).strip()}
             if base.get("system_name"):
                 args["system_name"] = base["system_name"]
             if base.get("system_id"):
@@ -111,7 +162,7 @@ class AssistantExecutor:
         conv_id, ctx = context_manager.ensure(conversation_id)
         history = list(ctx.get("messages") or [])
         route = self.router.route(message, history=history, attachments=attachments or [])
-        route.arguments = self._build_tool_arguments(route.tool, message, ctx, attachments or [])
+        route.arguments = self._build_tool_arguments(route.tool, message, ctx, attachments or [], route.arguments)
         logger.info("assistant_route_resolved: message=%s tool=%s intent=%s arguments=%s", message, route.tool, route.intent, route.arguments)
         ctx["messages"].append({"role": "user", "content": message})
 
