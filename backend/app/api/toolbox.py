@@ -139,6 +139,9 @@ def _resolve_time_range(quick_range: Optional[str], start_at: Optional[str], end
             raise HTTPException(status_code=400, detail={"code": "TIME_RANGE_INVALID", "message": "开始时间不能晚于结束时间"})
         return start_dt, end_dt, "calendar"
 
+    if (quick_range or "").strip() == "all":
+        return None, None, "all_file"
+
     mapping = {"1h": 1, "3h": 3, "6h": 6}
     hours = mapping.get((quick_range or "1h").strip(), 1)
     end_dt = datetime.now()
@@ -398,7 +401,9 @@ def read_error_logs(
         level=level,
         lines=lines,
     )
-    if payload.file_name and not payload.start_at and not payload.end_at:
+    if (payload.quick_range or "").strip() == "all":
+        start_dt, end_dt, range_mode = _resolve_time_range(payload.quick_range, payload.start_at, payload.end_at)
+    elif payload.file_name and not payload.start_at and not payload.end_at:
         start_dt, end_dt, range_mode = None, None, "selected_file"
     else:
         start_dt, end_dt, range_mode = _resolve_time_range(payload.quick_range, payload.start_at, payload.end_at)

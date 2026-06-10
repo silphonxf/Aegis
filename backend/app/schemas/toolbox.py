@@ -27,8 +27,8 @@ class TaskStatusUpdateRequest(BaseModel):
 class ErrorLogSourceRequest(BaseModel):
     source: str = Field(default="aegis", pattern="^(aegis|system)$")
     file_name: Optional[str] = Field(default=None, max_length=512)
-    quick_range: Optional[str] = Field(default="1h", pattern="^(1h|3h|6h)?$")
+    quick_range: Optional[str] = Field(default="1h", pattern="^(1h|3h|6h|all)?$")
     start_at: Optional[str] = Field(default=None, max_length=32)
     end_at: Optional[str] = Field(default=None, max_length=32)
     level: str = Field(default="warning", pattern="^(info|warning|error)$")
-    lines: int = Field(default=5000, ge=1, le=5000)
+    lines: int = Field(default=5000, ge=1, le=20000)

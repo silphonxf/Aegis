@@ -2356,7 +2356,7 @@ function updateTimeSummary() {
     if (trigger) trigger.textContent = text;
     return;
   }
-  const labels = { '1h': '最近 1 小时', '3h': '最近 3 小时', '6h': '最近 6 小时' };
+  const labels = { '1h': '最近 1 小时', '3h': '最近 3 小时', '6h': '最近 6 小时', all: '全量日志文件' };
   const text = labels[state.selectedQuickRange || '1h'] || '最近 1 小时';
   summary.textContent = text;
   if (trigger) trigger.textContent = text;
@@ -2364,6 +2364,12 @@ function updateTimeSummary() {
 
 function syncQuickRangeInputs(rangeValue) {
   state.isCustomLogTimeRange = false;
+  if (rangeValue === 'all') {
+    if ($('errorStartAt')) $('errorStartAt').value = '';
+    if ($('errorEndAt')) $('errorEndAt').value = '';
+    updateTimeSummary();
+    return;
+  }
   const mapping = { '1h': 1, '3h': 3, '6h': 6 };
   const hours = mapping[rangeValue] || 1;
   const end = new Date();
@@ -2467,15 +2473,15 @@ onClick('btnLoadErrors', async () => {
       file_name: fileName,
       quick_range: quickRange,
       level,
-      lines: '5000',
+      lines: quickRange === 'all' ? '20000' : '5000',
     });
-    if (state.isCustomLogTimeRange && startAt && endAt) {
+    if (quickRange !== 'all' && state.isCustomLogTimeRange && startAt && endAt) {
       query.set('start_at', startAt.replace('T', ' '));
       query.set('end_at', endAt.replace('T', ' '));
     }
     const data = await api(`/api/v1/toolbox/error-logs?${query.toString()}`, { headers: authHeaders() });
     const prefix = configuredPath ? `管理端配置日志地址：${configuredPath}\n\n` : '';
-    state.extractedErrors = String(data.content || '').split('\n').filter(Boolean).slice(0, 5000).map((line) => ({ line }));
+    state.extractedErrors = String(data.content || '').split('\n').filter(Boolean).slice(0, quickRange === 'all' ? 20000 : 5000).map((line) => ({ line }));
     show('errorLogsView', prefix + (data.content || '未读取到日志内容。'));
     show('errorAiView', '');
     switchResultTab('logs');
@@ -2494,7 +2500,7 @@ onClick('btnAnalyzeErrors', async () => {
   show('errorAiView', '正在分析当前错误日志，请稍候...');
   try {
     const detail = state.extractedErrors.length
-      ? state.extractedErrors.map((e) => e.line || `${e.at} ${e.method || ''} ${e.url || ''} status=${e.status || 0} err=${e.network_error || ''}`).join('\n').slice(0, 1800)
+      ? state.extractedErrors.map((e) => e.line || `${e.at} ${e.method || ''} ${e.url || ''} status=${e.status || 0} err=${e.network_error || ''}`).join('\n').slice(0, 20000)
       : '暂无系统日志，建议先执行“提取日志”。';
     const payload = { title: '系统日志分析', detail, severity: $('errorLogLevel').value === 'error' ? 'high' : $('errorLogLevel').value === 'warning' ? 'medium' : 'low' };
     const result = await api('/api/v1/ai/diagnose', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });

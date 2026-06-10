@@ -175,6 +175,40 @@ def test_toolbox_error_logs_reads_configured_system_log_path(client, admin_heade
     assert str(log_file) in body["source_detail"]
 
 
+def test_toolbox_error_logs_all_range_reads_whole_selected_file_window(client, admin_headers, tmp_path):
+    log_file = tmp_path / "full-range-system.log"
+    log_file.write_text(
+        "2026-01-01 00:00:00 ERROR app first historical failure\n"
+        "2026-06-04 12:00:00 INFO app normal\n"
+        "2026-12-31 23:59:59 ERROR app future scheduled failure\n",
+        encoding="utf-8",
+    )
+    created = client.post(
+        "/api/v1/admin/systems",
+        headers=admin_headers,
+        json={
+            "system_code": "SYS-LOG-FULL-RANGE-001",
+            "name": "全量日志系统",
+            "host_address": "127.0.0.1",
+            "env": "prod",
+            "log_configs": [{"log_name": "full-range", "absolute_path": str(log_file), "log_level": "error"}],
+        },
+    )
+    assert created.status_code == 200, created.text
+
+    resp = client.get(
+        "/api/v1/toolbox/error-logs",
+        headers=admin_headers,
+        params={"source": "system", "file_name": str(log_file), "quick_range": "all", "level": "error", "lines": 10000},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["quick_range"] == "all"
+    assert body["range_mode"] == "all_file"
+    assert "first historical failure" in body["content"]
+    assert "future scheduled failure" in body["content"]
+
+
 def test_toolbox_error_logs_error_level_includes_http_exception_warning(client, admin_headers, tmp_path):
     log_file = tmp_path / "http-exception-system.log"
     log_file.write_text(
