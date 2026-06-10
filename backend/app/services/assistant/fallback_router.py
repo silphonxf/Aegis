@@ -28,22 +28,25 @@ class AssistantFallbackRouter:
         if any(keyword in text for keyword in {"你能做什么", "你会什么", "帮助", "help", "能力", "怎么用"}):
             return RouteResult(
                 intent="general_chat",
-                reply="我可以帮你查系统状态、巡检记录、自检记录、分析日志，也可以发起重启审批。你可以直接说，例如：帮我看示例业务系统状态。",
+                reply="我可以直接处理移动端里的常用运维能力：巡检、自检、系统状态、日志分析、抓包分析、IP 风险研判、Ping/端口检测、工具任务和应急审批。你直接说要查什么或把日志/附件发给我即可。",
                 cards=[
                     {
                         "type": "assistant_capabilities",
-                        "title": "当前可用能力",
+                        "title": "移动端 AI 能力",
                         "items": [
-                            {"label": "系统状态", "value": "查询异常系统、单个系统状态"},
-                            {"label": "巡检/自检", "value": "查看最近记录与结果"},
-                            {"label": "日志分析", "value": "分析报错文本并给出建议"},
-                            {"label": "重启审批", "value": "高风险动作，需确认后发起"},
+                            {"label": "巡检", "value": "查最近巡检记录"},
+                            {"label": "自检", "value": "查自检记录、生成 AI 自检报告"},
+                            {"label": "系统状态", "value": "查系统列表、状态总览、异常系统和详情"},
+                            {"label": "日志/附件", "value": "分析报错文本、系统错误日志和上传文件"},
+                            {"label": "网络排障", "value": "抓包分析、IP 风险研判、Ping、端口检测"},
+                            {"label": "应急与任务", "value": "发起重启审批、查看工具任务"},
                         ],
                     }
                 ],
                 actions=[
                     {"type": "quick_prompt", "label": "查异常系统", "payload": {"message": "帮我查今天有哪些异常系统"}},
                     {"type": "quick_prompt", "label": "查巡检记录", "payload": {"message": "看看示例业务系统最近巡检记录"}},
+                    {"type": "quick_prompt", "label": "分析 IP", "payload": {"message": "10.11.123.4 是恶意 IP 吗"}},
                 ],
             )
 
@@ -79,7 +82,7 @@ class AssistantFallbackRouter:
         if text:
             return RouteResult(
                 intent="general_chat",
-                reply="我会优先帮你查真实已接入的数据；如果当前还没接入对应能力，我也会直接告诉你。你可以继续问我系统状态、系统列表、巡检、自检、日志分析或重启审批。",
+                reply="我会优先调用已接入的移动端能力。你可以继续问系统状态、巡检、自检、日志/附件分析、抓包、IP 风险、Ping、端口、工具任务或应急审批。",
                 actions=[
                     {"type": "quick_prompt", "label": "看已接入系统", "payload": {"message": "我现在有哪几个系统"}},
                     {"type": "quick_prompt", "label": "看系统状态", "payload": {"message": "帮我看示例业务系统状态"}},

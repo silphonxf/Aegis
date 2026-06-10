@@ -61,11 +61,16 @@ class AssistantRouter:
         ai_result = self._route_via_ai(text, history=history or [], attachments=attachments or [])
         if ai_result:
             return ai_result
-        return self._route_by_rules(text)
+        return self._route_by_rules(text, attachments=attachments or [])
 
-    def _route_by_rules(self, text: str) -> RouteResult:
+    def _route_by_rules(self, text: str, attachments: Optional[list[dict]] = None) -> RouteResult:
         system_name = _extract_system_name(text)
         base_args = {"system_name": system_name} if system_name else {}
+        has_text_attachment = any((item.get("extracted_text") or "").strip() for item in attachments or [] if isinstance(item, dict))
+        wants_attachment_analysis = has_text_attachment and (
+            not text
+            or any(keyword in text for keyword in ["附件", "文件", "分析", "判断", "看看", "排查", "原因"])
+        )
 
         if _contains_any(text, _SYSTEM_LIST_KEYWORDS):
             return RouteResult(intent="query_system_list", tool="list_accessible_systems", arguments=base_args)
@@ -89,6 +94,8 @@ class AssistantRouter:
             return RouteResult(intent="analyze_system_error_logs", tool="analyze_system_error_logs", arguments={})
         if _contains_any(text.lower(), _CAPTURE_ANALYZE_KEYWORDS):
             return RouteResult(intent="analyze_capture_content", tool="analyze_capture_content", arguments={})
+        if wants_attachment_analysis:
+            return RouteResult(intent="analyze_log_text", tool="analyze_log_text", arguments={})
         lowered = text.lower()
         has_ip_literal = bool(re.search(r'(?:\d{1,3}\.){3}\d{1,3}', text))
         if _contains_any(lowered, _IP_REPUTATION_KEYWORDS) or (has_ip_literal and any(keyword in lowered for keyword in ['恶意ip', 'ip', '威胁情报', '信誉'])):

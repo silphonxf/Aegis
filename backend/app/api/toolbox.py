@@ -9,7 +9,7 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse, urlunparse
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -44,7 +44,27 @@ def _normalize_capture_url(raw: str) -> str:
     parsed = urlparse(value)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise HTTPException(status_code=400, detail={"code": "CAPTURE_URL_INVALID", "message": "URL 格式不正确"})
-    return value
+    hostname = parsed.hostname or ""
+    try:
+        ascii_host = hostname.encode("idna").decode("ascii")
+    except UnicodeError:
+        raise HTTPException(status_code=400, detail={"code": "CAPTURE_URL_INVALID", "message": "URL 域名格式不正确"})
+    if ":" in ascii_host and not ascii_host.startswith("["):
+        ascii_host = f"[{ascii_host}]"
+    try:
+        port = parsed.port
+    except ValueError:
+        raise HTTPException(status_code=400, detail={"code": "CAPTURE_URL_INVALID", "message": "URL 端口格式不正确"})
+    userinfo = ""
+    if parsed.username:
+        userinfo = quote(parsed.username, safe="")
+        if parsed.password:
+            userinfo += f":{quote(parsed.password, safe='')}"
+        userinfo += "@"
+    netloc = f"{userinfo}{ascii_host}{f':{port}' if port else ''}"
+    path = quote(parsed.path or "/", safe="/%:@!$&'()*+,;=")
+    query = quote(parsed.query, safe="=&?/%:@!$'()*+,;[]")
+    return urlunparse((parsed.scheme, netloc, path, "", query, ""))
 
 
 def _fetch_url_capture(url: str) -> Dict[str, Any]:
@@ -129,10 +149,10 @@ def _resolve_time_range(quick_range: Optional[str], start_at: Optional[str], end
 def _level_keyword_pattern(level: str) -> str:
     level = (level or "warning").lower()
     if level == "info":
-        return r"INFO|WARNING|ERROR|CRITICAL|Exception|Traceback|\[req:"
+        return r"(^|\s)INFO(\s|$)|(^|\s)WARNING(\s|$)|(^|\s)ERROR(\s|$)|(^|\s)CRITICAL(\s|$)|Exception|Traceback|\[req:"
     if level == "error":
-        return r"ERROR|CRITICAL|Exception|Traceback"
-    return r"WARNING|ERROR|CRITICAL|Exception|Traceback"
+        return r"(^|\s)ERROR(\s|$)|(^|\s)CRITICAL(\s|$)|Exception|Traceback|HTTP 异常|status=[45]\d\d|HTTP [45]\d\d|抓取失败"
+    return r"(^|\s)WARNING(\s|$)|(^|\s)ERROR(\s|$)|(^|\s)CRITICAL(\s|$)|Exception|Traceback"
 
 
 def _matches_time_range(line: str, start_dt: Optional[datetime], end_dt: Optional[datetime]) -> bool:

@@ -12,7 +12,6 @@ const AI_CHAT_HISTORY_KEY = 'aegis_ai_chat_history';
 const AI_CHAT_CONVERSATION_KEY = 'aegis_ai_chat_conversation';
 const AI_CHAT_SIDEBAR_COLLAPSED_KEY = 'aegis_ai_chat_sidebar_collapsed';
 const ACTIVE_TAB_KEY = 'aegis_mobile_active_tab';
-const API_BASE_KEY = 'aegis_mobile_api_base';
 const AUTH_TOKEN_KEY = 'aegis_mobile_token';
 const AI_SELFCHECK_TIMER_KEY = 'aegis_mobile_ai_selfcheck_timer';
 const AI_MAX_ATTACHMENTS = 4;
@@ -66,6 +65,7 @@ const state = {
   token: loadStoredToken(),
   requestLogs: JSON.parse(localStorage.getItem('aegis_request_logs') || '[]'),
   selectedQuickRange: '1h',
+  isCustomLogTimeRange: false,
   metricSeries: { cpu: [], mem: [], disk: [] },
   chartTimer: null,
   extractedErrors: [],
@@ -124,23 +124,13 @@ function clearStoredToken() {
 }
 
 function getDefaultBase() {
+  const protocol = window.location.protocol === 'http:' ? 'http:' : 'https:';
   const host = window.location.hostname || '127.0.0.1';
-  return `https://${host}:8000`;
+  return `${protocol}//${host}:8000`;
 }
 
 function getBase() {
-  const configured = ($('apiBase')?.value || localStorage.getItem(API_BASE_KEY) || '').trim();
-  if (configured) return configured;
   return getDefaultBase();
-}
-
-function saveApiBase() {
-  const value = ($('apiBase')?.value || '').trim();
-  if (!value) {
-    localStorage.removeItem(API_BASE_KEY);
-    return;
-  }
-  localStorage.setItem(API_BASE_KEY, value);
 }
 
 function authHeaders() {
@@ -223,20 +213,6 @@ function formatAiReply(result) {
   return result.reply || result.summary || 'AI 暂未返回有效内容。';
 }
 function setLoginState(text) { $('loginState').textContent = text; }
-
-function initApiBaseInput() {
-  const input = $('apiBase');
-  if (!input) return;
-  const stored = (localStorage.getItem(API_BASE_KEY) || '').trim();
-  const currentDefault = getDefaultBase();
-  const shouldResetTailnet = stored && /100\./.test(stored) && /192\.168\./.test(currentDefault);
-  input.value = shouldResetTailnet ? currentDefault : (stored || currentDefault);
-  if (shouldResetTailnet) {
-    localStorage.setItem(API_BASE_KEY, currentDefault);
-  }
-  input.addEventListener('change', saveApiBase);
-  input.addEventListener('blur', saveApiBase);
-}
 
 function escapeHtml(value) {
   return String(value || '')
@@ -933,8 +909,8 @@ async function sendAiQuestion(reusePayload = null) {
       attachmentsSource,
       uploadedFiles,
     };
-    $('aiQaResult').textContent = 'AI 回复中，请稍等...';
-    const result = await api('/api/v1/ai/chat/v2', {
+    $('aiQaResult').textContent = 'AI 助手正在调用移动端能力，请稍等...';
+    const result = await api('/api/v1/assistant/chat', {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(payload),
@@ -954,7 +930,7 @@ async function sendAiQuestion(reusePayload = null) {
       data: result.data || {},
     });
     renderAiMessages();
-    $('aiQaResult').textContent = 'AI 已返回结果。';
+    $('aiQaResult').textContent = 'AI 助手已返回结果。';
     state.aiAttachments.forEach((item) => item.previewUrl && URL.revokeObjectURL(item.previewUrl));
     state.aiAttachments = [];
     renderAiAttachmentList();
@@ -2084,7 +2060,6 @@ async function startNfcScanner() {
 // auth
 onClick('btnPing', async () => {
   try {
-    saveApiBase();
     const d = await api('/healthz');
     alert(`后端可用：${d.status || 'ok'}\n当前地址：${getBase()}`);
   }
@@ -2093,7 +2068,6 @@ onClick('btnPing', async () => {
 
 onClick('btnLogin', async () => {
   try {
-    saveApiBase();
     const data = await api('/api/v1/auth/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: $('username').value.trim(), password: $('password').value }),
@@ -2376,7 +2350,7 @@ function updateTimeSummary() {
   const summary = $('errorTimeSummary');
   const trigger = $('btnOpenTimeFilter');
   if (!summary) return;
-  if (start && end) {
+  if (state.isCustomLogTimeRange && start && end) {
     const text = `${start.replace('T', ' ')} 至 ${end.replace('T', ' ')}`;
     summary.textContent = text;
     if (trigger) trigger.textContent = text;
@@ -2389,6 +2363,7 @@ function updateTimeSummary() {
 }
 
 function syncQuickRangeInputs(rangeValue) {
+  state.isCustomLogTimeRange = false;
   const mapping = { '1h': 1, '3h': 3, '6h': 6 };
   const hours = mapping[rangeValue] || 1;
   const end = new Date();
@@ -2423,10 +2398,12 @@ onClick('btnApplyTimeFilter', () => {
 
 if ($('errorStartAt') && $('errorEndAt')) {
   $('errorStartAt').addEventListener('change', () => {
+    state.isCustomLogTimeRange = true;
     document.querySelectorAll('.quick-range-btn').forEach((item) => item.classList.remove('active'));
     updateTimeSummary();
   });
   $('errorEndAt').addEventListener('change', () => {
+    state.isCustomLogTimeRange = true;
     document.querySelectorAll('.quick-range-btn').forEach((item) => item.classList.remove('active'));
     updateTimeSummary();
   });
@@ -2492,7 +2469,7 @@ onClick('btnLoadErrors', async () => {
       level,
       lines: '5000',
     });
-    if (startAt && endAt) {
+    if (state.isCustomLogTimeRange && startAt && endAt) {
       query.set('start_at', startAt.replace('T', ' '));
       query.set('end_at', endAt.replace('T', ' '));
     }
@@ -2616,7 +2593,6 @@ bindCaptureToolActions();
 renderAiMessages();
 renderAiAttachmentList();
 applyAiSidebarState();
-initApiBaseInput();
 applyProfileUI();
 closeDetailPages();
 switchTab('tab-workbench');

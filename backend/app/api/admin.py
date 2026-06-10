@@ -44,6 +44,10 @@ from app.schemas.emergency_config import (
     EmergencySshHostSaveRequest,
 )
 from app.services.emergency_config import (
+    delete_db_action,
+    delete_process_action,
+    delete_server_action,
+    delete_ssh_host,
     import_emergency_json_to_db,
     list_public_config,
     upsert_db_action,
@@ -1173,6 +1177,17 @@ def save_emergency_ssh_host(
     return item
 
 
+@router.delete("/emergency-config/ssh-hosts/{host_code}")
+def delete_emergency_ssh_host(
+    host_code: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+):
+    result = delete_ssh_host(host_code, db=db)
+    log_action(db, "delete_emergency_ssh_host", "emergency_config", current_user, {"host_code": host_code})
+    return result
+
+
 @router.post("/emergency-config/server-actions")
 def save_emergency_server_action(
     payload: EmergencyServerActionSaveRequest,
@@ -1182,6 +1197,17 @@ def save_emergency_server_action(
     item = upsert_server_action(payload, db=db)
     log_action(db, "save_emergency_server_action", "emergency_config", current_user, {"action_code": payload.action_code})
     return item
+
+
+@router.delete("/emergency-config/server-actions/{action_code}")
+def delete_emergency_server_action(
+    action_code: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+):
+    result = delete_server_action(action_code, db=db)
+    log_action(db, "delete_emergency_server_action", "emergency_config", current_user, {"action_code": action_code})
+    return result
 
 
 @router.post("/emergency-config/database-actions")
@@ -1195,6 +1221,17 @@ def save_emergency_db_action(
     return item
 
 
+@router.delete("/emergency-config/database-actions/{action_code}")
+def delete_emergency_db_action(
+    action_code: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+):
+    result = delete_db_action(action_code, db=db)
+    log_action(db, "delete_emergency_db_action", "emergency_config", current_user, {"action_code": action_code})
+    return result
+
+
 @router.post("/emergency-config/process-actions")
 def save_emergency_process_action(
     payload: EmergencyProcessActionSaveRequest,
@@ -1204,6 +1241,17 @@ def save_emergency_process_action(
     item = upsert_process_action(payload, db=db)
     log_action(db, "save_emergency_process_action", "emergency_config", current_user, {"action_code": payload.action_code})
     return item
+
+
+@router.delete("/emergency-config/process-actions/{action_code}")
+def delete_emergency_process_action(
+    action_code: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+):
+    result = delete_process_action(action_code, db=db)
+    log_action(db, "delete_emergency_process_action", "emergency_config", current_user, {"action_code": action_code})
+    return result
 
 
 @router.post("/emergency-config/import-json")

@@ -445,19 +445,30 @@
               <h2>SSH 主机配置</h2>
             </div>
             <div class="action-row compact">
-              <button id="btnEmergencySshMockSave">保存</button>
+              <button id="btnEmergencySshAdd">新增</button>
               <button id="btnEmergencySshMockList" class="toolbar-btn secondary">刷新</button>
             </div>
           </div>
-          <div class="grid4 emergency-admin-grid">
-            <input id="emgSshHostCode" placeholder="主机编码" />
-            <input id="emgSshHostName" placeholder="主机名" />
-            <input id="emgSshHostIp" placeholder="IP 地址" />
-            <input id="emgSshPort" placeholder="SSH 端口，默认 22" value="22" />
-            <input id="emgSshUser" placeholder="登录用户名" />
-            <input id="emgSshSecret" type="password" placeholder="密码（仅首次或重置时输入）" autocomplete="new-password" />
-            <select id="emgSshSystemId"></select>
-            <input id="emgSshRemark" placeholder="备注（可选）" />
+          <div class="search-toolbar">
+            <input id="emgSshKeyword" class="search-input" placeholder="搜索主机编码、主机名、IP 或用户名" />
+            <button id="btnEmergencySshSearch" class="toolbar-btn secondary">搜索</button>
+            <button id="btnEmergencySshClear" class="toolbar-btn ghost">清空</button>
+          </div>
+          <div id="emgSshForm" class="form-section emergency-edit-panel" hidden>
+            <div class="grid4 emergency-admin-grid">
+              <input id="emgSshHostCode" placeholder="主机编码" />
+              <input id="emgSshHostName" placeholder="主机名" />
+              <input id="emgSshHostIp" placeholder="IP 地址" />
+              <input id="emgSshPort" placeholder="SSH 端口，默认 22" value="22" />
+              <input id="emgSshUser" placeholder="登录用户名" />
+              <input id="emgSshSecret" type="password" placeholder="密码（仅首次或重置时输入）" autocomplete="new-password" />
+              <select id="emgSshSystemId"></select>
+              <input id="emgSshRemark" placeholder="备注（可选）" />
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencySshMockSave">保存</button>
+              <button id="btnEmergencySshCancel" class="toolbar-btn secondary" type="button">取消</button>
+            </div>
           </div>
           <div class="table-wrap">
             <table>
@@ -476,19 +487,30 @@
               <h2>服务器动作配置</h2>
             </div>
             <div class="action-row compact">
-              <button id="btnEmergencyServerMockSave">保存</button>
+              <button id="btnEmergencyServerAdd">新增</button>
               <button id="btnEmergencyServerMockList" class="toolbar-btn secondary">刷新</button>
             </div>
           </div>
-          <div class="grid4 emergency-admin-grid">
-            <input id="emgServerActionCode" placeholder="动作编码" />
-            <input id="emgServerActionName" placeholder="命令名称，如 重启主机" />
-            <select id="emgServerHostCode"></select>
-            <select id="emgServerSystemId"></select>
-            <select id="emgServerAdminUserId"></select>
-            <input id="emgServerConfirmText" placeholder="确认文案" />
+          <div class="search-toolbar">
+            <input id="emgServerKeyword" class="search-input" placeholder="搜索动作编码、命令名称、主机、系统或管理员" />
+            <button id="btnEmergencyServerSearch" class="toolbar-btn secondary">搜索</button>
+            <button id="btnEmergencyServerClear" class="toolbar-btn ghost">清空</button>
           </div>
-          <textarea id="emgServerScript" rows="6" placeholder="需要运行的命令，例如 sudo reboot"></textarea>
+          <div id="emgServerForm" class="form-section emergency-edit-panel" hidden>
+            <div class="grid4 emergency-admin-grid">
+              <input id="emgServerActionCode" placeholder="动作编码" />
+              <input id="emgServerActionName" placeholder="命令名称，如 重启主机" />
+              <select id="emgServerHostCode"></select>
+              <select id="emgServerSystemId"></select>
+              <select id="emgServerAdminUserId"></select>
+              <input id="emgServerConfirmText" placeholder="确认文案" />
+            </div>
+            <textarea id="emgServerScript" rows="6" placeholder="需要运行的命令，例如 sudo reboot"></textarea>
+            <div class="action-row compact">
+              <button id="btnEmergencyServerMockSave">保存</button>
+              <button id="btnEmergencyServerCancel" class="toolbar-btn secondary" type="button">取消</button>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>动作编码</th><th>命令名称</th><th>主机</th><th>系统</th><th>管理员</th><th>状态</th><th>操作</th></tr></thead>
@@ -506,24 +528,35 @@
               <h2>数据库动作配置</h2>
             </div>
             <div class="action-row compact">
-              <button id="btnEmergencyDbMockSave">保存数据库动作</button>
+              <button id="btnEmergencyDbAdd">新增</button>
               <button id="btnEmergencyDbMockList" class="toolbar-btn secondary">刷新列表</button>
             </div>
           </div>
-          <div class="grid4 emergency-admin-grid">
-            <input id="emgDbActionCode" placeholder="action_code" />
-            <input id="emgDbActionName" placeholder="动作名称" />
-            <select id="emgDbType"><option value="oracle">oracle</option><option value="dameng">dameng</option><option value="shell_proxy">shell_proxy</option></select>
-            <select id="emgDbHostCode"></select>
-            <select id="emgDbSystemId"></select>
-            <select id="emgDbAdminUserId"></select>
+          <div class="search-toolbar">
+            <input id="emgDbKeyword" class="search-input" placeholder="搜索动作编码、名称、数据库类型、主机或系统" />
+            <button id="btnEmergencyDbSearch" class="toolbar-btn secondary">搜索</button>
+            <button id="btnEmergencyDbClear" class="toolbar-btn ghost">清空</button>
           </div>
-          <input id="emgDbParamSchema" placeholder='参数定义 JSON，如 [{"name":"employee_id"}]' />
-          <textarea id="emgDbScript" rows="7" placeholder="脚本 / SQL 模板，支持 {{system_code}} / {{employee_id}} 之类占位符"></textarea>
+          <div id="emgDbForm" class="form-section emergency-edit-panel" hidden>
+            <div class="grid4 emergency-admin-grid">
+              <input id="emgDbActionCode" placeholder="action_code" />
+              <input id="emgDbActionName" placeholder="动作名称" />
+              <select id="emgDbType"><option value="oracle">oracle</option><option value="dameng">dameng</option><option value="shell_proxy">shell_proxy</option></select>
+              <select id="emgDbHostCode"></select>
+              <select id="emgDbSystemId"></select>
+              <select id="emgDbAdminUserId"></select>
+            </div>
+            <input id="emgDbParamSchema" placeholder='参数定义 JSON，如 [{"name":"employee_id"}]' />
+            <textarea id="emgDbScript" rows="7" placeholder="脚本 / SQL 模板，支持 {{system_code}} / {{employee_id}} 之类占位符"></textarea>
+            <div class="action-row compact">
+              <button id="btnEmergencyDbMockSave">保存</button>
+              <button id="btnEmergencyDbCancel" class="toolbar-btn secondary" type="button">取消</button>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>action_code</th><th>动作名称</th><th>db_type</th><th>参数</th><th>状态</th></tr></thead>
-              <tbody id="emgDbTbody"><tr><td colspan="5">暂无数据库动作配置</td></tr></tbody>
+              <thead><tr><th>action_code</th><th>动作名称</th><th>db_type</th><th>参数</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="emgDbTbody"><tr><td colspan="6">暂无数据库动作配置</td></tr></tbody>
             </table>
           </div>
           <pre id="emgDbResult"></pre>
@@ -537,22 +570,33 @@
               <h2>进程动作配置</h2>
             </div>
             <div class="action-row compact">
-              <button id="btnEmergencyProcessMockSave">保存</button>
+              <button id="btnEmergencyProcessAdd">新增</button>
               <button id="btnEmergencyProcessMockList" class="toolbar-btn secondary">刷新</button>
             </div>
           </div>
-          <div class="grid4 emergency-admin-grid">
-            <input id="emgProcActionCode" placeholder="动作编码" />
-            <input id="emgProcActionName" placeholder="命令名称，如 重启 foc-gateway" />
-            <select id="emgProcHostCode"></select>
-            <select id="emgProcSystemId"></select>
-            <select id="emgProcAdminUserId"></select>
-            <input id="emgProcName" placeholder="process_name" />
-            <select id="emgProcIdSource"><option value="runtime_detect">runtime_detect</option><option value="fixed">fixed</option></select>
-            <input id="emgProcDefaultPid" placeholder="default_process_id（可选）" />
-            <input id="emgProcRemark" placeholder="备注（可选）" />
+          <div class="search-toolbar">
+            <input id="emgProcKeyword" class="search-input" placeholder="搜索动作编码、命令名称、进程名、主机或系统" />
+            <button id="btnEmergencyProcessSearch" class="toolbar-btn secondary">搜索</button>
+            <button id="btnEmergencyProcessClear" class="toolbar-btn ghost">清空</button>
           </div>
-          <textarea id="emgProcScript" rows="7" placeholder="需要运行的命令，例如 systemctl restart foc-gateway"></textarea>
+          <div id="emgProcForm" class="form-section emergency-edit-panel" hidden>
+            <div class="grid4 emergency-admin-grid">
+              <input id="emgProcActionCode" placeholder="动作编码" />
+              <input id="emgProcActionName" placeholder="命令名称，如 重启 foc-gateway" />
+              <select id="emgProcHostCode"></select>
+              <select id="emgProcSystemId"></select>
+              <select id="emgProcAdminUserId"></select>
+              <input id="emgProcName" placeholder="process_name" />
+              <select id="emgProcIdSource"><option value="runtime_detect">runtime_detect</option><option value="fixed">fixed</option></select>
+              <input id="emgProcDefaultPid" placeholder="default_process_id（可选）" />
+              <input id="emgProcRemark" placeholder="备注（可选）" />
+            </div>
+            <textarea id="emgProcScript" rows="7" placeholder="需要运行的命令，例如 systemctl restart foc-gateway"></textarea>
+            <div class="action-row compact">
+              <button id="btnEmergencyProcessMockSave">保存</button>
+              <button id="btnEmergencyProcessCancel" class="toolbar-btn secondary" type="button">取消</button>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>动作编码</th><th>命令名称</th><th>进程名</th><th>主机</th><th>系统</th><th>管理员</th><th>状态</th><th>操作</th></tr></thead>
@@ -570,19 +614,30 @@
               <h2>自定义命令配置</h2>
             </div>
             <div class="action-row compact">
-              <button id="btnEmergencyCustomSave">保存</button>
+              <button id="btnEmergencyCustomAdd">新增</button>
               <button id="btnEmergencyCustomList" class="toolbar-btn secondary">刷新</button>
             </div>
           </div>
-          <div class="grid4 emergency-admin-grid">
-            <input id="emgCustomActionCode" placeholder="动作编码" />
-            <input id="emgCustomActionName" placeholder="命令名称" />
-            <select id="emgCustomHostCode"></select>
-            <select id="emgCustomSystemId"></select>
-            <select id="emgCustomAdminUserId"></select>
-            <input id="emgCustomRemark" placeholder="备注（可选）" />
+          <div class="search-toolbar">
+            <input id="emgCustomKeyword" class="search-input" placeholder="搜索动作编码、命令名称、主机、系统或管理员" />
+            <button id="btnEmergencyCustomSearch" class="toolbar-btn secondary">搜索</button>
+            <button id="btnEmergencyCustomClear" class="toolbar-btn ghost">清空</button>
           </div>
-          <textarea id="emgCustomScript" rows="7" placeholder="需要运行的命令"></textarea>
+          <div id="emgCustomForm" class="form-section emergency-edit-panel" hidden>
+            <div class="grid4 emergency-admin-grid">
+              <input id="emgCustomActionCode" placeholder="动作编码" />
+              <input id="emgCustomActionName" placeholder="命令名称" />
+              <select id="emgCustomHostCode"></select>
+              <select id="emgCustomSystemId"></select>
+              <select id="emgCustomAdminUserId"></select>
+              <input id="emgCustomRemark" placeholder="备注（可选）" />
+            </div>
+            <textarea id="emgCustomScript" rows="7" placeholder="需要运行的命令"></textarea>
+            <div class="action-row compact">
+              <button id="btnEmergencyCustomSave">保存</button>
+              <button id="btnEmergencyCustomCancel" class="toolbar-btn secondary" type="button">取消</button>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>动作编码</th><th>命令名称</th><th>主机</th><th>系统</th><th>管理员</th><th>状态</th><th>操作</th></tr></thead>

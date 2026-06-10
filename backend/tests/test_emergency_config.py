@@ -61,3 +61,21 @@ def test_emergency_config_visible_to_mobile_and_creates_task(client, admin_heade
     task = task_resp.json()
     assert task["task_id"] > 0
     assert task["status"] == "pending_approval"
+
+    delete_action = client.delete(
+        "/api/v1/admin/emergency-config/server-actions/reboot-emg-host-01",
+        headers=admin_headers,
+    )
+    assert delete_action.status_code == 200, delete_action.text
+    mobile_after_delete = client.get("/api/v1/emergency/actions", headers=admin_headers)
+    assert mobile_after_delete.status_code == 200, mobile_after_delete.text
+    assert mobile_after_delete.json()["server_actions"] == []
+
+    delete_host = client.delete(
+        "/api/v1/admin/emergency-config/ssh-hosts/emg-host-01",
+        headers=admin_headers,
+    )
+    assert delete_host.status_code == 200, delete_host.text
+    admin_config = client.get("/api/v1/admin/emergency-config", headers=admin_headers)
+    assert admin_config.status_code == 200, admin_config.text
+    assert admin_config.json()["ssh_hosts"] == []

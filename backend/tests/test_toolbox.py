@@ -95,6 +95,15 @@ def test_toolbox_capture_fetch_invalid_url(client, admin_headers):
     assert resp.status_code == 400, resp.text
 
 
+def test_capture_url_normalizes_chinese_path_and_query():
+    from app.api.toolbox import _normalize_capture_url
+
+    normalized = _normalize_capture_url("https://example.com/接口/登录?备注=登录失败&x=1")
+
+    assert normalized == "https://example.com/%E6%8E%A5%E5%8F%A3/%E7%99%BB%E5%BD%95?%E5%A4%87%E6%B3%A8=%E7%99%BB%E5%BD%95%E5%A4%B1%E8%B4%A5&x=1"
+    normalized.encode("ascii")
+
+
 def test_toolbox_capture_analyze(client, admin_headers):
     resp = client.post(
         "/api/v1/toolbox/capture/analyze",
@@ -164,6 +173,65 @@ def test_toolbox_error_logs_reads_configured_system_log_path(client, admin_heade
     body = resp.json()
     assert "configured path failed" in body["content"]
     assert str(log_file) in body["source_detail"]
+
+
+def test_toolbox_error_logs_error_level_includes_http_exception_warning(client, admin_headers, tmp_path):
+    log_file = tmp_path / "http-exception-system.log"
+    log_file.write_text(
+        "2026-06-10 13:50:34 WARNING app [req:abc] HTTP 异常: method=POST path=/api/v1/assistant/chat status=400 code=CAPTURE_FETCH_FAILED message=抓取失败：HTTP 502\n",
+        encoding="utf-8",
+    )
+    created = client.post(
+        "/api/v1/admin/systems",
+        headers=admin_headers,
+        json={
+            "system_code": "SYS-LOG-HTTP-EXCEPTION-001",
+            "name": "HTTP异常日志系统",
+            "host_address": "127.0.0.1",
+            "env": "prod",
+            "log_configs": [{"log_name": "http-exception", "absolute_path": str(log_file), "log_level": "error"}],
+        },
+    )
+    assert created.status_code == 200, created.text
+
+    resp = client.get(
+        "/api/v1/toolbox/error-logs",
+        headers=admin_headers,
+        params={"source": "system", "file_name": str(log_file), "level": "error", "lines": 20},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "抓取失败：HTTP 502" in body["content"]
+
+
+def test_toolbox_error_logs_error_level_does_not_match_query_param_text(client, admin_headers, tmp_path):
+    log_file = tmp_path / "query-param-only.log"
+    log_file.write_text(
+        '2026-06-10 13:56:48 INFO access [req:-] "GET /api/v1/toolbox/error-logs?level=error&lines=100 HTTP/1.1" 200\n',
+        encoding="utf-8",
+    )
+    created = client.post(
+        "/api/v1/admin/systems",
+        headers=admin_headers,
+        json={
+            "system_code": "SYS-LOG-QUERY-PARAM-001",
+            "name": "查询参数日志系统",
+            "host_address": "127.0.0.1",
+            "env": "prod",
+            "log_configs": [{"log_name": "query-param", "absolute_path": str(log_file), "log_level": "error"}],
+        },
+    )
+    assert created.status_code == 200, created.text
+
+    resp = client.get(
+        "/api/v1/toolbox/error-logs",
+        headers=admin_headers,
+        params={"source": "system", "file_name": str(log_file), "level": "error", "lines": 20},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "level=error" not in body["content"]
+    assert "未读取到系统日志" in body["content"]
 
 
 def test_toolbox_error_logs_warning_does_not_fallback_to_info(client, admin_headers, tmp_path):

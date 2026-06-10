@@ -17,6 +17,24 @@ register_all_tools(registry)
 logger = logging.getLogger(__name__)
 
 
+def _extract_url_from_message(message: str) -> str | None:
+    import re
+    from urllib.parse import urlparse
+
+    match = re.search(r'(https?://[^\s]+)', message, flags=re.I)
+    if not match:
+        return None
+    candidate = match.group(1).strip('，。；;、,')
+    parsed = urlparse(candidate)
+    netloc = parsed.netloc
+    if netloc and re.search(r'[\u4e00-\u9fff]', netloc):
+        trimmed_netloc = re.split(r'[\u4e00-\u9fff]', netloc, maxsplit=1)[0]
+        if "." in trimmed_netloc:
+            remainder = candidate[match.start(1) + len(parsed.scheme) + 3 + len(netloc) - match.start(1):]
+            candidate = f"{parsed.scheme}://{trimmed_netloc}{remainder}"
+    return candidate
+
+
 class AssistantExecutor:
     def __init__(self) -> None:
         self.router = AssistantRouter()
@@ -56,11 +74,10 @@ class AssistantExecutor:
                 args["host"] = host_match.group(1)
             return args
         if tool == "analyze_capture_content":
-            import re
             args = {}
-            url_match = re.search(r'(https?://[^\s]+)', message, flags=re.I)
-            if url_match:
-                args["url"] = url_match.group(1)
+            url = _extract_url_from_message(message)
+            if url:
+                args["url"] = url
             return args
         if tool == "analyze_ip_reputation":
             import re
@@ -77,7 +94,12 @@ class AssistantExecutor:
                 args["port"] = int(port_match.group(1))
             return args
         if tool == "analyze_log_text":
-            args = {"text": message}
+            attachment_text = "\n\n".join(
+                f"附件 {item.get('name') or '未命名'}：\n{(item.get('extracted_text') or '').strip()}"
+                for item in attachments
+                if isinstance(item, dict) and (item.get("extracted_text") or "").strip()
+            ).strip()
+            args = {"text": "\n\n".join(part for part in [message, attachment_text] if part).strip()}
             if base.get("system_name"):
                 args["system_name"] = base["system_name"]
             if base.get("system_id"):

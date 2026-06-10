@@ -53,6 +53,34 @@ def test_assistant_chat_requires_login(client, admin_headers):
     assert authed.json()["reply"]
 
 
+def test_assistant_capture_tool_encodes_non_ascii_url(monkeypatch):
+    from app.services.assistant.tools import security_ops
+
+    captured = {}
+
+    def fake_fetch(url):
+        captured["url"] = url
+        return {"content": "HTTP_STATUS: 200", "status_code": 200, "elapsed_ms": 1}
+
+    def fake_analyze(payload):
+        return {"summary": "已完成抓包分析。", "suggestions": [], "matched_rules": [], "severity": payload.severity}
+
+    monkeypatch.setattr(security_ops, "_fetch_url_capture", fake_fetch)
+    monkeypatch.setattr(security_ops, "run_offline_analyze", fake_analyze)
+
+    result = security_ops.analyze_capture_content(url="https://example.com/接口/登录?备注=失败")
+
+    assert result["success"] is True
+    assert captured["url"] == "https://example.com/%E6%8E%A5%E5%8F%A3/%E7%99%BB%E5%BD%95?%E5%A4%87%E6%B3%A8=%E5%A4%B1%E8%B4%A5"
+    captured["url"].encode("ascii")
+
+
+def test_assistant_capture_url_extraction_trims_chinese_suffix():
+    from app.services.assistant.executor import _extract_url_from_message
+
+    assert _extract_url_from_message("帮我抓包分析一下http://baidu.com这个地址") == "http://baidu.com"
+
+
 def test_external_assistant_chat_uses_admin_generated_apikey(client, admin_headers):
     missing = client.post(
         "/api/v1/assistant/external/chat",
@@ -133,3 +161,71 @@ def test_assistant_can_route_system_selfcheck(client, admin_headers):
     body = resp.json()
     assert body["tool_calls"][0]["tool"] == "run_system_selfcheck_report"
     assert body["cards"][0]["html_report"].startswith("<!doctype html>")
+
+
+def test_assistant_ip_reputation_private_ip_is_user_friendly(client, admin_headers):
+    resp = client.post(
+        "/api/v1/assistant/chat",
+        headers=admin_headers,
+        json={"message": "10.11.123.4 是恶意 IP 吗"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["tool_calls"][0]["tool"] == "analyze_ip_reputation"
+    assert "不是公网恶意 IP" in body["reply"]
+    assert "is_private" not in body["reply"]
+    assert "bogon" not in body["reply"].lower()
+    assert "is_global" not in body["reply"]
+
+
+def test_assistant_can_analyze_uploaded_file_content(client, admin_headers):
+    import base64
+
+    created = client.post(
+        "/api/v1/ai/conversations",
+        headers=admin_headers,
+        json={"title": "新会话", "source": "mobile"},
+    )
+    assert created.status_code == 200, created.text
+    conversation_id = created.json()["conversation_id"]
+
+    payload = "ERROR upstream timeout while connecting to database"
+    data_url = "data:text/plain;base64," + base64.b64encode(payload.encode("utf-8")).decode("ascii")
+    uploaded = client.post(
+        "/api/v1/ai/files/upload",
+        headers=admin_headers,
+        json={
+            "conversation_id": conversation_id,
+            "name": "backend-error.log",
+            "type": "text/plain",
+            "size": len(payload.encode("utf-8")),
+            "data_url": data_url,
+        },
+    )
+    assert uploaded.status_code == 200, uploaded.text
+    uploaded_file = uploaded.json()["file"]
+
+    resp = client.post(
+        "/api/v1/assistant/chat",
+        headers=admin_headers,
+        json={
+            "conversation_id": conversation_id,
+            "message": "请分析附件里的报错原因",
+            "attachments": [
+                {
+                    "file_id": uploaded_file["file_id"],
+                    "name": uploaded_file["name"],
+                    "type": uploaded_file["type"],
+                    "size": uploaded_file["size"],
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["tool_calls"][0]["tool"] == "analyze_log_text"
+    assert body["reply"]
+
+    detail = client.get(f"/api/v1/ai/conversations/{conversation_id}", headers=admin_headers)
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["message_count"] == 2

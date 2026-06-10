@@ -135,17 +135,37 @@ bindClick('btnLogout', () => {
 });
 
 bindClick('btnRefreshDashboard', () => ns.dashboard?.refreshDashboard?.());
+bindClick('btnEmergencySshAdd', () => ns.emergencyConfig?.openCreate?.('ssh'));
 bindClick('btnEmergencySshMockSave', () => ns.emergencyConfig?.saveSshHostMock?.());
 bindClick('btnEmergencySshMockList', () => ns.emergencyConfig?.listSshHosts?.());
+bindClick('btnEmergencySshSearch', () => ns.emergencyConfig?.applySearch?.('ssh', 'emgSshKeyword', ns.emergencyConfig.listSshHosts));
+bindClick('btnEmergencySshClear', () => ns.emergencyConfig?.clearSearch?.('ssh', 'emgSshKeyword', ns.emergencyConfig.listSshHosts));
+bindClick('btnEmergencySshCancel', () => ns.emergencyConfig?.cancelEdit?.('ssh'));
 bindClick('btnEmergencyImportJson', () => ns.emergencyConfig?.importJsonToDb?.());
+bindClick('btnEmergencyServerAdd', () => ns.emergencyConfig?.openCreate?.('server'));
 bindClick('btnEmergencyServerMockSave', () => ns.emergencyConfig?.saveServerActionMock?.());
 bindClick('btnEmergencyServerMockList', () => ns.emergencyConfig?.listServerActions?.());
+bindClick('btnEmergencyServerSearch', () => ns.emergencyConfig?.applySearch?.('server', 'emgServerKeyword', ns.emergencyConfig.listServerActions));
+bindClick('btnEmergencyServerClear', () => ns.emergencyConfig?.clearSearch?.('server', 'emgServerKeyword', ns.emergencyConfig.listServerActions));
+bindClick('btnEmergencyServerCancel', () => ns.emergencyConfig?.cancelEdit?.('server'));
+bindClick('btnEmergencyDbAdd', () => ns.emergencyConfig?.openCreate?.('db'));
 bindClick('btnEmergencyDbMockSave', () => ns.emergencyConfig?.saveDbActionMock?.());
 bindClick('btnEmergencyDbMockList', () => ns.emergencyConfig?.listDbActions?.());
+bindClick('btnEmergencyDbSearch', () => ns.emergencyConfig?.applySearch?.('db', 'emgDbKeyword', ns.emergencyConfig.listDbActions));
+bindClick('btnEmergencyDbClear', () => ns.emergencyConfig?.clearSearch?.('db', 'emgDbKeyword', ns.emergencyConfig.listDbActions));
+bindClick('btnEmergencyDbCancel', () => ns.emergencyConfig?.cancelEdit?.('db'));
+bindClick('btnEmergencyProcessAdd', () => ns.emergencyConfig?.openCreate?.('process'));
 bindClick('btnEmergencyProcessMockSave', () => ns.emergencyConfig?.saveProcessActionMock?.());
 bindClick('btnEmergencyProcessMockList', () => ns.emergencyConfig?.listProcessActions?.());
+bindClick('btnEmergencyProcessSearch', () => ns.emergencyConfig?.applySearch?.('process', 'emgProcKeyword', ns.emergencyConfig.listProcessActions));
+bindClick('btnEmergencyProcessClear', () => ns.emergencyConfig?.clearSearch?.('process', 'emgProcKeyword', ns.emergencyConfig.listProcessActions));
+bindClick('btnEmergencyProcessCancel', () => ns.emergencyConfig?.cancelEdit?.('process'));
+bindClick('btnEmergencyCustomAdd', () => ns.emergencyConfig?.openCreate?.('custom'));
 bindClick('btnEmergencyCustomSave', () => ns.emergencyConfig?.saveCustomAction?.());
 bindClick('btnEmergencyCustomList', () => ns.emergencyConfig?.listCustomActions?.());
+bindClick('btnEmergencyCustomSearch', () => ns.emergencyConfig?.applySearch?.('custom', 'emgCustomKeyword', ns.emergencyConfig.listCustomActions));
+bindClick('btnEmergencyCustomClear', () => ns.emergencyConfig?.clearSearch?.('custom', 'emgCustomKeyword', ns.emergencyConfig.listCustomActions));
+bindClick('btnEmergencyCustomCancel', () => ns.emergencyConfig?.cancelEdit?.('custom'));
 bindClick('btnToolTaskList', () => ns.toolbox.listTasks().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnToolTaskUpdate', () => ns.toolbox.updateTask().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnListInspectionPoints', () => ns.inspectionPoints.listInspectionPoints().catch((e) => {

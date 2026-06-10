@@ -141,9 +141,9 @@ def _process_action_from_runbook(item: Runbook, host_code: str) -> EmergencyProc
 
 
 def _load_db_config(db: Session) -> EmergencyOpsConfig:
-    hosts = db.query(EmergencyHost).order_by(EmergencyHost.id.asc()).all()
+    hosts = db.query(EmergencyHost).filter(EmergencyHost.is_active.is_(True)).order_by(EmergencyHost.id.asc()).all()
     host_map = {item.id: item for item in hosts}
-    runbooks = db.query(Runbook).order_by(Runbook.id.asc()).all()
+    runbooks = db.query(Runbook).filter(Runbook.enabled.is_(True)).order_by(Runbook.id.asc()).all()
 
     server_actions: List[EmergencyServerActionItem] = []
     database_actions: List[EmergencyDbActionItem] = []
@@ -316,6 +316,79 @@ def upsert_process_action(payload: EmergencyProcessActionItem, db: Optional[Sess
     db.commit()
     db.refresh(runbook)
     return payload.dict()
+
+
+def delete_ssh_host(host_code: str, db: Optional[Session] = None) -> Dict:
+    if db is None:
+        config = _load_json_config()
+        before = len(config.ssh_hosts)
+        config.ssh_hosts = [x for x in config.ssh_hosts if x.host_code != host_code]
+        save_emergency_config(config)
+        if before == len(config.ssh_hosts):
+            raise HTTPException(status_code=404, detail={"code": "EMERGENCY_HOST_NOT_FOUND", "message": "SSH 主机不存在"})
+        return {"host_code": host_code, "deleted": True}
+
+    host = db.query(EmergencyHost).filter(EmergencyHost.host_code == host_code).first()
+    if not host:
+        raise HTTPException(status_code=404, detail={"code": "EMERGENCY_HOST_NOT_FOUND", "message": "SSH 主机不存在"})
+    host.is_active = False
+    db.query(Runbook).filter(Runbook.target_host_id == host.id).update({"enabled": False})
+    db.commit()
+    return {"host_code": host_code, "deleted": True}
+
+
+def delete_server_action(action_code: str, db: Optional[Session] = None) -> Dict:
+    if db is None:
+        config = _load_json_config()
+        before = len(config.server_actions)
+        config.server_actions = [x for x in config.server_actions if x.action_code != action_code]
+        save_emergency_config(config)
+        if before == len(config.server_actions):
+            raise HTTPException(status_code=404, detail={"code": "RUNBOOK_NOT_FOUND", "message": "应急动作不存在"})
+        return {"action_code": action_code, "deleted": True}
+
+    runbook = db.query(Runbook).filter(Runbook.runbook_code == action_code, Runbook.runbook_type == "server").first()
+    if not runbook:
+        raise HTTPException(status_code=404, detail={"code": "RUNBOOK_NOT_FOUND", "message": "应急动作不存在"})
+    runbook.enabled = False
+    db.commit()
+    return {"action_code": action_code, "deleted": True}
+
+
+def delete_db_action(action_code: str, db: Optional[Session] = None) -> Dict:
+    if db is None:
+        config = _load_json_config()
+        before = len(config.database_actions)
+        config.database_actions = [x for x in config.database_actions if x.action_code != action_code]
+        save_emergency_config(config)
+        if before == len(config.database_actions):
+            raise HTTPException(status_code=404, detail={"code": "RUNBOOK_NOT_FOUND", "message": "应急动作不存在"})
+        return {"action_code": action_code, "deleted": True}
+
+    runbook = db.query(Runbook).filter(Runbook.runbook_code == action_code, Runbook.runbook_type == "database").first()
+    if not runbook:
+        raise HTTPException(status_code=404, detail={"code": "RUNBOOK_NOT_FOUND", "message": "应急动作不存在"})
+    runbook.enabled = False
+    db.commit()
+    return {"action_code": action_code, "deleted": True}
+
+
+def delete_process_action(action_code: str, db: Optional[Session] = None) -> Dict:
+    if db is None:
+        config = _load_json_config()
+        before = len(config.process_actions)
+        config.process_actions = [x for x in config.process_actions if x.action_code != action_code]
+        save_emergency_config(config)
+        if before == len(config.process_actions):
+            raise HTTPException(status_code=404, detail={"code": "RUNBOOK_NOT_FOUND", "message": "应急动作不存在"})
+        return {"action_code": action_code, "deleted": True}
+
+    runbook = db.query(Runbook).filter(Runbook.runbook_code == action_code, Runbook.runbook_type == "process").first()
+    if not runbook:
+        raise HTTPException(status_code=404, detail={"code": "RUNBOOK_NOT_FOUND", "message": "应急动作不存在"})
+    runbook.enabled = False
+    db.commit()
+    return {"action_code": action_code, "deleted": True}
 
 
 def import_emergency_json_to_db(db: Session) -> Dict:
