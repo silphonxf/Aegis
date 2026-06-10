@@ -75,6 +75,45 @@ def test_assistant_capture_tool_encodes_non_ascii_url(monkeypatch):
     captured["url"].encode("ascii")
 
 
+def test_assistant_capture_ai_payload_is_compact(monkeypatch):
+    from app.services.assistant.tools import security_ops
+
+    seen = {}
+    long_body = "x" * 5000
+
+    def fake_fetch(url):
+        return {
+            "content": "\n".join(
+                [
+                    "URL: https://example.com/",
+                    "HTTP_STATUS: 200",
+                    "ELAPSED_MS: 12",
+                    "RESPONSE_HEADERS:",
+                    "Server: test",
+                    "",
+                    "RESPONSE_BODY_EXCERPT:",
+                    long_body,
+                ]
+            ),
+            "status_code": 200,
+            "elapsed_ms": 12,
+        }
+
+    def fake_analyze(payload):
+        seen["detail"] = payload.detail
+        return {"summary": "已完成抓包分析。", "suggestions": [], "matched_rules": [], "severity": payload.severity}
+
+    monkeypatch.setattr(security_ops, "_fetch_url_capture", fake_fetch)
+    monkeypatch.setattr(security_ops, "run_offline_analyze", fake_analyze)
+
+    result = security_ops.analyze_capture_content(url="https://example.com")
+
+    assert result["success"] is True
+    assert result["data"]["capture"]["content"].endswith(long_body)
+    assert len(seen["detail"]) < 1600
+    assert "RESPONSE_BODY_SHORT_EXCERPT" in seen["detail"]
+
+
 def test_assistant_capture_url_extraction_trims_chinese_suffix():
     from app.services.assistant.executor import _extract_url_from_message
 

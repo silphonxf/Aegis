@@ -11,6 +11,29 @@ from app.services.assistant.schemas import ToolSpec
 from app.services.threatbook import ThreatbookError, batch_query_ip_reputation
 
 
+def _compact_capture_for_ai(capture: Dict[str, Any], body_limit: int = 1200) -> str:
+    content = str(capture.get("content") or "")
+    header_part, _, body_part = content.partition("RESPONSE_BODY_EXCERPT:")
+    header_lines = [line for line in header_part.splitlines() if line.strip()]
+    important_headers = []
+    for line in header_lines:
+        lower = line.lower()
+        if (
+            lower.startswith(("url:", "http_status:", "elapsed_ms:", "content-type:", "server:", "strict-transport-security:", "location:"))
+            or lower in {"response_headers:"}
+        ):
+            important_headers.append(line)
+    body_excerpt = body_part.strip()[:body_limit]
+    return "\n".join(
+        [
+            *important_headers[:30],
+            "",
+            "RESPONSE_BODY_SHORT_EXCERPT:",
+            body_excerpt,
+        ]
+    ).strip()
+
+
 def analyze_capture_content(url: Optional[str] = None, severity: str = 'medium', note: Optional[str] = None, **_: Any) -> Dict[str, Any]:
     target_url = (url or '').strip()
     if not target_url:
@@ -19,7 +42,7 @@ def analyze_capture_content(url: Optional[str] = None, severity: str = 'medium',
     capture = _fetch_url_capture(target_url)
     payload = OfflineAnalyzeRequest(
         title='抓包结果分析',
-        detail=capture.get('content', ''),
+        detail=_compact_capture_for_ai(capture),
         severity=severity,
         source_type='url_fetch',
         source_ref=note or target_url,
