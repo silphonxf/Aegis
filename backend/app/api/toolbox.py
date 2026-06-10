@@ -151,11 +151,13 @@ def _resolve_time_range(quick_range: Optional[str], start_at: Optional[str], end
 
 def _level_keyword_pattern(level: str) -> str:
     level = (level or "warning").lower()
+    token_left = r"(^|[\s,;|\t])"
+    token_right = r"($|[\s,;|\t])"
     if level == "info":
-        return r"(^|\s)INFO(\s|$)|(^|\s)WARNING(\s|$)|(^|\s)ERROR(\s|$)|(^|\s)CRITICAL(\s|$)|Exception|Traceback|\[req:"
+        return rf"{token_left}INFO{token_right}|{token_left}WARNING{token_right}|{token_left}ERROR{token_right}|{token_left}CRITICAL{token_right}|Exception|Traceback|\[req:"
     if level == "error":
-        return r"(^|\s)ERROR(\s|$)|(^|\s)CRITICAL(\s|$)|Exception|Traceback|HTTP 异常|status=[45]\d\d|HTTP [45]\d\d|抓取失败"
-    return r"(^|\s)WARNING(\s|$)|(^|\s)ERROR(\s|$)|(^|\s)CRITICAL(\s|$)|Exception|Traceback"
+        return rf"{token_left}ERROR{token_right}|{token_left}CRITICAL{token_right}|Exception|Traceback|HTTP 异常|status=[45]\d\d|HTTP [45]\d\d|抓取失败"
+    return rf"{token_left}WARNING{token_right}|{token_left}ERROR{token_right}|{token_left}CRITICAL{token_right}|Exception|Traceback"
 
 
 def _matches_time_range(line: str, start_dt: Optional[datetime], end_dt: Optional[datetime]) -> bool:
@@ -232,9 +234,20 @@ def _log_file_aliases(file_name: str) -> list[str]:
     return [file_name, *alias_map.get(file_name, [])]
 
 
+def _decode_log_bytes(raw: bytes) -> str:
+    for encoding in ("utf-8-sig", "utf-8", "gb18030", "gbk", "big5"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("latin-1", errors="replace")
+
+
 def _read_log_tail(path: str, max_lines: int = 20000) -> list[str]:
-    with open(path, "r", encoding="utf-8", errors="ignore") as fh:
-        return list(deque(fh, maxlen=max_lines))
+    with open(path, "rb") as fh:
+        raw = fh.read()
+    text = _decode_log_bytes(raw)
+    return list(deque(text.splitlines(), maxlen=max_lines))
 
 
 def _read_selected_logs(source: str, file_name: Optional[str], level: str, start_dt: Optional[datetime], end_dt: Optional[datetime], lines: int, configured_paths: Optional[list[str]] = None) -> Tuple[str, str]:

@@ -304,3 +304,34 @@ def test_assistant_can_analyze_uploaded_file_content(client, admin_headers):
     detail = client.get(f"/api/v1/ai/conversations/{conversation_id}", headers=admin_headers)
     assert detail.status_code == 200, detail.text
     assert detail.json()["message_count"] == 2
+
+
+def test_ai_file_upload_decodes_gbk_csv(client, admin_headers):
+    import base64
+
+    created = client.post(
+        "/api/v1/ai/conversations",
+        headers=admin_headers,
+        json={"title": "CSV日志分析", "source": "mobile"},
+    )
+    assert created.status_code == 200, created.text
+    conversation_id = created.json()["conversation_id"]
+
+    payload = "时间,级别,内容\n2026-06-10 10:00:00,ERROR,数据库连接失败\n"
+    raw = payload.encode("gbk")
+    data_url = "data:text/csv;base64," + base64.b64encode(raw).decode("ascii")
+    uploaded = client.post(
+        "/api/v1/ai/files/upload",
+        headers=admin_headers,
+        json={
+            "conversation_id": conversation_id,
+            "name": "system-error.csv",
+            "type": "text/csv",
+            "size": len(raw),
+            "data_url": data_url,
+        },
+    )
+    assert uploaded.status_code == 200, uploaded.text
+    body = uploaded.json()["file"]
+    assert "数据库连接失败" in body["extracted_text"]
+    assert "���" not in body["extracted_text"]

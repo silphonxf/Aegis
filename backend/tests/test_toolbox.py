@@ -209,6 +209,35 @@ def test_toolbox_error_logs_all_range_reads_whole_selected_file_window(client, a
     assert "future scheduled failure" in body["content"]
 
 
+def test_toolbox_error_logs_decodes_gbk_csv_log(client, admin_headers, tmp_path):
+    log_file = tmp_path / "system-error.csv"
+    log_file.write_bytes(
+        "时间,级别,内容\n2026-06-10 10:00:00,ERROR,数据库连接失败\n".encode("gbk")
+    )
+    created = client.post(
+        "/api/v1/admin/systems",
+        headers=admin_headers,
+        json={
+            "system_code": "SYS-LOG-CSV-GBK-001",
+            "name": "CSV日志系统",
+            "host_address": "127.0.0.1",
+            "env": "prod",
+            "log_configs": [{"log_name": "csv-error", "absolute_path": str(log_file), "log_level": "error"}],
+        },
+    )
+    assert created.status_code == 200, created.text
+
+    resp = client.get(
+        "/api/v1/toolbox/error-logs",
+        headers=admin_headers,
+        params={"source": "system", "file_name": str(log_file), "quick_range": "all", "level": "error", "lines": 20},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "数据库连接失败" in body["content"]
+    assert "���" not in body["content"]
+
+
 def test_toolbox_error_logs_error_level_includes_http_exception_warning(client, admin_headers, tmp_path):
     log_file = tmp_path / "http-exception-system.log"
     log_file.write_text(

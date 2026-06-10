@@ -18,6 +18,39 @@ router = APIRouter(prefix="/ai/files", tags=["ai-files"])
 UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "uploads" / "ai-chat"
 UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 
+TEXT_LOG_EXTENSIONS = (
+    "txt",
+    "log",
+    "out",
+    "err",
+    "trace",
+    "access",
+    "error",
+    "csv",
+    "tsv",
+    "json",
+    "jsonl",
+    "ndjson",
+    "md",
+    "xml",
+    "yaml",
+    "yml",
+    "conf",
+    "ini",
+    "properties",
+)
+
+TEXT_MIME_TOKENS = ("text", "json", "csv", "xml", "javascript", "x-ndjson", "yaml")
+
+
+def _decode_text_bytes(raw: bytes) -> str:
+    for encoding in ("utf-8-sig", "utf-8", "gb18030", "gbk", "big5"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("latin-1", errors="replace")
+
 
 def _decode_data_url(data_url: str) -> tuple[bytes, str | None]:
     match = re.match(r"^data:([^;]+);base64,(.+)$", data_url, re.S)
@@ -34,12 +67,13 @@ def _decode_data_url(data_url: str) -> tuple[bytes, str | None]:
 
 
 def _extract_text(name: str, mime_type: str, raw: bytes) -> str | None:
-    text_like = any(token in (mime_type or "") for token in ["text", "json", "csv", "xml", "javascript"])
-    text_like = text_like or bool(re.search(r"\.(txt|log|json|csv|md|xml|yaml|yml)$", name, re.I))
+    lowered_mime = (mime_type or "").lower()
+    text_like = any(token in lowered_mime for token in TEXT_MIME_TOKENS)
+    text_like = text_like or bool(re.search(rf"\.({'|'.join(TEXT_LOG_EXTENSIONS)})$", name, re.I))
     if not text_like:
         return None
     try:
-        return raw.decode("utf-8", errors="ignore")[:12000]
+        return _decode_text_bytes(raw)[:12000]
     except Exception:
         return None
 
