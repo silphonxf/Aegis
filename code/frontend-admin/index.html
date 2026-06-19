@@ -1,0 +1,1106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>运维助手 - 管理后台</title>
+  <style>
+    .hidden,
+    [hidden],
+    body:not(.is-authenticated) #appView,
+    body.is-authenticated #loginView,
+    body:not(.is-authenticated) .modal,
+    body.auth-restoring #loginView,
+    body.auth-restoring #appView {
+      display: none !important;
+    }
+  </style>
+  <script>
+    try {
+      if (localStorage.getItem('aegis_admin_token') || sessionStorage.getItem('aegis_admin_token')) {
+        document.documentElement.classList.add('auth-restoring');
+      }
+    } catch {}
+  </script>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <script>
+    try {
+      if (document.documentElement.classList.contains('auth-restoring')) {
+        document.body.classList.add('auth-restoring');
+      }
+    } catch {}
+  </script>
+  <section id="loginView" class="login-view">
+    <div class="login-card">
+      <div class="brand-pill">Aegis Admin</div>
+      <h1>运维助手管理后台</h1>
+      <p class="muted">请先登录后进入主界面</p>
+      <input id="username" placeholder="用户名" />
+      <input id="password" type="password" placeholder="密码" />
+      <button id="btnLogin">登录</button>
+      <p id="state" class="state-text"></p>
+    </div>
+  </section>
+
+  <div id="appView" class="app-shell hidden" hidden aria-hidden="true">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">A</div>
+        <div>
+          <h2>运维助手</h2>
+          <p class="subtitle">Admin Console</p>
+        </div>
+      </div>
+      <nav class="menu-tree">
+        <div class="menu-group active" data-group="dashboard">
+          <button class="menu-btn group-btn active" data-group-target="dashboard">
+            <span class="menu-icon">📊</span><span class="menu-label">监控大盘</span>
+          </button>
+          <div class="submenu-list active">
+            <button class="submenu-btn active" data-view="view-dashboard-overview">运行总览</button>
+          </div>
+        </div>
+
+        <div class="menu-group" data-group="ops-workbench">
+          <button class="menu-btn group-btn" data-group-target="ops-workbench">
+            <span class="menu-icon">🗂️</span><span class="menu-label">资产与日常运维</span>
+          </button>
+          <div class="submenu-list">
+            <button class="submenu-btn" data-view="view-systems">系统</button>
+            <button class="submenu-btn" data-view="view-inspection-points">巡检点</button>
+            <button class="submenu-btn" data-view="view-inspection-records">巡检记录</button>
+            <button class="submenu-btn" data-view="view-users">用户</button>
+          </div>
+        </div>
+
+        <div class="menu-group" data-group="runbook">
+          <button class="menu-btn group-btn" data-group-target="runbook">
+            <span class="menu-icon">🚨</span><span class="menu-label">应急预案配置</span>
+          </button>
+          <div class="submenu-list">
+            <button class="submenu-btn" data-view="view-emergency-ssh">SSH 主机</button>
+            <button class="submenu-btn" data-view="view-emergency-server">重启主机</button>
+            <button class="submenu-btn" data-view="view-emergency-process">重启进程</button>
+            <button class="submenu-btn" data-view="view-emergency-custom">自定义命令</button>
+            <button class="submenu-btn" data-view="view-emergency-db">数据库动作配置</button>
+          </div>
+        </div>
+
+        <div class="menu-group" data-group="approval-audit">
+          <button class="menu-btn group-btn" data-group-target="approval-audit">
+            <span class="menu-icon">🧾</span><span class="menu-label">运维审批与审计</span>
+          </button>
+          <div class="submenu-list">
+            <button class="submenu-btn" data-view="view-tool-ops">运维审批</button>
+            <button class="submenu-btn" data-view="view-tool-rules">规则与审计</button>
+            <button class="submenu-btn" data-view="view-tool-ai">AI诊断</button>
+            <button class="submenu-btn" data-view="view-ai-external-keys">AI 对外接口 Key</button>
+            <button class="submenu-btn" data-view="view-tool-threatbook">高危IP研判</button>
+            <button class="submenu-btn" data-view="view-tool-debug">调试与错误码</button>
+          </div>
+        </div>
+      </nav>
+      <button id="btnLogout" class="logout-btn">退出登录</button>
+    </aside>
+
+    <main class="workspace">
+      <header id="workspaceHeader" class="workspace-header">
+        <div>
+          <div class="header-eyebrow">Aegis 管理控制台</div>
+          <h1>管理工作台 <span class="badge">v2.1 Tech</span></h1>
+          <p id="currentViewDesc" class="view-desc">查看系统运行状态、资产统计与关键指标。</p>
+        </div>
+        <div class="header-meta">
+          <button id="btnToggleAutoRefresh" class="toggle-btn">切换手动刷新</button>
+          <span id="liveStatus" class="live-status on">● 自动刷新开启</span>
+          <span id="lastUpdated" class="last-updated">最近更新：--</span>
+        </div>
+      </header>
+
+      <section id="controlStrip" class="control-strip">
+        <div class="control-chip">
+          <span>当前模块</span>
+          <strong id="controlStripView">运行总览</strong>
+        </div>
+        <div class="control-chip">
+          <span>刷新状态</span>
+          <strong id="controlStripRefresh">自动刷新</strong>
+        </div>
+        <div class="control-chip">
+          <span>控制台风格</span>
+          <strong>深色运维态</strong>
+        </div>
+      </section>
+
+      <section id="view-dashboard-overview" class="view-panel active" data-view-title="运行总览" data-view-desc="查看系统运行状态、资产统计与关键指标。">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>全局看板</h2>
+              <p class="muted">聚合系统状态、性能趋势与资产统计，适合快速巡览。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnRefreshDashboard">刷新看板</button>
+              <button id="btnExportAbnormal">导出异常清单 CSV</button>
+              <button id="btnCollectLocal">采集本机监控样本</button>
+            </div>
+          </div>
+
+          <h3>系统状态</h3>
+          <div class="grid2 table-filters">
+            <select id="systemSelect"></select>
+            <input id="systemSearchKeyword" placeholder="输入关键词筛选系统（编号/名称）" />
+            <button id="btnSystemSearch" type="button">筛选</button>
+            <button id="btnSystemReset" type="button">重置</button>
+          </div>
+          <div class="kpis">
+            <div class="kpi green"><span>绿色</span><strong id="kpiGreen" class="digit-roll">0</strong></div>
+            <div class="kpi yellow"><span>黄色</span><strong id="kpiYellow" class="digit-roll">0</strong></div>
+            <div class="kpi red"><span>红色</span><strong id="kpiRed" class="digit-roll">0</strong></div>
+            <div class="kpi total"><span>总系统</span><strong id="kpiTotal" class="digit-roll">0</strong></div>
+          </div>
+
+          <div class="tech-metrics">
+            <div class="tech-meter">
+              <div class="tech-head"><span>CPU 负载</span><b id="metricCpuText">0%</b></div>
+              <div class="meter-track"><i id="metricCpuBar"></i></div>
+              <canvas id="sparkCpu" class="sparkline" width="220" height="40"></canvas>
+            </div>
+            <div class="tech-meter">
+              <div class="tech-head"><span>内存占用</span><b id="metricMemText">0%</b></div>
+              <div class="meter-track"><i id="metricMemBar"></i></div>
+              <canvas id="sparkMem" class="sparkline" width="220" height="40"></canvas>
+            </div>
+            <div class="tech-meter">
+              <div class="tech-head"><span>磁盘占用</span><b id="metricDiskText">0%</b></div>
+              <div class="meter-track"><i id="metricDiskBar"></i></div>
+              <canvas id="sparkDisk" class="sparkline" width="220" height="40"></canvas>
+            </div>
+          </div>
+
+          <h3>资产概览</h3>
+          <div class="kpis">
+            <div class="kpi total"><span>总资产</span><strong id="assetTotal" class="digit-roll">0</strong></div>
+            <div class="kpi green"><span>在用</span><strong id="assetInUse" class="digit-roll">0</strong></div>
+            <div class="kpi yellow"><span>维修中</span><strong id="assetRepair" class="digit-roll">0</strong></div>
+            <div class="kpi red"><span>停用</span><strong id="assetRetired" class="digit-roll">0</strong></div>
+          </div>
+          <div class="grid2 table-filters">
+            <select id="abnormalColorFilter">
+              <option value="all">全部状态</option>
+              <option value="red">仅红色</option>
+              <option value="yellow">仅黄色</option>
+              <option value="red,yellow">仅红黄</option>
+              <option value="green">仅绿色</option>
+            </select>
+            <input id="abnormalKeyword" placeholder="筛选系统名/编号关键词" />
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>系统</th><th>环境</th><th>状态</th><th>CPU</th><th>MEM</th><th>DISK</th><th>采集时间</th>
+                </tr>
+              </thead>
+              <tbody id="abnormalTbody"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-users" class="view-panel" data-view-title="用户与角色配置" data-view-desc="维护移动端与管理端共用的用户主数据、角色与后续负责人配置。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>用户与角色配置</h2>
+            </div>
+          </div>
+          <div class="search-toolbar">
+            <input id="userSearchKeyword" class="search-input" placeholder="搜索用户名 / 账号关键字" />
+            <button id="btnFindUsers" class="toolbar-btn">搜索</button>
+            <button id="btnOpenCreateUserModal" class="toolbar-btn secondary">新增用户配置</button>
+          </div>
+          <div id="userListSummary" class="result-line"></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>序号</th><th>用户名</th><th>角色</th><th>ID</th></tr></thead>
+              <tbody id="userListTbody"><tr><td colspan="4">暂无数据</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-systems" class="view-panel" data-view-title="系统" data-view-desc="维护系统地址、管理员与日志路径，供移动端按权限查看和拉取日志。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>系统</h2>
+              <p class="muted">系统、管理员和日志路径在这里维护。admin 可查看全部系统，普通移动端用户只看到自己管理的系统。</p>
+            </div>
+          </div>
+          <div class="search-toolbar wide-toolbar">
+            <input id="systemSearchKeyword2" class="search-input" placeholder="搜索编号 / 名称 / 地址" />
+            <select id="systemFilterEnv">
+              <option value="">全部环境</option>
+              <option value="prod">生产</option>
+              <option value="test">测试</option>
+              <option value="dev">开发</option>
+            </select>
+            <select id="systemFilterActive">
+              <option value="">全部状态</option>
+              <option value="true">启用</option>
+              <option value="false">停用</option>
+            </select>
+            <select id="systemSortBy">
+              <option value="updated_at">按更新时间</option>
+              <option value="name">按名称</option>
+              <option value="system_code">按编号</option>
+              <option value="host_address">按地址</option>
+              <option value="env">按环境</option>
+            </select>
+            <select id="systemSortOrder">
+              <option value="desc">降序</option>
+              <option value="asc">升序</option>
+            </select>
+            <button id="btnFindSystems" class="toolbar-btn">搜索</button>
+            <button id="btnOpenCreateSystemModal" class="toolbar-btn secondary">新增</button>
+          </div>
+          <div id="systemListSummary" class="result-line"></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>地址/IP</th><th>环境</th><th>管理员ID</th><th>日志位置</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="systemListTbody"><tr><td colspan="9">暂无数据</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-inspection-points" class="view-panel" data-view-title="巡检点管理" data-view-desc="维护移动端扫码 / NFC 巡检使用的点位配置。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>巡检点</h2>
+              <p class="muted">统一维护移动端扫码 / NFC 巡检点、二维码、NFC 与位置说明。</p>
+            </div>
+          </div>
+          <div class="search-toolbar wide-toolbar">
+            <input id="pointFilterKeyword" class="search-input" placeholder="搜索点位编号 / 名称 / 二维码 / NFC" />
+            <select id="pointFilterActive">
+              <option value="">全部状态</option>
+              <option value="true">启用</option>
+              <option value="false">停用</option>
+            </select>
+            <button id="btnListInspectionPoints" class="toolbar-btn">搜索</button>
+            <button id="btnOpenCreatePointModal" class="toolbar-btn secondary">新增</button>
+          </div>
+          <div id="pointListSummary" class="result-line"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>序号</th><th>点位编号</th><th>点位名称</th><th>类型</th><th>机房</th><th>系统</th><th>二维码</th><th>NFC</th><th>位置</th><th>状态</th><th>操作</th></tr>
+              </thead>
+              <tbody id="pointListTbody"><tr><td colspan="11">暂无巡检点数据</td></tr></tbody>
+            </table>
+          </div>
+          <details class="details-block">
+            <summary>查看巡检点接口原始返回</summary>
+            <pre id="pointListResult"></pre>
+          </details>
+        </section>
+      </section>
+      <section id="view-inspection-records" class="view-panel" data-view-title="巡检记录审阅" data-view-desc="按系统、机房、点位和结果审阅移动端巡检记录。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>巡检记录</h2>
+              <p class="muted">集中查看移动端扫码 / NFC 巡检提交结果、巡检项明细和备注。</p>
+            </div>
+          </div>
+          <div class="search-toolbar inspection-record-toolbar">
+            <input id="inspectionRecordSystemId" class="search-input" placeholder="系统 ID（可选）" />
+            <input id="inspectionRecordRoomId" class="search-input" placeholder="机房 ID（可选）" />
+            <input id="inspectionRecordPointId" class="search-input" placeholder="点位 ID（可选）" />
+            <select id="inspectionRecordResult">
+              <option value="">全部结果</option>
+              <option value="normal">正常</option>
+              <option value="abnormal">异常</option>
+            </select>
+            <input id="inspectionRecordStartAt" class="search-input" type="datetime-local" />
+            <input id="inspectionRecordEndAt" class="search-input" type="datetime-local" />
+            <button id="btnListInspectionRecords" class="toolbar-btn">查询</button>
+            <button id="btnClearInspectionRecordFilters" class="toolbar-btn ghost">清空</button>
+          </div>
+          <div id="inspectionRecordSummary" class="result-line"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>ID</th><th>系统</th><th>机房</th><th>点位</th><th>巡检人</th><th>结果</th><th>来源</th><th>巡检时间</th><th>巡检项</th><th>备注</th></tr>
+              </thead>
+              <tbody id="inspectionRecordTbody"><tr><td colspan="10">暂无巡检记录</td></tr></tbody>
+            </table>
+          </div>
+          <details class="details-block">
+            <summary>查看巡检记录接口原始返回</summary>
+            <pre id="inspectionRecordRaw"></pre>
+          </details>
+        </section>
+      </section>
+      <section id="view-ops-workbench" class="view-panel" data-view-title="资产与日常运维" data-view-desc="以三 Tab 工作台整合系统自检、机房巡检与基础数据录入。">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>资产与日常运维工作台</h2>
+              <p class="muted">先把现有系统、自检模板、用户与资产数据收进统一工作台，后续再继续拆细到真正的三 Tab 深度页面。</p>
+            </div>
+          </div>
+          <div class="ops-tabs">
+            <button class="ops-tab active" type="button" data-target-view="view-systems">系统自检配置与记录</button>
+            <button class="ops-tab" type="button" data-target-view="view-inspection-points">巡检点配置</button>
+            <button class="ops-tab" type="button" data-target-view="view-inspection-records">巡检记录审阅</button>
+            <button class="ops-tab" type="button" data-target-view="view-users">用户配置</button>
+          </div>
+          <div class="summary-strip">
+            <div class="summary-card"><span>Tab 1</span><strong>系统自检配置与记录</strong></div>
+            <div class="summary-card"><span>Tab 2</span><strong>巡检点配置</strong></div>
+            <div class="summary-card"><span>Tab 3</span><strong>巡检记录审阅</strong></div>
+            <div class="summary-card"><span>Tab 4</span><strong>用户配置</strong></div>
+          </div>
+          <div class="ops-workbench-sections">
+            <section class="guide-card ops-section-card">
+              <div class="section-head">
+                <div>
+                  <h3>系统自检配置与记录</h3>
+                  <p>以系统为主线，维护负责人、运行环境与最近自检相关数据入口。</p>
+                </div>
+                <button class="toolbar-btn" type="button" data-jump-view="view-systems">进入完整页</button>
+              </div>
+              <div class="grid2">
+                <div class="mini-panel">
+                  <strong>当前承接能力</strong>
+                  <ul class="mini-list">
+                    <li>系统列表检索</li>
+                    <li>新建系统</li>
+                    <li>后续联动负责人 / 服务器</li>
+                  </ul>
+                </div>
+                <div class="mini-panel">
+                  <strong>下一步补齐</strong>
+                  <ul class="mini-list">
+                    <li>负责人字段</li>
+                    <li>检查频次</li>
+                    <li>最近自检状态与时间</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <section class="guide-card ops-section-card">
+              <div class="section-head">
+                <div>
+                  <h3>巡检点配置与记录</h3>
+                  <p>这一块最终要给移动端的扫码巡检、NFC 巡检和巡检记录审阅提供配置与审阅能力。</p>
+                </div>
+                <div class="action-row compact">
+                  <button class="toolbar-btn" type="button" data-jump-view="view-inspection-points">进入巡检点配置</button>
+                  <button class="toolbar-btn secondary" type="button" data-jump-view="view-inspection-records">进入巡检记录</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="guide-card ops-section-card">
+              <div class="section-head">
+                <div>
+                  <h3>用户配置</h3>
+                  <p>维护移动端与管理端共用的用户主数据、角色和后续负责人配置。</p>
+                </div>
+                <div class="action-row compact">
+                  <button class="toolbar-btn secondary" type="button" data-jump-view="view-users">进入用户数据</button>
+                </div>
+              </div>
+              <div class="grid2">
+                <div class="mini-panel">
+                  <strong>当前承接能力</strong>
+                  <ul class="mini-list">
+                    <li>用户列表 / 新增用户</li>
+                    <li>基础查询与筛选</li>
+                  </ul>
+                </div>
+                <div class="mini-panel">
+                  <strong>后续补强方向</strong>
+                  <ul class="mini-list">
+                    <li>系统角色字段</li>
+                    <li>服务器基础 IP 录入</li>
+                    <li>Excel 模板化导入</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-tool-ops" class="view-panel" data-view-title="运维审批" data-view-desc="处理工具任务审批、状态更新与执行结果查看。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>运维审批</h2>
+              <p class="muted">审批与状态流转单独成页，避免和其他低频工具堆叠。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnToolTaskList">刷新工具任务</button>
+              <button id="btnToolTaskUpdate">更新任务状态</button>
+            </div>
+          </div>
+          <div class="grid4">
+            <input id="toolTaskStatusFilter" placeholder="筛选status，如 pending_approval/running" />
+            <input id="toolTaskId" placeholder="task_id" />
+            <select id="toolTaskActionStatus"><option value="approved">approved</option><option value="running">running</option><option value="done">done</option><option value="failed">failed</option><option value="rejected">rejected</option><option value="cancelled">cancelled</option></select>
+            <input id="toolTaskNote" placeholder="备注（可选）" />
+          </div>
+          <div class="summary-strip">
+            <div class="summary-card"><span>主操作</span><strong>先筛选再审批</strong></div>
+            <div class="summary-card"><span>状态更新</span><strong>单任务精确操作</strong></div>
+            <div class="summary-card"><span>结果查看</span><strong>优先看表格</strong></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>动作</th><th>目标</th><th>状态</th><th>执行者</th><th>时间</th><th>说明</th><th>下一步操作</th>
+                </tr>
+              </thead>
+              <tbody id="toolTaskTbody"><tr><td colspan="8">暂无任务</td></tr></tbody>
+            </table>
+          </div>
+          <details class="details-block">
+            <summary>查看任务原始返回</summary>
+            <pre id="toolTaskResult"></pre>
+          </details>
+        </section>
+      </section>
+
+      <section id="view-emergency-ssh" class="view-panel" data-view-title="SSH 主机配置" data-view-desc="维护应急处置使用的远程 SSH 主机信息与认证方式。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>SSH 主机配置</h2>
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencySshAdd">新增</button>
+              <button id="btnEmergencySshMockList" class="toolbar-btn secondary">刷新</button>
+            </div>
+          </div>
+          <div class="search-toolbar">
+            <input id="emgSshKeyword" class="search-input" placeholder="搜索主机编码、主机名、IP 或用户名" />
+            <button id="btnEmergencySshSearch" class="toolbar-btn secondary">搜索</button>
+            <button id="btnEmergencySshClear" class="toolbar-btn ghost">清空</button>
+          </div>
+          <div id="emgSshForm" class="form-section emergency-edit-panel" hidden>
+            <div class="grid4 emergency-admin-grid">
+              <input id="emgSshHostCode" placeholder="主机编码" />
+              <input id="emgSshHostName" placeholder="主机名" />
+              <input id="emgSshHostIp" placeholder="IP 地址" />
+              <input id="emgSshPort" placeholder="SSH 端口，默认 22" value="22" />
+              <input id="emgSshUser" placeholder="登录用户名" />
+              <input id="emgSshSecret" type="password" placeholder="密码（仅首次或重置时输入）" autocomplete="new-password" />
+              <select id="emgSshSystemId"></select>
+              <input id="emgSshRemark" placeholder="备注（可选）" />
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencySshMockSave">保存</button>
+              <button id="btnEmergencySshCancel" class="toolbar-btn secondary" type="button">取消</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>主机编码</th><th>主机名</th><th>IP</th><th>端口</th><th>用户名</th><th>密码</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="emgSshTbody"><tr><td colspan="8">暂无 SSH 主机配置</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="emgSshResult"></pre>
+        </section>
+      </section>
+
+      <section id="view-emergency-server" class="view-panel" data-view-title="服务器动作配置" data-view-desc="维护服务器重启等高危动作与目标 SSH 主机的绑定关系。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>服务器动作配置</h2>
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencyServerAdd">新增</button>
+              <button id="btnEmergencyServerMockList" class="toolbar-btn secondary">刷新</button>
+            </div>
+          </div>
+          <div class="search-toolbar">
+            <input id="emgServerKeyword" class="search-input" placeholder="搜索动作编码、命令名称、主机、系统或管理员" />
+            <button id="btnEmergencyServerSearch" class="toolbar-btn secondary">搜索</button>
+            <button id="btnEmergencyServerClear" class="toolbar-btn ghost">清空</button>
+          </div>
+          <div id="emgServerForm" class="form-section emergency-edit-panel" hidden>
+            <div class="grid4 emergency-admin-grid">
+              <input id="emgServerActionCode" placeholder="动作编码" />
+              <input id="emgServerActionName" placeholder="命令名称，如 重启主机" />
+              <select id="emgServerHostCode"></select>
+              <select id="emgServerSystemId"></select>
+              <select id="emgServerAdminUserId"></select>
+              <input id="emgServerConfirmText" placeholder="确认文案" />
+            </div>
+            <textarea id="emgServerScript" rows="6" placeholder="需要运行的命令，例如 sudo reboot"></textarea>
+            <div class="action-row compact">
+              <button id="btnEmergencyServerMockSave">保存</button>
+              <button id="btnEmergencyServerCancel" class="toolbar-btn secondary" type="button">取消</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>动作编码</th><th>命令名称</th><th>主机</th><th>系统</th><th>管理员</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="emgServerTbody"><tr><td colspan="7">暂无服务器动作配置</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="emgServerResult"></pre>
+        </section>
+      </section>
+
+      <section id="view-emergency-db" class="view-panel" data-view-title="数据库动作配置" data-view-desc="维护 FOC 密码查询、死锁处理、闪回与表空间查询等数据库脚本模板。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>数据库动作配置</h2>
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencyDbAdd">新增</button>
+              <button id="btnEmergencyDbMockList" class="toolbar-btn secondary">刷新列表</button>
+            </div>
+          </div>
+          <div class="search-toolbar">
+            <input id="emgDbKeyword" class="search-input" placeholder="搜索动作编码、名称、数据库类型、主机或系统" />
+            <button id="btnEmergencyDbSearch" class="toolbar-btn secondary">搜索</button>
+            <button id="btnEmergencyDbClear" class="toolbar-btn ghost">清空</button>
+          </div>
+          <div id="emgDbForm" class="form-section emergency-edit-panel" hidden>
+            <div class="grid4 emergency-admin-grid">
+              <input id="emgDbActionCode" placeholder="action_code" />
+              <input id="emgDbActionName" placeholder="动作名称" />
+              <select id="emgDbType"><option value="oracle">oracle</option><option value="mysql">mysql</option><option value="shell_proxy">shell_proxy</option></select>
+              <select id="emgDbHostCode"></select>
+              <select id="emgDbSystemId"></select>
+              <select id="emgDbAdminUserId"></select>
+            </div>
+            <input id="emgDbParamSchema" placeholder='参数定义 JSON，如 [{"name":"employee_id"}]' />
+            <textarea id="emgDbScript" rows="7" placeholder="脚本 / SQL 模板，支持 {{system_code}} / {{employee_id}} 之类占位符"></textarea>
+            <div class="action-row compact">
+              <button id="btnEmergencyDbMockSave">保存</button>
+              <button id="btnEmergencyDbCancel" class="toolbar-btn secondary" type="button">取消</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>action_code</th><th>动作名称</th><th>db_type</th><th>参数</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="emgDbTbody"><tr><td colspan="6">暂无数据库动作配置</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="emgDbResult"></pre>
+        </section>
+      </section>
+
+      <section id="view-emergency-process" class="view-panel" data-view-title="进程动作配置" data-view-desc="维护进程重启与关闭动作，并绑定目标 SSH 主机和脚本模板。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>进程动作配置</h2>
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencyProcessAdd">新增</button>
+              <button id="btnEmergencyProcessMockList" class="toolbar-btn secondary">刷新</button>
+            </div>
+          </div>
+          <div class="search-toolbar">
+            <input id="emgProcKeyword" class="search-input" placeholder="搜索动作编码、命令名称、进程名、主机或系统" />
+            <button id="btnEmergencyProcessSearch" class="toolbar-btn secondary">搜索</button>
+            <button id="btnEmergencyProcessClear" class="toolbar-btn ghost">清空</button>
+          </div>
+          <div id="emgProcForm" class="form-section emergency-edit-panel" hidden>
+            <div class="grid4 emergency-admin-grid">
+              <input id="emgProcActionCode" placeholder="动作编码" />
+              <input id="emgProcActionName" placeholder="命令名称，如 重启 foc-gateway" />
+              <select id="emgProcHostCode"></select>
+              <select id="emgProcSystemId"></select>
+              <select id="emgProcAdminUserId"></select>
+              <input id="emgProcName" placeholder="process_name" />
+              <select id="emgProcIdSource"><option value="runtime_detect">runtime_detect</option><option value="fixed">fixed</option></select>
+              <input id="emgProcDefaultPid" placeholder="default_process_id（可选）" />
+              <input id="emgProcRemark" placeholder="备注（可选）" />
+            </div>
+            <textarea id="emgProcScript" rows="7" placeholder="需要运行的命令，例如 systemctl restart foc-gateway"></textarea>
+            <div class="action-row compact">
+              <button id="btnEmergencyProcessMockSave">保存</button>
+              <button id="btnEmergencyProcessCancel" class="toolbar-btn secondary" type="button">取消</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>动作编码</th><th>命令名称</th><th>进程名</th><th>主机</th><th>系统</th><th>管理员</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="emgProcTbody"><tr><td colspan="8">暂无进程动作配置</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="emgProcResult"></pre>
+        </section>
+      </section>
+
+      <section id="view-emergency-custom" class="view-panel" data-view-title="自定义命令配置" data-view-desc="维护自定义服务器命令，并绑定目标 SSH 主机、系统与管理员。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>自定义命令配置</h2>
+            </div>
+            <div class="action-row compact">
+              <button id="btnEmergencyCustomAdd">新增</button>
+              <button id="btnEmergencyCustomList" class="toolbar-btn secondary">刷新</button>
+            </div>
+          </div>
+          <div class="search-toolbar">
+            <input id="emgCustomKeyword" class="search-input" placeholder="搜索动作编码、命令名称、主机、系统或管理员" />
+            <button id="btnEmergencyCustomSearch" class="toolbar-btn secondary">搜索</button>
+            <button id="btnEmergencyCustomClear" class="toolbar-btn ghost">清空</button>
+          </div>
+          <div id="emgCustomForm" class="form-section emergency-edit-panel" hidden>
+            <div class="grid4 emergency-admin-grid">
+              <input id="emgCustomActionCode" placeholder="动作编码" />
+              <input id="emgCustomActionName" placeholder="命令名称" />
+              <select id="emgCustomHostCode"></select>
+              <select id="emgCustomSystemId"></select>
+              <select id="emgCustomAdminUserId"></select>
+              <input id="emgCustomRemark" placeholder="备注（可选）" />
+            </div>
+            <textarea id="emgCustomScript" rows="7" placeholder="需要运行的命令"></textarea>
+            <div class="action-row compact">
+              <button id="btnEmergencyCustomSave">保存</button>
+              <button id="btnEmergencyCustomCancel" class="toolbar-btn secondary" type="button">取消</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>动作编码</th><th>命令名称</th><th>主机</th><th>系统</th><th>管理员</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="emgCustomTbody"><tr><td colspan="7">暂无自定义命令配置</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="emgCustomResult"></pre>
+        </section>
+      </section>
+
+      <section id="view-tool-ai" class="view-panel" data-view-title="AI诊断" data-view-desc="查看 AI 诊断记录和严重级别分布。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>AI诊断</h2>
+              <p class="muted">把诊断记录查询独立出来，适合快速排查模型输出。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnDiagList">刷新诊断记录</button>
+            </div>
+          </div>
+          <div class="grid2">
+            <input id="diagSeverityFilter" placeholder="severity筛选：low/medium/high" />
+          </div>
+          <pre id="diagListResult"></pre>
+        </section>
+      </section>
+
+      <section id="view-ai-external-keys" class="view-panel" data-view-title="AI 对外接口 Key" data-view-desc="生成和停用免登录调用 AI 对话接口使用的 apikey。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>AI 对外接口 Key</h2>
+              <p class="muted">外部系统调用 AI 对话接口时，在请求体传入 apikey；Key 明文只在生成后显示一次。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnListAiExternalKeys">刷新 Key 列表</button>
+            </div>
+          </div>
+          <div class="form-section">
+            <h3>生成 Key</h3>
+            <div class="grid2">
+              <input id="aiExternalKeyName" placeholder="Key 名称，例如：外部监控平台" />
+              <input id="aiExternalKeyRemark" placeholder="备注（可选）" />
+            </div>
+            <div class="action-row compact">
+              <button id="btnCreateAiExternalKey">生成 apikey</button>
+            </div>
+            <pre id="aiExternalKeyCreateResult"></pre>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>名称</th><th>Key 前缀</th><th>状态</th><th>创建人</th><th>最后使用</th><th>操作</th></tr></thead>
+              <tbody id="aiExternalKeyTbody"><tr><td colspan="7">暂无数据</td></tr></tbody>
+            </table>
+          </div>
+          <pre id="aiExternalKeyListResult"></pre>
+        </section>
+      </section>
+
+      <section id="view-tool-template" class="view-panel" data-view-title="机房巡检配置与记录（承接页）" data-view-desc="当前先承接移动端巡检/自检相关配置与审阅能力，后续再拆成独立机房巡检页。">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>机房巡检配置与记录（承接页）</h2>
+              <p class="muted">当前先承接移动端巡检、自检和状态审阅所需的模板与快照能力，后续会继续拆成“机房/二维码配置 + 巡检历史”双栏结构。</p>
+            </div>
+          </div>
+          <div class="form-section">
+            <h3>自检模板管理</h3>
+            <input id="tplSystemId" placeholder="system_id" />
+            <select id="tplCheckType"><option value="daily">daily</option><option value="weekly">weekly</option><option value="yearly">yearly</option></select>
+            <input id="tplName" placeholder="模板名称" />
+            <div class="action-row compact">
+              <button id="btnCreateTemplate">创建模板</button>
+              <button id="btnListTemplates">刷新模板列表</button>
+            </div>
+            <pre id="templateCreateResult"></pre>
+            <pre id="templateListResult"></pre>
+          </div>
+          <div class="form-section">
+            <h3>状态快照上报</h3>
+            <input id="snapSystemId" placeholder="system_id" />
+            <div class="grid2">
+              <input id="snapHostOnline" placeholder="host_online(normal/abnormal/unknown)" value="normal" />
+              <input id="snapPortOk" placeholder="port_ok(normal/abnormal/unknown)" value="normal" />
+              <input id="snapCpu" type="number" placeholder="cpu_usage(%)" value="60" />
+              <input id="snapMem" type="number" placeholder="mem_usage(%)" value="65" />
+              <input id="snapDisk" type="number" placeholder="disk_usage(%)" value="70" />
+              <input id="snapSelfcheck" placeholder="last_selfcheck_result(normal/warning/critical/unknown)" value="normal" />
+            </div>
+            <button id="btnCreateSnapshot">提交状态快照</button>
+            <pre id="snapshotResult"></pre>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-tool-rules" class="view-panel" data-view-title="规则与审计" data-view-desc="调整状态规则并检索审计日志。">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>规则与审计</h2>
+              <p class="muted">把配置与审计聚合在一个治理页面，便于联动分析。</p>
+            </div>
+          </div>
+          <div class="form-section">
+            <h3>状态规则配置</h3>
+            <div class="grid2">
+              <label>CPU 黄阈值(%)<input id="cpuWarn" type="number" value="70" /></label>
+              <label>CPU 红阈值(%)<input id="cpuCritical" type="number" value="90" /></label>
+              <label>内存 黄阈值(%)<input id="memWarn" type="number" value="75" /></label>
+              <label>内存 红阈值(%)<input id="memCritical" type="number" value="90" /></label>
+              <label>磁盘 黄阈值(%)<input id="diskWarn" type="number" value="80" /></label>
+              <label>磁盘 红阈值(%)<input id="diskCritical" type="number" value="95" /></label>
+            </div>
+            <div class="action-row compact">
+              <button id="btnLoadRules">读取后端规则</button>
+              <button id="btnSaveRules">保存到后端</button>
+            </div>
+            <pre id="ruleResult"></pre>
+          </div>
+          <div class="form-section">
+            <h3>审计日志</h3>
+            <div class="grid3">
+              <input id="auditAction" placeholder="action，例如 create_user" />
+              <input id="auditUsername" placeholder="username，例如 admin" />
+              <input id="auditResource" placeholder="resource，例如 system" />
+            </div>
+            <div class="grid3">
+              <input id="auditStartAt" placeholder="start_at，例如 2026-02-25T00:00:00" />
+              <input id="auditEndAt" placeholder="end_at，例如 2026-02-25T23:59:59" />
+              <input id="auditKeyword" placeholder="keyword（detail模糊匹配）" />
+            </div>
+            <div class="action-row compact">
+              <button id="btnAudit">按筛选读取审计日志</button>
+              <button id="btnAuditClear">清空筛选</button>
+            </div>
+            <pre id="audit"></pre>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-tool-threatbook" class="view-panel" data-view-title="高危IP研判" data-view-desc="查询 IP 风险情报，支持 Excel 导入与封禁候选筛选。">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>高危IP研判</h2>
+              <p class="muted">把查询、筛选和封禁动作放在一页，但按“输入 / 结果 / 操作”三段组织，避免一眼看上去太满。</p>
+            </div>
+          </div>
+          <div class="form-section">
+            <h3>查询输入</h3>
+            <div class="grid2">
+              <select id="threatbookLang"><option value="zh">中文</option><option value="en">英文</option></select>
+              <select id="threatbookRealtimeVerdict"><option value="true">仅当前有效情报</option><option value="false">包含历史过期情报</option></select>
+            </div>
+            <label>单个 / 批量 IP 输入（支持逗号、空格、换行分隔）
+              <textarea id="threatbookRawInput" rows="6" style="width:100%;padding:10px;">127.0.0.1</textarea>
+            </label>
+            <div class="action-row compact">
+              <button id="btnThreatbookQuery">查询 IP 风险</button>
+              <button id="btnThreatbookFillDemo">填充示例</button>
+            </div>
+            <p class="muted">支持直接粘贴批量 IP，也支持导入 Excel（默认读取首个命中 IP 列，列名可为 ip / IP地址 等）。</p>
+            <div class="grid2">
+              <input id="threatbookExcelFile" type="file" accept=".xlsx,.xlsm,.xltx,.xltm" />
+              <button id="btnThreatbookUploadExcel">导入 Excel 并查询</button>
+            </div>
+          </div>
+          <div class="summary-strip">
+            <div class="summary-card"><span>查询模式</span><strong>文本 / Excel</strong></div>
+            <div class="summary-card"><span>重点结果</span><strong>自动封禁 / 二次确认</strong></div>
+            <div class="summary-card"><span>建议流程</span><strong>先筛选，再执行动作</strong></div>
+          </div>
+          <div class="form-section">
+            <h3>结果筛选</h3>
+            <div class="grid3">
+              <select id="threatbookResultFilter">
+                <option value="all">全部结果</option>
+                <option value="auto_block">仅自动封禁</option>
+                <option value="manual_confirm">仅待二次确认</option>
+                <option value="malicious">仅恶意 IP</option>
+              </select>
+              <button id="btnThreatbookApplyFilter">应用筛选</button>
+              <button id="btnThreatbookResetFilter">重置筛选</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>IP</th><th>风险等级</th><th>是否恶意</th><th>严重级别</th><th>可信度</th><th>建议动作</th><th>摘要</th>
+                  </tr>
+                </thead>
+                <tbody id="threatbookResultTbody"><tr><td colspan="7">暂无结果</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="form-section">
+            <h3>后续动作</h3>
+            <div class="grid2">
+              <input id="threatbookBlockIp" placeholder="要封禁的 IP（可从结果里复制）" />
+              <input id="threatbookBlockReason" placeholder="封禁原因（可选）" />
+            </div>
+            <div class="grid3">
+              <button id="btnThreatbookBlock">模拟封禁指定 IP</button>
+              <button id="btnThreatbookBatchBlock">模拟封禁自动封禁候选</button>
+              <button id="btnThreatbookExport">导出结果 JSON</button>
+            </div>
+            <details class="details-block" open>
+              <summary>查看查询摘要与原始返回</summary>
+              <pre id="threatbookResult">尚未查询</pre>
+            </details>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-tool-debug" class="view-panel" data-view-title="调试与错误码" data-view-desc="查看当前连接状态、常见错误码和接口调试历史。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>调试与错误码</h2>
+              <p class="muted">保留给联调和排障使用，避免干扰常规管理操作。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnDebugHealthz">检测 healthz</button>
+              <button id="btnDebugMe">读取当前用户</button>
+            </div>
+          </div>
+          <div class="debug-grid">
+            <div class="debug-card"><span>API Base</span><strong id="debugApiBase">--</strong></div>
+            <div class="debug-card"><span>Token 状态</span><strong id="debugTokenState">未登录</strong></div>
+            <div class="debug-card"><span>当前用户</span><strong id="debugCurrentUser">--</strong></div>
+            <div class="debug-card"><span>最近请求时间</span><strong id="debugLastRequestAt">--</strong></div>
+          </div>
+          <details class="details-block">
+            <summary>查看调试输出</summary>
+            <pre id="debugPanelResult">尚未执行调试检查</pre>
+          </details>
+
+          <h3>错误码说明</h3>
+          <ul class="code-list">
+            <li><code>TOKEN_EXPIRED</code>：Token 过期，需要重新登录</li>
+            <li><code>TOKEN_INVALID</code>：Token 无效或格式错误</li>
+            <li><code>USER_DISABLED</code>：账号已禁用</li>
+            <li><code>USER_NOT_FOUND</code>：账号不存在</li>
+            <li><code>FORBIDDEN</code>：权限不足</li>
+            <li><code>VALIDATION_ERROR</code>：参数校验失败</li>
+            <li><code>HTTP_ERROR</code>：通用业务错误</li>
+          </ul>
+          <div class="action-row compact">
+            <button id="btnRefreshHistory">刷新历史</button>
+            <button id="btnClearHistory">清空历史</button>
+          </div>
+          <details class="details-block">
+            <summary>查看接口调试历史</summary>
+            <pre id="requestHistory"></pre>
+          </details>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="createUserModal" class="modal hidden" hidden aria-hidden="true">
+    <div class="modal-card">
+      <h3>新增用户</h3>
+      <label>用户名
+        <input id="modalUserName" placeholder="请输入用户名" />
+      </label>
+      <label>密码
+        <input id="modalUserPassword" type="password" placeholder="请输入密码" />
+      </label>
+      <label>角色
+        <select id="modalUserRole">
+          <option value="inspector">巡检员</option>
+          <option value="admin">管理员</option>
+          <option value="super_admin">超级管理员</option>
+        </select>
+      </label>
+      <div class="grid2">
+        <button id="btnSubmitCreateUser">确认新增</button>
+        <button id="btnCloseCreateUserModal" type="button">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="createSystemModal" class="modal hidden" hidden aria-hidden="true">
+    <div class="modal-card">
+      <h3 id="systemModalTitle">新增系统</h3>
+      <label>系统编号
+        <input id="modalSystemCode" placeholder="请输入系统编号" />
+      </label>
+      <label>系统名称
+        <input id="modalSystemName" placeholder="请输入系统名称" />
+      </label>
+      <label>系统地址/IP
+        <input id="modalSystemHostAddress" placeholder="例如 192.168.1.10" />
+      </label>
+      <div class="inline-form-actions">
+        <button id="btnTestSystemHost" class="toolbar-btn ghost" type="button">测试连通性</button>
+        <span id="systemHostTestResult" class="inline-result"></span>
+      </div>
+      <label>环境
+        <select id="modalSystemEnv">
+          <option value="prod">生产</option>
+          <option value="test">测试</option>
+          <option value="dev">开发</option>
+        </select>
+      </label>
+      <label>启用状态
+        <select id="modalSystemActive">
+          <option value="true">启用</option>
+          <option value="false">停用</option>
+        </select>
+      </label>
+      <label>管理员
+        <input id="modalSystemOwnerIds" type="hidden" />
+        <div id="modalSystemOwnerSummary" class="selection-summary">暂未选择管理员</div>
+        <button id="btnOpenSystemOwnerPicker" class="toolbar-btn ghost" type="button">选择管理员</button>
+      </label>
+      <label>检查频次
+        <select id="modalSystemCheckFrequency">
+          <option value="">不设置</option>
+          <option value="hourly">每小时</option>
+          <option value="daily">每天</option>
+          <option value="weekly">每周</option>
+          <option value="monthly">每月</option>
+        </select>
+      </label>
+      <label>日志位置
+        <textarea id="modalSystemLogConfigs" rows="4" placeholder="每行一条绝对路径，例如：/var/log/nginx/error.log"></textarea>
+      </label>
+      <label>自检 skill
+        <textarea id="modalSystemSelfcheckSkill" rows="5" placeholder="配置该系统的 AI 自检要求，例如检查哪些服务、指标阈值、常见告警处理步骤"></textarea>
+      </label>
+      <label>备注
+        <input id="modalSystemRemark" placeholder="补充说明（可选）" />
+      </label>
+      <div class="grid2">
+        <button id="btnSubmitCreateSystem">确认新增</button>
+        <button id="btnCloseCreateSystemModal" type="button">取消</button>
+      </div>
+      <button id="btnDeleteSystem" class="danger hidden" type="button">删除系统</button>
+    </div>
+  </div>
+
+  <div id="systemOwnerPickerModal" class="modal hidden" hidden aria-hidden="true">
+    <div class="modal-card">
+      <h3>选择管理员</h3>
+      <div class="search-toolbar picker-toolbar">
+        <input id="systemOwnerSearchKeyword" class="search-input" placeholder="搜索用户名 / 用户ID" />
+        <button id="btnSearchSystemOwners" class="toolbar-btn" type="button">搜索</button>
+      </div>
+      <div id="systemOwnerPickerList" class="picker-list"></div>
+      <div class="grid2">
+        <button id="btnConfirmSystemOwners" type="button">确认选择</button>
+        <button id="btnCloseSystemOwnerPicker" type="button">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="createPointModal" class="modal hidden" hidden aria-hidden="true">
+    <div class="modal-card">
+      <h3 id="pointModalTitle">新增巡检点</h3>
+      <label>点位编号
+        <input id="modalPointCode" placeholder="请输入点位编号" />
+      </label>
+      <label>点位名称
+        <input id="modalPointName" placeholder="请输入点位名称" />
+      </label>
+      <label>点位类型
+        <select id="modalPointType">
+          <option value="point">巡检点</option>
+          <option value="system">系统</option>
+          <option value="device">设备</option>
+          <option value="area">区域</option>
+        </select>
+      </label>
+      <label>所属机房
+        <select id="modalPointRoomId"></select>
+      </label>
+      <label>关联系统
+        <select id="modalPointSystemId"></select>
+      </label>
+      <label>二维码值
+        <input id="modalPointQrContent" placeholder="为空时默认使用点位编号" />
+      </label>
+      <label>NFC 值
+        <input id="modalPointNfcTag" placeholder="可选，NFC 标签内容" />
+      </label>
+      <label>位置说明
+        <input id="modalPointLocationDetail" placeholder="例如 A 栋 3 层核心机房门口" />
+      </label>
+      <label>启用状态
+        <select id="modalPointActive">
+          <option value="true">启用</option>
+          <option value="false">停用</option>
+        </select>
+      </label>
+      <div class="grid2">
+        <button id="btnSubmitPoint">确认新增</button>
+        <button id="btnCloseCreatePointModal" type="button">取消</button>
+      </div>
+      <button id="btnDeletePoint" class="danger hidden" type="button">删除巡检点</button>
+    </div>
+  </div>
+  <script defer src="./js/api.js"></script>
+  <script defer src="./js/auth.js"></script>
+  <script defer src="./js/dashboard.js"></script>
+  <script defer src="./js/toolbox.js"></script>
+  <script defer src="./js/inspection-points.js"></script>
+  <script defer src="./js/inspection-records.js"></script>
+  <script defer src="./js/users.js"></script>
+  <script defer src="./js/systems.js"></script>
+  <script defer src="./js/rules-audit.js"></script>
+  <script defer src="./js/templates.js"></script>
+  <script defer src="./js/modals.js"></script>
+  <script defer src="./js/threatbook.js"></script>
+  <script defer src="./js/debug.js"></script>
+  <script defer src="./js/emergency-config.js"></script>
+  <script defer src="./js/shared-data.js"></script>
+  <script defer src="./app.js"></script>
+</body>
+</html>

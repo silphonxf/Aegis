@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment and secrets
+.env
+.env.*
+!*.env.example
+*.key
+*.pem
+.certs/
+
+# Runtime data
+*.db
+*.sqlite
+*.sqlite3
+.logs/
+logs/
+uploads/
+selfcheck_reports/
+
+# Frontend
+node_modules/
+dist/
+.vite/
+
+# Build and package artifacts
+*.tar.gz
+*.zip
+*.whl
+wheelhouse*/
+
+# OS and IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Local scratch
+*.bak
+*.bak.*
+tmp/

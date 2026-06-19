@@ -1,0 +1,11 @@
+fastapi==0.103.2
+uvicorn[standard]==0.23.2
+sqlalchemy==2.0.35
+pydantic==1.10.18
+python-jose==3.3.0
+passlib[bcrypt]==1.7.4
+alembic==1.13.2
+python-multipart==0.0.9
+openpyxl==3.1.5
+requests==2.32.3
+PyMySQL==1.1.1
