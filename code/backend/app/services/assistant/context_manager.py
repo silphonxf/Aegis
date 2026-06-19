@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 
@@ -8,7 +8,7 @@ class ContextManager:
     def __init__(self) -> None:
         self._store: Dict[str, Dict[str, Any]] = {}
 
-    def ensure(self, conversation_id: str | None) -> tuple[str, Dict[str, Any]]:
+    def ensure(self, conversation_id: Optional[str]) -> tuple[str, Dict[str, Any]]:
         conv_id = conversation_id or f"conv_{uuid4().hex}"
         ctx = self._store.setdefault(
             conv_id,

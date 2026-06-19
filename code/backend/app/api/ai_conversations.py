@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -110,7 +111,7 @@ def get_conversation(
     )
 
 
-def _touch_conversation(db: Session, conversation_id: str, *, title_hint: str | None = None) -> None:
+def _touch_conversation(db: Session, conversation_id: str, *, title_hint: Optional[str] = None) -> None:
     row = db.query(AIConversation).filter(AIConversation.conversation_id == conversation_id).first()
     if not row:
         return

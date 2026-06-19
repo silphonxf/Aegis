@@ -98,7 +98,12 @@ class EntityResolver:
             return None
         return self._normalize_candidate(match.group(1))
 
-    def resolve(self, message: str, context: Dict[str, Any] | None = None, route_arguments: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    def resolve(
+        self,
+        message: str,
+        context: Optional[Dict[str, Any]] = None,
+        route_arguments: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         text = (message or "").strip()
         context = context or {}
         args = dict(route_arguments or {})

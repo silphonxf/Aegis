@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 from app.schemas.assistant import AssistantAction, AssistantToolCall
 
@@ -17,7 +17,7 @@ register_all_tools(registry)
 logger = logging.getLogger(__name__)
 
 
-def _extract_url_from_message(message: str) -> str | None:
+def _extract_url_from_message(message: str) -> Optional[str]:
     import re
     from urllib.parse import urlparse
 
@@ -59,7 +59,14 @@ class AssistantExecutor:
     def __init__(self) -> None:
         self.router = AssistantRouter()
 
-    def _build_tool_arguments(self, tool: str | None, message: str, ctx: dict, attachments: list[dict], route_arguments: dict | None = None) -> dict:
+    def _build_tool_arguments(
+        self,
+        tool: Optional[str],
+        message: str,
+        ctx: dict,
+        attachments: list[dict],
+        route_arguments: Optional[dict] = None,
+    ) -> dict:
         if not tool:
             return {}
         route_args = dict(route_arguments or {})
@@ -158,7 +165,7 @@ class AssistantExecutor:
             return args
         return {}
 
-    def chat(self, conversation_id: str | None, message: str, attachments: list[dict] | None = None):
+    def chat(self, conversation_id: Optional[str], message: str, attachments: Optional[list[dict]] = None):
         conv_id, ctx = context_manager.ensure(conversation_id)
         history = list(ctx.get("messages") or [])
         route = self.router.route(message, history=history, attachments=attachments or [])

@@ -1,5 +1,6 @@
 from datetime import datetime
 import hashlib
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -53,7 +54,7 @@ def _load_assistant_attachments(db: Session, file_refs: list[dict]) -> list[dict
     return items
 
 
-def _save_assistant_turn(db: Session, conversation_id: str | None, user_message: str, assistant_reply: str) -> None:
+def _save_assistant_turn(db: Session, conversation_id: Optional[str], user_message: str, assistant_reply: str) -> None:
     if not conversation_id:
         return
     message = (user_message or "").strip()

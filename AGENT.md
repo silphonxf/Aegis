@@ -18,6 +18,10 @@ Curated Codex workspace:
 /home/xf/.codex/workspace/projects/Aegis
 ```
 
+## Python Development
+
+Use Python 3.9-compatible code and dependencies for backend and script development. Do not use syntax, standard-library APIs, dependency versions, or typing forms that require Python 3.10 or newer.
+
 ## Current Structure
 
 ```text

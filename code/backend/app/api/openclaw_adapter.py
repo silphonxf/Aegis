@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Header, HTTPException
 
 from app.core.config import settings
@@ -7,7 +9,7 @@ from app.services.ai_provider import mock_diagnose, mock_suggestions, offline_ru
 router = APIRouter(prefix="/aegis/ai", tags=["openclaw-adapter"])
 
 
-def _check_auth(authorization: str | None) -> None:
+def _check_auth(authorization: Optional[str]) -> None:
     if not settings.OPENCLAW_ADAPTER_ENABLED:
         raise HTTPException(status_code=404, detail={"code": "ADAPTER_DISABLED", "message": "OpenClaw adapter 未启用"})
     if not authorization or not authorization.startswith("Bearer "):
@@ -23,7 +25,7 @@ def adapter_healthz():
 
 
 @router.post("/chat")
-def adapter_chat(payload: AdapterChatRequest, authorization: str | None = Header(default=None)):
+def adapter_chat(payload: AdapterChatRequest, authorization: Optional[str] = Header(default=None)):
     _check_auth(authorization)
 
     message = (payload.message or "").strip() or "请帮我分析这些附件。"
@@ -52,7 +54,7 @@ def adapter_chat(payload: AdapterChatRequest, authorization: str | None = Header
 
 
 @router.post("/diagnose")
-def adapter_diagnose(payload: AdapterDiagnoseRequest, authorization: str | None = Header(default=None)):
+def adapter_diagnose(payload: AdapterDiagnoseRequest, authorization: Optional[str] = Header(default=None)):
     _check_auth(authorization)
     result = mock_diagnose(payload.title, payload.detail, payload.severity)
     return {
@@ -66,7 +68,7 @@ def adapter_diagnose(payload: AdapterDiagnoseRequest, authorization: str | None 
 
 
 @router.post("/log-analyze")
-def adapter_log_analyze(payload: AdapterLogAnalyzeRequest, authorization: str | None = Header(default=None)):
+def adapter_log_analyze(payload: AdapterLogAnalyzeRequest, authorization: Optional[str] = Header(default=None)):
     _check_auth(authorization)
     result = offline_rule_analyze(payload.detail, payload.severity)
     return {

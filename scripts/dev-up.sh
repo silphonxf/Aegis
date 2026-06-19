@@ -14,12 +14,13 @@ BACKEND_PORT="${AEGIS_BACKEND_PORT:-8000}"
 MOBILE_PORT="${AEGIS_MOBILE_PORT:-5173}"
 ADMIN_PORT="${AEGIS_ADMIN_PORT:-5174}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-VENV_PYTHON="${VENV_PYTHON:-$VENV_DIR/bin/python}"
-VENV_UVICORN="${VENV_UVICORN:-$VENV_DIR/bin/uvicorn}"
-VENV_ALEMBIC="${VENV_ALEMBIC:-$VENV_DIR/bin/alembic}"
 HTTPS_CERT="${AEGIS_HTTPS_CERT:-$CERT_DIR/dev-lan.crt}"
 HTTPS_KEY="${AEGIS_HTTPS_KEY:-$CERT_DIR/dev-lan.key}"
 LOCAL_ADMIN_PASSWORD="${AEGIS_INIT_ADMIN_PASSWORD:-local_admin_pass_2026}"
+
+VENV_PYTHON="${VENV_PYTHON:-$VENV_DIR/bin/python}"
+VENV_UVICORN="${VENV_UVICORN:-$VENV_DIR/bin/uvicorn}"
+VENV_ALEMBIC="${VENV_ALEMBIC:-$VENV_DIR/bin/alembic}"
 
 get_lan_ips() {
   hostname -I 2>/dev/null | awk '{for(i=1;i<=NF;i++) print $i}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || true

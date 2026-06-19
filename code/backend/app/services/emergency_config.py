@@ -30,11 +30,11 @@ def _ensure_parent():
     _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
-def _mask_secret(value: str | None) -> str | None:
+def _mask_secret(value: Optional[str]) -> Optional[str]:
     return "***" if value else None
 
 
-def _encrypt_secret(value: str | None) -> str | None:
+def _encrypt_secret(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
     key = os.getenv("AEGIS_CREDENTIALS_MASTER_KEY") or os.getenv("AEGIS_SECRET_KEY") or settings.SECRET_KEY

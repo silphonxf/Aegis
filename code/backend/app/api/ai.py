@@ -53,7 +53,7 @@ def _load_chat_files(db: Session, file_refs: list[dict]) -> list[dict]:
 
 
 
-def _load_conversation_history(db: Session, conversation_id: str | None) -> list[dict]:
+def _load_conversation_history(db: Session, conversation_id: Optional[str]) -> list[dict]:
     if not conversation_id:
         return []
     rows = (
@@ -68,7 +68,7 @@ def _load_conversation_history(db: Session, conversation_id: str | None) -> list
 
 
 
-def _save_conversation_turn(db: Session, conversation_id: str | None, user_message: str, ai_reply: str) -> None:
+def _save_conversation_turn(db: Session, conversation_id: Optional[str], user_message: str, ai_reply: str) -> None:
     if not conversation_id:
         return
     if user_message.strip():

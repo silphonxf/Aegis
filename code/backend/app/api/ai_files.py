@@ -2,6 +2,7 @@ import base64
 import os
 import re
 from pathlib import Path
+from typing import Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -52,7 +53,7 @@ def _decode_text_bytes(raw: bytes) -> str:
     return raw.decode("latin-1", errors="replace")
 
 
-def _decode_data_url(data_url: str) -> tuple[bytes, str | None]:
+def _decode_data_url(data_url: str) -> Tuple[bytes, Optional[str]]:
     match = re.match(r"^data:([^;]+);base64,(.+)$", data_url, re.S)
     if match:
         mime_type = match.group(1)
@@ -66,7 +67,7 @@ def _decode_data_url(data_url: str) -> tuple[bytes, str | None]:
         raise HTTPException(status_code=400, detail={"code": "FILE_DECODE_FAILED", "message": f"附件解码失败: {e}"})
 
 
-def _extract_text(name: str, mime_type: str, raw: bytes) -> str | None:
+def _extract_text(name: str, mime_type: str, raw: bytes) -> Optional[str]:
     lowered_mime = (mime_type or "").lower()
     text_like = any(token in lowered_mime for token in TEXT_MIME_TOKENS)
     text_like = text_like or bool(re.search(rf"\.({'|'.join(TEXT_LOG_EXTENSIONS)})$", name, re.I))
