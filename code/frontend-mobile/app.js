@@ -175,7 +175,7 @@ function explainActionError(error, featureName, roleHint) {
     return `${featureName}失败：当前账号权限不足，通常需要 ${roleHint}。`;
   }
   if (msg.includes('请求发送失败')) {
-    return `${featureName}失败：接口请求未发出。请检查后端是否可达，或确认手机浏览器没有拦截 HTTPS 页面访问 HTTP 接口。`;
+    return `${featureName}失败：接口请求被浏览器拦截或未完成。若连通性检查正常但登录失败，优先检查后端 CORS 是否放行当前页面地址。`;
   }
   if (msg.includes('请求超时')) {
     return `${featureName}失败：接口响应超时，请稍后重试。`;
@@ -301,7 +301,7 @@ function normalizeApiError(error, resp, data, url) {
 
   const raw = error?.message || 'fetch failed';
   if (/Failed to fetch|NetworkError|Load failed|fetch failed/i.test(raw)) {
-    return new Error('请求发送失败：请检查后端是否可达，或确认手机浏览器没有拦截 HTTPS 页面访问 HTTP 接口。');
+    return new Error(`请求发送失败：浏览器没有完成接口请求。常见原因是后端 CORS 未放行当前页面地址，也可能是后端证书未被信任或 HTTPS 页面访问了 HTTP 接口。当前接口：${url}`);
   }
 
   return error instanceof Error ? error : new Error(String(raw));
