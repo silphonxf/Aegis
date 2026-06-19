@@ -7,7 +7,7 @@ MOBILE_DIR="$ROOT_DIR/code/frontend-mobile"
 ADMIN_DIR="$ROOT_DIR/code/frontend-admin"
 LOG_DIR="$ROOT_DIR/.logs"
 CERT_DIR="$ROOT_DIR/.certs"
-VENV_DIR="$ROOT_DIR/.venv"
+VENV_DIR="${VENV_DIR:-$ROOT_DIR/.venv}"
 mkdir -p "$LOG_DIR"
 
 BACKEND_PORT="${AEGIS_BACKEND_PORT:-8000}"
