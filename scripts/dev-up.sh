@@ -7,13 +7,7 @@ MOBILE_DIR="$ROOT_DIR/code/frontend-mobile"
 ADMIN_DIR="$ROOT_DIR/code/frontend-admin"
 LOG_DIR="$ROOT_DIR/.logs"
 CERT_DIR="$ROOT_DIR/.certs"
-DEFAULT_VENV_DIR="$ROOT_DIR/.venv"
-OPENCLAW_VENV_DIR="/home/xf/.openclaw/workspace/projects/Aegis/.venv"
-if [[ -z "${VENV_DIR:-}" && ! -x "$DEFAULT_VENV_DIR/bin/python" && -x "$OPENCLAW_VENV_DIR/bin/python" ]]; then
-  VENV_DIR="$OPENCLAW_VENV_DIR"
-else
-  VENV_DIR="${VENV_DIR:-$DEFAULT_VENV_DIR}"
-fi
+VENV_DIR="${VENV_DIR:-$ROOT_DIR/.venv}"
 mkdir -p "$LOG_DIR"
 
 BACKEND_PORT="${AEGIS_BACKEND_PORT:-8000}"
