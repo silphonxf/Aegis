@@ -68,6 +68,7 @@ const state = {
   isCustomLogTimeRange: false,
   metricSeries: { cpu: [], mem: [], disk: [] },
   chartTimer: null,
+  selfcheckStatusTimer: null,
   extractedErrors: [],
   profile: JSON.parse(localStorage.getItem('aegis_profile') || '{}'),
   statusSystems: [],
@@ -386,6 +387,7 @@ function getDetailPageTitle(pageId) {
 
 function openDetailPage(pageId) {
   state.activeDetailPage = pageId;
+  if (pageId !== 'page-selfcheck-run') stopSelfcheckStatusLoop();
   document.querySelectorAll('.detail-screen').forEach((el) => el.classList.add('hidden'));
   $(pageId)?.classList.remove('hidden');
   const title = getDetailPageTitle(pageId);
@@ -399,6 +401,7 @@ function openDetailPage(pageId) {
 
 function closeDetailPages() {
   state.activeDetailPage = '';
+  stopSelfcheckStatusLoop();
   document.querySelectorAll('.detail-screen').forEach((el) => el.classList.add('hidden'));
   updateTopbarByTab(state.activeTab || 'tab-workbench');
 }
@@ -811,7 +814,7 @@ async function confirmAssistantAction(actionId, confirmed) {
       action_id: actionId,
       confirmed,
     }),
-    timeoutMs: 45000,
+    timeoutMs: 150000,
   });
 
   await appendAssistantResult(result, '操作已完成。');
@@ -914,7 +917,7 @@ async function sendAiQuestion(reusePayload = null) {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(payload),
-      timeoutMs: 45000,
+      timeoutMs: 150000,
     });
     const reply = formatAiReply(result);
     state.aiMessages = state.aiMessages.filter((item) => !item.pending);
@@ -1508,11 +1511,16 @@ async function beginSelfcheckFlow() {
 async function openSelfcheckPageForSystem(systemId) {
   closeSelfcheckSystemModal();
   state.selectedStatusSystemId = Number(systemId) || null;
+  state.metricSeries = { cpu: [], mem: [], disk: [] };
   openDetailPage('page-selfcheck-run');
   renderStatusSystemOptions();
   if ($('scStatusSystem')) $('scStatusSystem').value = String(state.selectedStatusSystemId || '');
   show('selfcheckAiReport', '请选择系统后点击“开始 AI 自检”生成报告。');
   syncSelfcheckTimerUi();
+  await refreshSelfcheckStatus({ collect: true }).catch((e) => {
+    if ($('statusSystemHint')) $('statusSystemHint').textContent = explainActionError(e, '刷新系统自检状态', 'inspector / admin / super_admin');
+  });
+  startSelfcheckStatusLoop();
   await loadSelfcheckReports({ recent: true }).catch(() => {});
 }
 
@@ -1520,7 +1528,16 @@ function formatUsage(value) {
   return value === null || value === undefined ? '-' : `${Math.round(Number(value))}%`;
 }
 
-function renderSelfcheckStatus(data) {
+function ensureMetricLine(values, latestValue) {
+  const finite = values.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  const latest = Number(latestValue);
+  if (!Number.isFinite(latest)) return finite;
+  if (finite.length >= 2) return finite.slice(-24);
+  if (finite.length === 1) return [finite[0], latest].slice(-24);
+  return Array.from({ length: 6 }, () => latest);
+}
+
+function renderSelfcheckStatus(data, options = {}) {
   const latest = data?.status?.latest || null;
   const system = data?.system || {};
   const summary = $('selfcheckStatusSummary');
@@ -1536,11 +1553,27 @@ function renderSelfcheckStatus(data) {
     ` : '<div class="hint">当前系统暂无状态快照。</div>';
   }
   const series = data?.status?.series || [];
-  state.metricSeries = {
+  const nextSeries = {
     cpu: series.map((item) => Number(item.cpu_usage)).filter((v) => Number.isFinite(v)),
     mem: series.map((item) => Number(item.mem_usage)).filter((v) => Number.isFinite(v)),
     disk: series.map((item) => Number(item.disk_usage)).filter((v) => Number.isFinite(v)),
   };
+  if (options.appendLatest && latest) {
+    state.metricSeries = {
+      cpu: ensureMetricLine(state.metricSeries.cpu.length ? state.metricSeries.cpu : nextSeries.cpu, latest.cpu_usage),
+      mem: ensureMetricLine(state.metricSeries.mem.length ? state.metricSeries.mem : nextSeries.mem, latest.mem_usage),
+      disk: ensureMetricLine(state.metricSeries.disk.length ? state.metricSeries.disk : nextSeries.disk, latest.disk_usage),
+    };
+    pushMetric('cpu', latest.cpu_usage);
+    pushMetric('mem', latest.mem_usage);
+    pushMetric('disk', latest.disk_usage);
+  } else {
+    state.metricSeries = {
+      cpu: ensureMetricLine(nextSeries.cpu, latest?.cpu_usage),
+      mem: ensureMetricLine(nextSeries.mem, latest?.mem_usage),
+      disk: ensureMetricLine(nextSeries.disk, latest?.disk_usage),
+    };
+  }
   renderCharts();
 }
 
@@ -1555,20 +1588,79 @@ function renderSelfcheckAlarms(alarms = []) {
   `).join('') : '<div class="hint">当前时间范围内暂无告警。</div>';
 }
 
+async function collectSelectedSelfcheckSnapshot() {
+  const systemId = Number($('scStatusSystem')?.value || state.selectedStatusSystemId || 0);
+  const selected = state.statusSystems.find((item) => Number(item.system_id) === systemId);
+  const systemCode = selected?.system_code;
+  if (!systemCode) return null;
+  const params = new URLSearchParams({
+    system_code: systemCode,
+    env: selected?.env || 'prod',
+  });
+  return api(`/api/v1/monitoring/collect/local?${params.toString()}`, {
+    method: 'POST',
+    headers: authHeaders(),
+    timeoutMs: 10000,
+  }).catch(() => null);
+}
+
+async function refreshSelfcheckStatus(options = {}) {
+  const systemId = Number($('scStatusSystem')?.value || state.selectedStatusSystemId || 0);
+  if (!systemId) return null;
+  state.selectedStatusSystemId = systemId;
+  const range = Number(options.rangeMinutes || $('selfcheckRange')?.value || 60);
+  if (options.collect) await collectSelectedSelfcheckSnapshot();
+  const data = await api(`/api/v1/selfchecks/status?system_id=${encodeURIComponent(systemId)}&range_minutes=${encodeURIComponent(range)}`, { headers: authHeaders() });
+  renderSelfcheckStatus(data, { appendLatest: Boolean(options.appendLatest) });
+  renderSelfcheckAlarms(data.alarms || []);
+  const latest = data?.status?.latest;
+  if ($('statusSystemHint')) {
+    $('statusSystemHint').textContent = latest
+      ? `当前系统：${data.system?.system_name || data.system?.system_code || systemId} · 最新采集 ${latest.captured_at || '-'}`
+      : `当前系统：${data.system?.system_name || data.system?.system_code || systemId} · 暂无状态快照`;
+  }
+  return data;
+}
+
+function startSelfcheckStatusLoop() {
+  stopSelfcheckStatusLoop();
+  state.selfcheckStatusTimer = setInterval(() => {
+    if (state.activeDetailPage !== 'page-selfcheck-run') {
+      stopSelfcheckStatusLoop();
+      return;
+    }
+    refreshSelfcheckStatus({ collect: true, appendLatest: true }).catch(() => {});
+  }, 5000);
+}
+
+function stopSelfcheckStatusLoop() {
+  if (!state.selfcheckStatusTimer) return;
+  clearInterval(state.selfcheckStatusTimer);
+  state.selfcheckStatusTimer = null;
+}
+
 function renderSelfcheckAiReport(data) {
   const report = data?.ai_report;
+  const alarmCount = Number(data?.alarm_count ?? data?.report_file?.alarm_count ?? (Array.isArray(data?.alarms) ? data.alarms.length : 0));
+  const checkedAt = data?.checked_at || data?.report_file?.checked_at || '';
+  const fileName = data?.report_file?.file_name || '';
+  const meta = [
+    checkedAt ? `报告时间：${checkedAt}` : '',
+    `告警数：${Number.isFinite(alarmCount) ? alarmCount : 0} 条`,
+    fileName ? `报告文件：${fileName}` : '',
+  ].filter(Boolean).join('\n');
   if (!data?.system?.selfcheck_skill) {
-    show('selfcheckAiReport', '暂未配置ai自检项目');
+    show('selfcheckAiReport', `${meta}${meta ? '\n\n' : ''}暂未配置ai自检项目`);
     return;
   }
   if (!report) {
-    show('selfcheckAiReport', 'AI 自检报告生成失败，请稍后重试。');
+    show('selfcheckAiReport', `${meta}${meta ? '\n\n' : ''}AI 自检报告生成失败，请稍后重试。`);
     return;
   }
   const suggestions = Array.isArray(report.suggestions) && report.suggestions.length
     ? `\n\n建议：\n${report.suggestions.map((item, idx) => `${idx + 1}. ${item}`).join('\n')}`
     : '';
-  show('selfcheckAiReport', `${report.reply || report.summary || 'AI 已返回自检报告。'}${suggestions}`);
+  show('selfcheckAiReport', `${meta}${meta ? '\n\n' : ''}${report.reply || report.summary || 'AI 已返回自检报告。'}${suggestions}`);
 }
 
 function loadSelfcheckTimerConfig() {
@@ -1641,11 +1733,23 @@ function renderSelfcheckReportList(items = []) {
   if (!host) return;
   state.latestSelfcheckReports = items;
   host.innerHTML = items.length ? items.map((item) => `
-    <div class="activity-item">
+    <button type="button" class="activity-item selfcheck-report-item" data-selfcheck-report-file="${escapeHtml(item.file_name || '')}">
       <strong>${escapeHtml(item.system_name || item.system_code || item.file_name || 'AI 自检报告')}</strong>
-      <span>${escapeHtml(item.checked_at || '-')} · 告警 ${escapeHtml(item.alarm_count ?? 0)} 条 · ${escapeHtml(item.file_name || '-')}</span>
-    </div>
+      <span>${escapeHtml(item.checked_at || '-')} · 告警数 ${escapeHtml(item.alarm_count ?? 0)} 条 · ${escapeHtml(item.file_name || '-')}</span>
+    </button>
   `).join('') : '<div class="hint">暂无匹配的 AI 自检报告。</div>';
+}
+
+async function openSelfcheckReportDetail(fileName) {
+  if (!fileName) return;
+  show('selfcheckAiReport', '正在读取历史 AI 自检报告...');
+  const data = await api(`/api/v1/selfchecks/reports/${encodeURIComponent(fileName)}`, { headers: authHeaders() });
+  renderSelfcheckStatus(data);
+  renderSelfcheckAlarms(data.alarms || []);
+  renderSelfcheckAiReport(data);
+  const alarmCount = data?.alarm_count ?? data?.report_file?.alarm_count ?? (Array.isArray(data?.alarms) ? data.alarms.length : 0);
+  const hint = $('selfcheckRecentHint');
+  if (hint) hint.textContent = `已打开历史报告：${fileName}，告警数 ${alarmCount} 条。`;
 }
 
 async function loadSelfcheckReports({ recent = true } = {}) {
@@ -1681,6 +1785,7 @@ async function runSystemSelfcheck(options = {}) {
   renderSelfcheckAlarms([]);
   setButtonLoading('btnRunSelfcheck', true, '自检中...');
   try {
+    await collectSelectedSelfcheckSnapshot();
     const data = await api(`/api/v1/selfchecks/run?system_id=${encodeURIComponent(systemId)}&range_minutes=${encodeURIComponent(range)}`, { headers: authHeaders() });
     renderSelfcheckStatus(data);
     renderSelfcheckAlarms(data.alarms || []);
@@ -2251,8 +2356,22 @@ onClick('btnSubmitNfc', async () => {
 if ($('scStatusSystem')) {
   $('scStatusSystem').onchange = () => {
     state.selectedStatusSystemId = Number($('scStatusSystem').value || 0) || null;
+    state.metricSeries = { cpu: [], mem: [], disk: [] };
     show('selfcheckAiReport', '已切换系统，点击“开始 AI 自检”后生成新报告。');
+    refreshSelfcheckStatus({ collect: true }).catch((e) => {
+      if ($('statusSystemHint')) $('statusSystemHint').textContent = explainActionError(e, '刷新系统自检状态', 'inspector / admin / super_admin');
+    });
+    startSelfcheckStatusLoop();
     loadSelfcheckReports({ recent: true }).catch(() => {});
+  };
+}
+if ($('selfcheckRange')) {
+  $('selfcheckRange').onchange = () => {
+    state.metricSeries = { cpu: [], mem: [], disk: [] };
+    refreshSelfcheckStatus({ collect: true }).catch((e) => {
+      if ($('statusSystemHint')) $('statusSystemHint').textContent = explainActionError(e, '刷新系统自检状态', 'inspector / admin / super_admin');
+    });
+    startSelfcheckStatusLoop();
   };
 }
 onClick('btnRunSelfcheck', runSystemSelfcheck);
@@ -2269,6 +2388,14 @@ onClick('btnLoadRecentSelfcheckReports', () => loadSelfcheckReports({ recent: tr
   const hint = $('selfcheckRecentHint');
   if (hint) hint.textContent = explainActionError(e, '读取自检报告', 'inspector / admin / super_admin');
 }));
+
+$('selfcheckReportList')?.addEventListener('click', (event) => {
+  const btn = event.target.closest('[data-selfcheck-report-file]');
+  if (!btn) return;
+  openSelfcheckReportDetail(btn.dataset.selfcheckReportFile).catch((e) => {
+    show('selfcheckAiReport', explainActionError(e, '读取自检报告详情', 'inspector / admin / super_admin'));
+  });
+});
 
 $('selfcheckSystemPickerList')?.addEventListener('click', (event) => {
   const btn = event.target.closest('[data-selfcheck-system-id]');

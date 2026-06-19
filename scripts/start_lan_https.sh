@@ -44,7 +44,7 @@ start_services() {
   stop_all
   gen_cert
 
-  nohup bash -lc "cd '$BACKEND_DIR' && source .venv/bin/activate && export DATABASE_URL='sqlite:///./aegis.db' && unset DM_HOST DM_PORT DM_NAME DM_USER DM_PASSWORD && uvicorn app.main:app --host 0.0.0.0 --port 8000 --ssl-certfile '$CERT_FILE' --ssl-keyfile '$KEY_FILE'" > "$LOG_DIR/backend-https.log" 2>&1 &
+  nohup bash -lc "cd '$BACKEND_DIR' && source .venv/bin/activate && export DATABASE_URL='sqlite:///./aegis.db' && uvicorn app.main:app --host 0.0.0.0 --port 8000 --ssl-certfile '$CERT_FILE' --ssl-keyfile '$KEY_FILE'" > "$LOG_DIR/backend-https.log" 2>&1 &
 
   nohup python3 "$ROOT_DIR/scripts/serve_https.py" --host 0.0.0.0 --port 5173 --dir "$MOBILE_DIR" --cert "$CERT_FILE" --key "$KEY_FILE" > "$LOG_DIR/frontend-mobile-https.log" 2>&1 &
 

@@ -156,6 +156,29 @@ def test_assistant_tool_arguments_use_ai_extracted_arguments():
     assert port_args == {"host": "baidu.com", "port": 443}
 
 
+def test_assistant_router_prefers_rules_for_slow_tool_intents(monkeypatch):
+    from app.services.assistant import router as router_module
+    from app.services.assistant.router import AssistantRouter
+
+    monkeypatch.setattr(router_module.settings, "AI_PROVIDER", "openclaw")
+    monkeypatch.setattr(router_module.settings, "OPENCLAW_BASE_URL", "http://127.0.0.1:18789")
+
+    def fail_ai_route(*args, **kwargs):
+        raise AssertionError("explicit tool intents should not wait for AI route")
+
+    monkeypatch.setattr(router_module, "run_chat", fail_ai_route)
+
+    router = AssistantRouter()
+    selfcheck = router.route("请对AI自检系统进行一次智能自检")
+    assert selfcheck.tool == "run_system_selfcheck_report"
+
+    uploaded_log = router.route(
+        "请分析附件里的报错原因",
+        attachments=[{"name": "backend-error.log", "extracted_text": "ERROR upstream timeout"}],
+    )
+    assert uploaded_log.tool == "analyze_log_text"
+
+
 def test_external_assistant_chat_uses_admin_generated_apikey(client, admin_headers):
     missing = client.post(
         "/api/v1/assistant/external/chat",
@@ -251,6 +274,38 @@ def test_assistant_ip_reputation_private_ip_is_user_friendly(client, admin_heade
     assert "is_private" not in body["reply"]
     assert "bogon" not in body["reply"].lower()
     assert "is_global" not in body["reply"]
+
+
+def test_assistant_ip_reputation_malicious_ip_is_explicit(monkeypatch):
+    from app.services.assistant.tools import security_ops
+
+    def fake_batch_query_ip_reputation(public_items, lang="zh", realtime_verdict=True):
+        assert public_items == ["74.48.130.196"]
+        return {
+            "summary": {"total": 1, "malicious": 1, "high_risk": 0, "block_candidates": ["74.48.130.196"]},
+            "items": [
+                {
+                    "ip": "74.48.130.196",
+                    "is_malicious": True,
+                    "risk_level": "medium_risk",
+                    "should_block": True,
+                    "needs_manual_confirmation": False,
+                    "decision": "block",
+                    "summary": "微步判定为恶意 IP；严重级别：中；可信度：高；ASN 风险值：4；命中恶意情报且归属地非济南，满足自动封禁条件",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(security_ops, "batch_query_ip_reputation", fake_batch_query_ip_reputation)
+
+    result = security_ops.analyze_ip_reputation(ip="74.48.130.196")
+
+    assert result["success"] is True
+    assert result["summary"].startswith("74.48.130.196：恶意 IP，高风险，建议拦截。")
+    assert "恶意 IP，高风险，建议拦截" in result["summary"]
+    assert "微步判定为恶意 IP" in result["summary"]
+    assert "可疑，建议复核" not in result["summary"]
+    assert result["data"]["items"][0]["user_verdict"] == "恶意 IP，高风险，建议拦截"
 
 
 def test_assistant_can_analyze_uploaded_file_content(client, admin_headers):

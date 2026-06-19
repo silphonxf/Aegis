@@ -102,6 +102,5 @@ python3 -m http.server 5174
 
 ## 8. 联调补充说明
 - 前端 API 地址建议填当前页面主机的 `:8000`
-- 本地联调默认走 SQLite，不依赖达梦
-- 达梦专项接入见 `docs/dameng-setup.md`
+- 本地联调默认走 SQLite，可按需切换 MySQL。
 - 离线 AI 接入见 `docs/offline-ai-setup.md`

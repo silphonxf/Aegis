@@ -283,6 +283,9 @@ body {
 .wide-toolbar {
   grid-template-columns: minmax(0, 1fr) 110px 110px 120px;
 }
+.inspection-record-toolbar {
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) 120px minmax(160px, 1fr) minmax(160px, 1fr) 96px 96px;
+}
 .search-input {
   background: #091826;
   border: 1px solid #203d58;
@@ -322,6 +325,22 @@ body {
   border: 1px solid rgba(255, 107, 107, .24);
   box-shadow: none;
 }
+.task-action-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.task-action-btn {
+  margin: 0;
+  width: auto;
+  min-width: 44px;
+}
+.muted-cell {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .list-toolbar {
   display: flex;
   gap: 10px;
@@ -696,10 +715,10 @@ th { background: #113654; color: #7dd3fc; }
 @media (max-width: 900px) {
   .app-shell { grid-template-columns: 1fr; }
   .sidebar { position: sticky; top: 0; z-index: 10; }
-  .grid3, .grid4, .kpis, .tech-metrics, .debug-grid, .search-toolbar, .wide-toolbar { grid-template-columns: 1fr 1fr; }
+  .grid3, .grid4, .kpis, .tech-metrics, .debug-grid, .search-toolbar, .wide-toolbar, .inspection-record-toolbar { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
-  .grid2, .grid3, .grid4, .kpis, .tech-metrics, .debug-grid, .summary-strip, .search-toolbar, .wide-toolbar, .ops-workbench-guide, .runbook-guide-grid, .ops-workbench-sections { grid-template-columns: 1fr; }
+  .grid2, .grid3, .grid4, .kpis, .tech-metrics, .debug-grid, .summary-strip, .search-toolbar, .wide-toolbar, .inspection-record-toolbar, .ops-workbench-guide, .runbook-guide-grid, .ops-workbench-sections { grid-template-columns: 1fr; }
   .action-row.compact button, .toolbar-btn { width: 100%; }
   .inline-result { margin-left: 0; width: 100%; }
 }

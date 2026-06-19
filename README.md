@@ -7,7 +7,7 @@
 - 自查标准化：日检 / 周检 / 年检可配置模板
 - 数据可视化：巡检与自检报表、趋势分析
 - 管理闭环：移动端执行 + 管理后台监管 + 超级管理员总览
-- 平台兼容：Python 技术栈 + 达梦数据库 + 信创环境适配 + Docker 部署
+- 平台兼容：Python 技术栈 + SQLite/MySQL 数据库 + Docker 部署
 
 ## 仓库结构
 - `docs/`：产品文档、开发计划、进度与接手说明
@@ -76,6 +76,5 @@ cd /home/xf/.openclaw/workspace/projects/Aegis
 - `CONTRIBUTING.md`：协作与分支开发规则
 
 ## 说明
-- 本地联调默认走 SQLite，不依赖达梦即可启动。
-- 达梦接入与检查见：`docs/dameng-setup.md`
+- 本地联调默认走 SQLite，可按需切换 MySQL。
 - 离线 AI（Ollama）接入见：`docs/offline-ai-setup.md`

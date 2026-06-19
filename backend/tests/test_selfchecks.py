@@ -1,3 +1,6 @@
+from pathlib import Path
+
+
 def test_create_template_and_list(client, admin_headers):
     create = client.post(
         "/api/v1/selfchecks/templates",
@@ -61,4 +64,42 @@ def test_run_system_selfcheck_without_skill_returns_status_and_no_ai(client, adm
     assert body["system"]["selfcheck_skill"] is None
     assert body["status"]["latest"]["cpu_usage"] == 91
     assert body["alarms"]
+    assert body["report_file"]["alarm_count"] == len(body["alarms"])
     assert body["ai_report"] is None
+
+    snapshot2 = client.post(
+        f"/api/v1/systems/{system_id}/status/snapshot",
+        headers=admin_headers,
+        json={
+            "host_online": "normal",
+            "port_ok": "normal",
+            "cpu_usage": 37,
+            "mem_usage": 42,
+            "disk_usage": 55,
+            "last_inspection_result": "normal",
+            "last_selfcheck_result": "unknown",
+        },
+    )
+    assert snapshot2.status_code == 200, snapshot2.text
+
+    status = client.get(f"/api/v1/selfchecks/status?system_id={system_id}&range_minutes=60", headers=admin_headers)
+    assert status.status_code == 200, status.text
+    status_body = status.json()
+    assert status_body["status"]["latest"]["cpu_usage"] == 37
+    assert status_body["alarm_count"] >= 1
+
+    reports = client.get(f"/api/v1/selfchecks/reports?system_id={system_id}", headers=admin_headers)
+    assert reports.status_code == 200, reports.text
+    report_items = reports.json()["items"]
+    assert report_items
+    assert report_items[0]["alarm_count"] == len(body["alarms"])
+
+    detail = client.get(f"/api/v1/selfchecks/reports/{report_items[0]['file_name']}", headers=admin_headers)
+    assert detail.status_code == 200, detail.text
+    detail_body = detail.json()
+    assert detail_body["system"]["system_id"] == system_id
+    assert detail_body["alarm_count"] == len(body["alarms"])
+    assert detail_body["alarms"]
+    report_path = detail_body.get("report_file", {}).get("file_path")
+    if report_path:
+        Path(report_path).unlink(missing_ok=True)

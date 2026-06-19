@@ -12,8 +12,6 @@
   - API 规范
 - `er-model.md`
   - 数据模型设计
-- `dameng-setup.md`
-  - 达梦数据库接入与配置
 - `integration-quickstart.md`
   - 联调与快速启动说明
 - `offline-ai-setup.md`
@@ -48,7 +46,7 @@
 - 迭代发布说明类（如 `release-note-v0.3.md`, `release-v1.0.0.md`）
 - 阶段验收清单快照（如 `iteration3-acceptance.md`, `release-checklist-v1.0.0-admin-v2.md`）
 - 单次优化总结（如 `admin-ui-optimization-summary-2026-03-01.md`）
-- 单次分支变更摘要（如 `change-summary-2026-03-09-offline-ai-dm.md`）
+- 单次分支变更摘要
 - 早期阶段开发计划草案（如 `development-plan.md`）
 - 已完成的历史里程碑范围文档（如 `mvp-scope.md`）
 - 已落地的单端实施方案（如管理端 V2 前端实施、移动端 UI 重构方案）

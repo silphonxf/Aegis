@@ -24,6 +24,7 @@ const VIEW_GROUP_MAP = {
   'view-ops-workbench': 'ops-workbench',
   'view-systems': 'ops-workbench',
   'view-inspection-points': 'ops-workbench',
+  'view-inspection-records': 'ops-workbench',
   'view-users': 'ops-workbench',
   'view-tool-template': 'ops-workbench',
   'view-emergency-ssh': 'runbook',
@@ -97,6 +98,7 @@ function switchView(viewId, groupId) {
   }
 
   if (viewId === 'view-inspection-points') ns.inspectionPoints?.listInspectionPoints?.();
+  if (viewId === 'view-inspection-records') ns.inspectionRecords?.listInspectionRecords?.();
   if (viewId === 'view-emergency-ssh') ns.emergencyConfig?.listSshHosts?.();
   if (viewId === 'view-emergency-server') ns.emergencyConfig?.listServerActions?.();
   if (viewId === 'view-emergency-db') ns.emergencyConfig?.listDbActions?.();
@@ -170,9 +172,11 @@ bindClick('btnToolTaskList', () => ns.toolbox.listTasks().catch((e) => { $('tool
 bindClick('btnToolTaskUpdate', () => ns.toolbox.updateTask().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnListInspectionPoints', () => ns.inspectionPoints.listInspectionPoints().catch((e) => {
   $('pointListSummary').textContent = formatError('巡检点列表', e);
-  $('pointListTbody').innerHTML = '<tr><td colspan="9">查询失败</td></tr>';
+  $('pointListTbody').innerHTML = '<tr><td colspan="11">查询失败</td></tr>';
 }));
-bindClick('btnOpenCreatePointModal', () => ns.inspectionPoints.openCreatePointModal());
+bindClick('btnOpenCreatePointModal', () => ns.inspectionPoints.openCreatePointModal().catch((e) => {
+  $('pointListSummary').textContent = formatError('巡检点弹窗', e);
+}));
 bindClick('btnCloseCreatePointModal', () => ns.modals.closeModal('createPointModal'));
 bindClick('btnSubmitPoint', () => ns.inspectionPoints.submitPoint().catch((e) => {
   $('pointListSummary').textContent = formatError('巡检点操作', e);
@@ -180,6 +184,11 @@ bindClick('btnSubmitPoint', () => ns.inspectionPoints.submitPoint().catch((e) =>
 bindClick('btnDeletePoint', () => ns.inspectionPoints.deletePoint().catch((e) => {
   $('pointListSummary').textContent = formatError('停用巡检点', e);
 }));
+bindClick('btnListInspectionRecords', () => ns.inspectionRecords.listInspectionRecords().catch((e) => {
+  $('inspectionRecordSummary').textContent = formatError('巡检记录审阅', e);
+  $('inspectionRecordTbody').innerHTML = '<tr><td colspan="10">查询失败</td></tr>';
+}));
+bindClick('btnClearInspectionRecordFilters', () => ns.inspectionRecords.clearFilters());
 bindClick('btnFindUsers', () => ns.users.findUsers($('userSearchKeyword').value.trim()).catch((e) => {
   $('userListSummary').textContent = formatError('用户查询', e);
   $('userListTbody').innerHTML = '<tr><td colspan="4">查询失败</td></tr>';

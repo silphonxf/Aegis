@@ -29,14 +29,6 @@
 | `iteration3_smoke.sh` | 端到端冒烟：健康检查、登录、创建系统、自检模板、自检记录、重启审批、AI 诊断、资产、审计日志。 | 保留或改名为通用 smoke；当前名称带历史迭代色彩。 |
 | `ai_perf_check.py` | 登录本地 HTTPS 后端，创建 AI 会话并调用 `/api/v1/ai/chat/v2`，输出耗时和回复信息。 | 保留，后续可参数化账号、密码和 Base URL。 |
 
-## 达梦数据库
-
-| 脚本 | 作用 | 建议 |
-|---|---|---|
-| `dameng_init.sql` | 达梦数据库初始化 SQL：创建 `AEGIS_USER` 并授权。 | 保留，归入部署文档引用。 |
-| `check_dm_connection.sh` | 达梦连通性验收：检查端口、执行 Alembic、临时启动后端、验证健康检查和登录等。 | 需要整理：当前 `ROOT_DIR` 硬编码为 `/home/xf/.openclaw/workspace/code/aegis`，与当前项目路径不一致。 |
-| `run_backend_dm.sh` | 使用达梦驱动环境变量启动后端。 | 需要整理：当前 `ROOT_DIR` 同样是旧硬编码路径，且与 `dev-up.sh` 的统一 HTTPS 流程不一致。 |
-
 ## AI 与上下文
 
 | 脚本 | 作用 | 建议 |
@@ -48,6 +40,5 @@
 
 1. 优先保留 `dev-up.sh`、`dev-stop.sh`、`dev-status.sh`、`dev-reset.sh`、`serve_https.py` 作为本地开发主链路。
 2. 将 `start_lan_https.sh` 标记为可删除候选，因为它与 `dev-up.sh` 功能重复且端口/日志命名更旧。
-3. 修复或删除 `check_dm_connection.sh`、`run_backend_dm.sh` 的旧硬编码路径。
-4. 将 `iteration3_smoke.sh` 重命名为更长期的 `smoke.sh`，避免后续误以为只服务第三轮迭代。
-5. 为 `ai_perf_check.py` 增加命令行参数，避免账号、密码、Base URL 写死。
+3. 将 `iteration3_smoke.sh` 重命名为更长期的 `smoke.sh`，避免后续误以为只服务第三轮迭代。
+4. 为 `ai_perf_check.py` 增加命令行参数，避免账号、密码、Base URL 写死。

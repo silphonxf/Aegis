@@ -184,6 +184,20 @@ main { padding: 12px; display: grid; gap: 12px; }
 .activity-item.warn {
   border-color: rgba(248, 113, 113, .35);
 }
+.activity-item.selfcheck-report-item {
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  box-shadow: none;
+}
+.activity-item.selfcheck-report-item:active {
+  transform: translateY(1px);
+}
+.activity-item.selfcheck-report-item:focus-visible {
+  outline: 2px solid rgba(47, 128, 237, .45);
+  outline-offset: 2px;
+}
 
 .assistant-cards {
   display: grid;

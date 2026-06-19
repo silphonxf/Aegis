@@ -1,8 +1,8 @@
-# Aegis 登录常见误区（应用账号 vs 数据库账号）
+# Aegis 登录常见误区（应用账号 vs 数据库连接账号）
 
 ## 结论先说
 - `POST /api/v1/auth/login` 使用的是 **Aegis 应用账号**（默认 `admin/admin123`）
-- 不是达梦数据库账号（如 `SYSDBA` / `DM_USER`）
+- 不是数据库连接账号（如 MySQL 连接用户）
 
 ---
 
@@ -20,9 +20,9 @@
 
 ---
 
-## 常见误区 2：以为改了 `DM_USER` 就能登录后台
+## 常见误区 2：以为改了数据库连接用户就能登录后台
 
-`DM_USER/DM_PASSWORD` 仅用于后端连接数据库，不影响 Aegis 后台登录凭据。
+数据库连接用户仅用于后端连接数据库，不影响 Aegis 后台登录凭据。
 
 ---
 
@@ -35,12 +35,6 @@
 
 ---
 
-## 与达梦验收脚本的对应关系
+## 推荐验证方式
 
-`./scripts/check_dm_connection.sh` 已包含：
-- 登录验证（应用账号）
-- 写库接口验证：
-  - `PUT /api/v1/auth/profile`
-  - `POST /api/v1/auth/change-password`（含回滚）
-
-这用于确认“数据库连接正常 + 关键写库接口可用”。
+使用 `scripts/dev-check.sh` 验证后端健康检查、应用登录和 `/auth/me`。关键写库接口应通过后端回归测试覆盖。

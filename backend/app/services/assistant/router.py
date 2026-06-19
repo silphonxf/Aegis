@@ -96,10 +96,13 @@ class AssistantRouter:
 
     def route(self, message: str, history: Optional[list[dict]] = None, attachments: Optional[list[dict]] = None) -> RouteResult:
         text = (message or "").strip()
+        rule_result = self._route_by_rules(text, attachments=attachments or [])
+        if rule_result.tool:
+            return rule_result
         ai_result = self._route_via_ai(text, history=history or [], attachments=attachments or [])
         if ai_result:
             return ai_result
-        return self._route_by_rules(text, attachments=attachments or [])
+        return rule_result
 
     def _route_by_rules(self, text: str, attachments: Optional[list[dict]] = None) -> RouteResult:
         system_name = _extract_system_name(text)

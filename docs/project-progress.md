@@ -1,4 +1,4 @@
-# Aegis 项目进度（更新于 2026-06-07）
+# Aegis 项目进度（更新于 2026-06-18）
 
 ## 当前总体状态
 
@@ -7,6 +7,58 @@
 - 当前开发路线：`docs/phase1-development-plan.md`
 
 
+
+## 本次新增进展（2026-06-18）
+
+### 7) 管理端巡检闭环补齐
+
+已完成：
+- 新增管理端巡检记录审阅接口 `GET /api/v1/admin/inspection-records`
+- 巡检记录审阅返回系统、机房、点位、巡检人、结果、来源、巡检时间、结构化巡检项和备注
+- 新增巡检点重新启用接口 `PATCH /api/v1/admin/inspection-points/{point_id}/active`
+- 管理端新增“巡检记录”菜单和审阅页面，支持按系统 ID、机房 ID、点位 ID、结果与时间范围筛选
+- 巡检点列表补充机房/系统展示名，并支持行内启用 / 停用切换
+- 巡检点新增/编辑弹窗补齐所属机房和关联系统下拉，提交真实 `room_id` / `system_id`
+
+验证结果：
+- `python3 -m py_compile backend/app/api/admin.py backend/app/api/inspections.py` → 通过
+- `node --check frontend-admin/js/inspection-points.js && node --check frontend-admin/js/inspection-records.js && node --check frontend-admin/app.js` → 通过
+- `./.venv/bin/pytest backend/tests/test_rooms_points.py backend/tests/test_inspections.py -q` → `13 passed`
+
+当前剩余：
+- 工具任务行内高危操作可继续加确认弹窗与二次确认文案
+- 如需无人值守 AI 自检，需把移动端本地定时迁移到后端定时任务并由管理端配置
+
+### 6) 取消达梦对接
+
+已完成：
+- 删除达梦接入文档、环境示例、初始化 SQL、连通性检查脚本和专用启动脚本
+- 移除 GitHub Actions 中的达梦可选检查 job 与 `RUN_DM_CHECK` / `DM_*` 入口
+- 移除启动脚本中的 `DM_*` 清理逻辑
+- 移除应急数据库动作配置中的 `dameng` 类型选项
+- README、文档索引、脚本清单、部署说明和 Agent 上下文不再指向达梦
+
+当前数据库策略：
+- 本地默认 SQLite
+- 外部数据库保留 MySQL 配置路径
+
+### 5) 管理端运维审批补行内状态流转
+
+已完成：
+- 运维审批表格新增“下一步操作”列
+- 管理端根据工具任务状态展示后端允许的下一步动作：
+  - `pending_approval`：通过 / 驳回 / 取消
+  - `approved`：开始 / 取消
+  - `running`：完成 / 失败 / 取消
+- 点击行内动作后复用现有任务状态更新接口，自动回填任务 ID、目标状态和默认备注，并刷新列表
+- 终态任务展示“无可用操作”，避免继续流转误操作
+- 补充表格列宽相关样式，保证操作按钮在表格内稳定排列
+
+验证结果：
+- `node --check frontend-admin/js/toolbox.js` → 通过（通过 `/tmp` 副本检查）
+
+当前剩余：
+- 后续可继续把工具任务行内操作接入更明确的确认弹窗
 
 ## 本次新增进展（2026-06-07）
 
@@ -65,8 +117,6 @@
 - `node --check frontend-admin/app.js` → 通过
 
 当前剩余：
-- 后台巡检记录审阅页仍未补齐
-- 巡检点目前只有停用接口，尚未补重新启用接口和按钮
 - `frontend-admin/js/assets.js` 实际已承接机房管理，但命名仍沿用 asset，后续可进一步收敛
 
 ## 本次新增进展（2026-06-03）
@@ -507,31 +557,6 @@
 
 ## 历史进展（保留）
 
-### 达梦接入与验收增强
-
-已支持两种达梦配置方式：
-- 方式A：`DATABASE_URL` 完整连接串
-- 方式B：`DM_HOST/DM_PORT/DM_NAME/DM_USER/DM_PASSWORD` 拆分配置（优先级更高）
-
-涉及文件：
-- `backend/app/core/config.py`
-- `backend/app/db/session.py`
-- `backend/alembic/env.py`
-- `backend/dameng.env.example`
-- `docs/dameng-setup.md`
-
-### 达梦检查脚本
-
-新增脚本：`scripts/check_dm_connection.sh`
-
-脚本会自动执行：
-1. 达梦端口连通检查（127.0.0.1:5236）
-2. Alembic 迁移（`alembic upgrade head`）
-3. 后端启动
-4. `/healthz` 健康检查
-5. 登录检查（`/api/v1/auth/login`）
-6. profile / change-password 写库回归
-
 ### 离线 AI（Ollama）接入
 
 已将离线模型接入以下接口，并保留规则引擎回退：
@@ -542,7 +567,6 @@
 - `backend/app/services/offline_llm.py`
 - `backend/app/api/ai.py`
 - `backend/app/core/config.py`
-- `backend/dameng.env.example`
 - `docs/offline-ai-setup.md`
 - `scripts/setup_offline_ai.sh`
 

@@ -126,7 +126,10 @@ def test_create_and_list_inspection_points(client, admin_headers):
 
     listing = client.get("/api/v1/admin/inspection-points", headers=admin_headers)
     assert listing.status_code == 200, listing.text
-    assert any(item["id"] == point_id and item["room_id"] == room_id for item in listing.json()["items"])
+    item = next(item for item in listing.json()["items"] if item["id"] == point_id)
+    assert item["room_id"] == room_id
+    assert item["room_name"] == "巡检机房"
+    assert item["system_name"] == "示例业务系统"
 
 
 def test_create_inspection_point_can_be_room_only(client, admin_headers):
@@ -285,3 +288,11 @@ def test_update_and_deactivate_inspection_point(client, admin_headers):
     deactivate = client.delete(f"/api/v1/admin/inspection-points/{point_id}", headers=admin_headers)
     assert deactivate.status_code == 200, deactivate.text
     assert deactivate.json()["is_active"] is False
+
+    reactivate = client.patch(f"/api/v1/admin/inspection-points/{point_id}/active?is_active=true", headers=admin_headers)
+    assert reactivate.status_code == 200, reactivate.text
+    assert reactivate.json()["is_active"] is True
+
+    listing = client.get("/api/v1/admin/inspection-points", headers=admin_headers)
+    target = next(item for item in listing.json()["items"] if item["id"] == point_id)
+    assert target["is_active"] is True

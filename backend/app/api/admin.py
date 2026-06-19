@@ -19,7 +19,7 @@ from app.db.session import get_db
 from app.models.asset import Asset
 from app.models.audit import AuditLog
 from app.models.ai_external_key import AIExternalApiKey
-from app.models.inspection import InspectionPoint
+from app.models.inspection import InspectionPoint, InspectionRecord
 from app.models.shared_data import Room
 from app.models.system import System, SystemLogConfig, SystemUserBinding
 from app.models.user import Role, User
@@ -599,6 +599,22 @@ def _serialize_system(item: System, owner_map: Dict[int, List[int]], log_map: Di
     }
 
 
+def _parse_inspection_note(value: Optional[str]) -> Dict[str, Any]:
+    if not value:
+        return {"note": "", "check_results": [], "monitoring_confirmation": None}
+    try:
+        data = json.loads(value)
+        if isinstance(data, dict):
+            return {
+                "note": data.get("note") or "",
+                "check_results": data.get("check_results") if isinstance(data.get("check_results"), list) else [],
+                "monitoring_confirmation": data.get("monitoring_confirmation"),
+            }
+    except Exception:
+        pass
+    return {"note": value, "check_results": [], "monitoring_confirmation": None}
+
+
 @router.get("/assets")
 def list_assets(
     page: int = 1,
@@ -925,12 +941,24 @@ def list_inspection_points(
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
     items = db.query(InspectionPoint).order_by(InspectionPoint.id.asc()).all()
+    room_ids = [item.room_id for item in items if item.room_id is not None]
+    system_ids = [item.system_id for item in items if item.system_id is not None]
+    rooms = {
+        item.id: item
+        for item in db.query(Room).filter(Room.id.in_(room_ids)).all()
+    } if room_ids else {}
+    systems = {
+        item.id: item
+        for item in db.query(System).filter(System.id.in_(system_ids)).all()
+    } if system_ids else {}
     return {
         "items": [
             {
                 "id": item.id,
                 "room_id": item.room_id,
+                "room_name": rooms[item.room_id].room_name if item.room_id in rooms else "",
                 "system_id": item.system_id,
+                "system_name": systems[item.system_id].name if item.system_id in systems else "",
                 "point_code": item.point_code,
                 "point_name": item.point_name,
                 "point_type": item.point_type,
@@ -1014,6 +1042,124 @@ def deactivate_inspection_point(
     db.commit()
     log_action(db, "deactivate_inspection_point", "inspection_point", current_user, {"point_id": point.id, "point_code": point.point_code})
     return {"id": point.id, "is_active": point.is_active}
+
+
+@router.patch("/inspection-points/{point_id}/active")
+def set_inspection_point_active(
+    point_id: int,
+    is_active: bool,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    point = db.query(InspectionPoint).filter(InspectionPoint.id == point_id).first()
+    if not point:
+        raise HTTPException(status_code=404, detail={"code": "POINT_NOT_FOUND", "message": "巡检点不存在"})
+    point.is_active = is_active
+    point.updated_at = datetime.utcnow()
+    db.commit()
+    log_action(
+        db,
+        "set_inspection_point_active",
+        "inspection_point",
+        current_user,
+        {"point_id": point.id, "point_code": point.point_code, "is_active": is_active},
+    )
+    return {"id": point.id, "is_active": point.is_active}
+
+
+@router.get("/inspection-records")
+def list_admin_inspection_records(
+    page: int = 1,
+    size: int = 20,
+    system_id: Optional[int] = None,
+    room_id: Optional[int] = None,
+    point_id: Optional[int] = None,
+    result: Optional[str] = None,
+    start_at: Optional[datetime] = None,
+    end_at: Optional[datetime] = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    page = max(page, 1)
+    size = min(max(size, 1), 100)
+    q = db.query(InspectionRecord)
+    if system_id is not None:
+        q = q.filter(InspectionRecord.system_id == system_id)
+    if room_id is not None:
+        q = q.filter(InspectionRecord.room_id == room_id)
+    if point_id is not None:
+        q = q.filter(InspectionRecord.point_id == point_id)
+    if result:
+        q = q.filter(InspectionRecord.result == result)
+    if start_at:
+        q = q.filter(InspectionRecord.inspected_at >= start_at)
+    if end_at:
+        q = q.filter(InspectionRecord.inspected_at <= end_at)
+
+    total = q.count()
+    records = q.order_by(InspectionRecord.inspected_at.desc()).offset((page - 1) * size).limit(size).all()
+    point_ids = [item.point_id for item in records]
+    room_ids = [item.room_id for item in records if item.room_id is not None]
+    system_ids = [item.system_id for item in records if item.system_id is not None]
+    inspector_ids = [item.inspector_id for item in records]
+
+    points = {
+        item.id: item
+        for item in db.query(InspectionPoint).filter(InspectionPoint.id.in_(point_ids)).all()
+    } if point_ids else {}
+    rooms = {
+        item.id: item
+        for item in db.query(Room).filter(Room.id.in_(room_ids)).all()
+    } if room_ids else {}
+    systems = {
+        item.id: item
+        for item in db.query(System).filter(System.id.in_(system_ids)).all()
+    } if system_ids else {}
+    users = {
+        item.id: item
+        for item in db.query(User).filter(User.id.in_(inspector_ids)).all()
+    } if inspector_ids else {}
+
+    items = []
+    for record in records:
+        point = points.get(record.point_id)
+        room = rooms.get(record.room_id)
+        system = systems.get(record.system_id)
+        inspector = users.get(record.inspector_id)
+        note = _parse_inspection_note(record.note)
+        items.append({
+            "id": record.id,
+            "system_id": record.system_id,
+            "system_name": system.name if system else "",
+            "point_id": record.point_id,
+            "point_code": point.point_code if point else "",
+            "point_name": point.point_name if point else "",
+            "room_id": record.room_id,
+            "room_name": room.room_name if room else "",
+            "inspector_id": record.inspector_id,
+            "inspector_name": inspector.nickname or inspector.username if inspector else "",
+            "result": record.result,
+            "note": note["note"],
+            "check_results": note["check_results"],
+            "monitoring_confirmation": note["monitoring_confirmation"],
+            "source": record.source,
+            "inspected_at": record.inspected_at,
+        })
+
+    return {
+        "page": page,
+        "size": size,
+        "total": total,
+        "filters": {
+            "system_id": system_id,
+            "room_id": room_id,
+            "point_id": point_id,
+            "result": result,
+            "start_at": start_at,
+            "end_at": end_at,
+        },
+        "items": items,
+    }
 
 
 @router.post("/assets/batch")

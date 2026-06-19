@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 AuthType = Literal["password", "private_key"]
 ScriptType = Literal["shell", "sql"]
-DbType = Literal["oracle", "dameng", "mysql", "shell_proxy"]
+DbType = Literal["oracle", "mysql", "shell_proxy"]
 ProcessIdSource = Literal["fixed", "runtime_detect"]
 ActionCategory = Literal["reboot_host", "restart_process", "custom_command"]
 

@@ -70,6 +70,7 @@
           <div class="submenu-list">
             <button class="submenu-btn" data-view="view-systems">系统</button>
             <button class="submenu-btn" data-view="view-inspection-points">巡检点</button>
+            <button class="submenu-btn" data-view="view-inspection-records">巡检记录</button>
             <button class="submenu-btn" data-view="view-users">用户</button>
           </div>
         </div>
@@ -298,14 +299,51 @@
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>序号</th><th>点位编号</th><th>点位名称</th><th>类型</th><th>二维码</th><th>NFC</th><th>位置</th><th>状态</th><th>操作</th></tr>
+                <tr><th>序号</th><th>点位编号</th><th>点位名称</th><th>类型</th><th>机房</th><th>系统</th><th>二维码</th><th>NFC</th><th>位置</th><th>状态</th><th>操作</th></tr>
               </thead>
-              <tbody id="pointListTbody"><tr><td colspan="9">暂无巡检点数据</td></tr></tbody>
+              <tbody id="pointListTbody"><tr><td colspan="11">暂无巡检点数据</td></tr></tbody>
             </table>
           </div>
           <details class="details-block">
             <summary>查看巡检点接口原始返回</summary>
             <pre id="pointListResult"></pre>
+          </details>
+        </section>
+      </section>
+      <section id="view-inspection-records" class="view-panel" data-view-title="巡检记录审阅" data-view-desc="按系统、机房、点位和结果审阅移动端巡检记录。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>巡检记录</h2>
+              <p class="muted">集中查看移动端扫码 / NFC 巡检提交结果、巡检项明细和备注。</p>
+            </div>
+          </div>
+          <div class="search-toolbar inspection-record-toolbar">
+            <input id="inspectionRecordSystemId" class="search-input" placeholder="系统 ID（可选）" />
+            <input id="inspectionRecordRoomId" class="search-input" placeholder="机房 ID（可选）" />
+            <input id="inspectionRecordPointId" class="search-input" placeholder="点位 ID（可选）" />
+            <select id="inspectionRecordResult">
+              <option value="">全部结果</option>
+              <option value="normal">正常</option>
+              <option value="abnormal">异常</option>
+            </select>
+            <input id="inspectionRecordStartAt" class="search-input" type="datetime-local" />
+            <input id="inspectionRecordEndAt" class="search-input" type="datetime-local" />
+            <button id="btnListInspectionRecords" class="toolbar-btn">查询</button>
+            <button id="btnClearInspectionRecordFilters" class="toolbar-btn ghost">清空</button>
+          </div>
+          <div id="inspectionRecordSummary" class="result-line"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>ID</th><th>系统</th><th>机房</th><th>点位</th><th>巡检人</th><th>结果</th><th>来源</th><th>巡检时间</th><th>巡检项</th><th>备注</th></tr>
+              </thead>
+              <tbody id="inspectionRecordTbody"><tr><td colspan="10">暂无巡检记录</td></tr></tbody>
+            </table>
+          </div>
+          <details class="details-block">
+            <summary>查看巡检记录接口原始返回</summary>
+            <pre id="inspectionRecordRaw"></pre>
           </details>
         </section>
       </section>
@@ -319,13 +357,15 @@
           </div>
           <div class="ops-tabs">
             <button class="ops-tab active" type="button" data-target-view="view-systems">系统自检配置与记录</button>
-            <button class="ops-tab" type="button" data-target-view="view-inspection-points">巡检点配置与记录</button>
+            <button class="ops-tab" type="button" data-target-view="view-inspection-points">巡检点配置</button>
+            <button class="ops-tab" type="button" data-target-view="view-inspection-records">巡检记录审阅</button>
             <button class="ops-tab" type="button" data-target-view="view-users">用户配置</button>
           </div>
           <div class="summary-strip">
             <div class="summary-card"><span>Tab 1</span><strong>系统自检配置与记录</strong></div>
-            <div class="summary-card"><span>Tab 2</span><strong>巡检点配置与记录</strong></div>
-            <div class="summary-card"><span>Tab 3</span><strong>用户配置</strong></div>
+            <div class="summary-card"><span>Tab 2</span><strong>巡检点配置</strong></div>
+            <div class="summary-card"><span>Tab 3</span><strong>巡检记录审阅</strong></div>
+            <div class="summary-card"><span>Tab 4</span><strong>用户配置</strong></div>
           </div>
           <div class="ops-workbench-sections">
             <section class="guide-card ops-section-card">
@@ -362,7 +402,10 @@
                   <h3>巡检点配置与记录</h3>
                   <p>这一块最终要给移动端的扫码巡检、NFC 巡检和巡检记录审阅提供配置与审阅能力。</p>
                 </div>
-                <button class="toolbar-btn" type="button" data-jump-view="view-inspection-points">进入巡检点配置</button>
+                <div class="action-row compact">
+                  <button class="toolbar-btn" type="button" data-jump-view="view-inspection-points">进入巡检点配置</button>
+                  <button class="toolbar-btn secondary" type="button" data-jump-view="view-inspection-records">进入巡检记录</button>
+                </div>
               </div>
             </section>
 
@@ -425,10 +468,10 @@
             <table>
               <thead>
                 <tr>
-                  <th>ID</th><th>动作</th><th>目标</th><th>状态</th><th>执行者</th><th>时间</th><th>说明</th>
+                  <th>ID</th><th>动作</th><th>目标</th><th>状态</th><th>执行者</th><th>时间</th><th>说明</th><th>下一步操作</th>
                 </tr>
               </thead>
-              <tbody id="toolTaskTbody"><tr><td colspan="7">暂无任务</td></tr></tbody>
+              <tbody id="toolTaskTbody"><tr><td colspan="8">暂无任务</td></tr></tbody>
             </table>
           </div>
           <details class="details-block">
@@ -541,7 +584,7 @@
             <div class="grid4 emergency-admin-grid">
               <input id="emgDbActionCode" placeholder="action_code" />
               <input id="emgDbActionName" placeholder="动作名称" />
-              <select id="emgDbType"><option value="oracle">oracle</option><option value="dameng">dameng</option><option value="shell_proxy">shell_proxy</option></select>
+              <select id="emgDbType"><option value="oracle">oracle</option><option value="mysql">mysql</option><option value="shell_proxy">shell_proxy</option></select>
               <select id="emgDbHostCode"></select>
               <select id="emgDbSystemId"></select>
               <select id="emgDbAdminUserId"></select>
@@ -1015,6 +1058,12 @@
           <option value="area">区域</option>
         </select>
       </label>
+      <label>所属机房
+        <select id="modalPointRoomId"></select>
+      </label>
+      <label>关联系统
+        <select id="modalPointSystemId"></select>
+      </label>
       <label>二维码值
         <input id="modalPointQrContent" placeholder="为空时默认使用点位编号" />
       </label>
@@ -1042,6 +1091,7 @@
   <script defer src="./js/dashboard.js"></script>
   <script defer src="./js/toolbox.js"></script>
   <script defer src="./js/inspection-points.js"></script>
+  <script defer src="./js/inspection-records.js"></script>
   <script defer src="./js/users.js"></script>
   <script defer src="./js/systems.js"></script>
   <script defer src="./js/rules-audit.js"></script>

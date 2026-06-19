@@ -10,6 +10,40 @@ window.AegisAdmin = window.AegisAdmin || {};
       .replaceAll("'", '&#39;');
   }
 
+  function renderTaskActions(task) {
+    const status = String(task.status || '').toLowerCase();
+    const actionsByStatus = {
+      pending_approval: [
+        ['approved', '通过', '审批通过'],
+        ['rejected', '驳回', '审批驳回'],
+        ['cancelled', '取消', '审批取消'],
+      ],
+      approved: [
+        ['running', '开始', '开始执行'],
+        ['cancelled', '取消', '执行前取消'],
+      ],
+      running: [
+        ['done', '完成', '执行完成'],
+        ['failed', '失败', '执行失败'],
+        ['cancelled', '取消', '执行中取消'],
+      ],
+    };
+    const actions = actionsByStatus[status] || [];
+    if (!actions.length) return '<span class="muted-cell">无可用操作</span>';
+    return actions.map(([nextStatus, label, note]) => {
+      const danger = ['rejected', 'failed', 'cancelled'].includes(nextStatus) ? ' danger' : '';
+      return `
+        <button
+          type="button"
+          class="table-action-btn task-action-btn${danger}"
+          data-task-id="${escapeHtml(task.id)}"
+          data-task-next-status="${escapeHtml(nextStatus)}"
+          data-task-note="${escapeHtml(note)}"
+        >${escapeHtml(label)}</button>
+      `;
+    }).join('');
+  }
+
   function renderToolTaskTable(items) {
     const tbody = document.getElementById('toolTaskTbody');
     if (!tbody) return;
@@ -19,6 +53,7 @@ window.AegisAdmin = window.AegisAdmin || {};
       const timeText = task.finished_at || task.started_at || task.created_at || '-';
       const noteText = result.note || result.reason || result.error || '-';
       const status = String(task.status || 'unknown').toLowerCase();
+      const actions = renderTaskActions(task);
       return `
         <tr>
           <td>${escapeHtml(task.id)}</td>
@@ -28,10 +63,19 @@ window.AegisAdmin = window.AegisAdmin || {};
           <td>${escapeHtml(task.executor || result.executor || '-')}</td>
           <td>${escapeHtml(timeText)}</td>
           <td>${escapeHtml(noteText)}</td>
+          <td><div class="task-action-row">${actions}</div></td>
         </tr>
       `;
     }).join('');
-    tbody.innerHTML = rows || '<tr><td colspan="7">暂无任务</td></tr>';
+    tbody.innerHTML = rows || '<tr><td colspan="8">暂无任务</td></tr>';
+    tbody.querySelectorAll('[data-task-next-status]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        quickUpdateTask(btn.dataset.taskId, btn.dataset.taskNextStatus, btn.dataset.taskNote || '').catch((e) => {
+          const resultEl = document.getElementById('toolTaskResult');
+          if (resultEl) resultEl.textContent = `状态更新失败：${e.message}`;
+        });
+      });
+    });
   }
 
   function formatTaskRow(task) {
@@ -62,6 +106,7 @@ window.AegisAdmin = window.AegisAdmin || {};
 
   async function updateTask() {
     const taskId = Number(document.getElementById('toolTaskId')?.value);
+    if (!taskId) throw new Error('请先输入 task_id');
     const d = await ns.api.request(`/api/v1/toolbox/tasks/${taskId}/status`, {
       method: 'PUT',
       headers: ns.api.headers(),
@@ -77,5 +122,15 @@ window.AegisAdmin = window.AegisAdmin || {};
     return d;
   }
 
-  ns.toolbox = { escapeHtml, renderToolTaskTable, formatTaskRow, listTasks, updateTask };
+  async function quickUpdateTask(taskId, status, note) {
+    const idInput = document.getElementById('toolTaskId');
+    const statusInput = document.getElementById('toolTaskActionStatus');
+    const noteInput = document.getElementById('toolTaskNote');
+    if (idInput) idInput.value = taskId;
+    if (statusInput) statusInput.value = status;
+    if (noteInput && !noteInput.value.trim()) noteInput.value = note;
+    return updateTask();
+  }
+
+  ns.toolbox = { escapeHtml, renderToolTaskTable, renderTaskActions, formatTaskRow, listTasks, updateTask, quickUpdateTask };
 })(window.AegisAdmin);

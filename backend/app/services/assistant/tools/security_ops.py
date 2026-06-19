@@ -224,22 +224,23 @@ def _build_public_ip_user_result(item: dict) -> dict:
     is_malicious = bool(item.get("is_malicious"))
     should_block = bool(item.get("should_block"))
     needs_confirmation = bool(item.get("needs_manual_confirmation"))
-    if should_block:
-        verdict = "高风险，建议拦截"
+    if is_malicious:
+        verdict = "恶意 IP，高风险，建议拦截"
         suggestion = "建议加入封禁或阻断策略，并保留相关访问日志。"
     elif needs_confirmation:
         verdict = "可疑，需人工确认"
         suggestion = "建议先核对业务归属和访问行为，再决定是否封禁。"
-    elif is_malicious or risk_level in {"high_risk", "medium_risk", "suspicious"}:
+    elif should_block or risk_level in {"high_risk", "medium_risk", "suspicious"}:
         verdict = "可疑，建议复核"
         suggestion = "建议查看访问频率、目标端口和命中日志后再处置。"
     else:
         verdict = "未发现明显恶意"
         suggestion = "暂不建议直接封禁，继续观察异常访问行为。"
+    intel_summary = item.get("summary") or ""
     return {
         **item,
         "user_verdict": verdict,
-        "user_summary": f"{item.get('ip', '-')}：{verdict}。",
+        "user_summary": f"{item.get('ip', '-')}：{verdict}。{intel_summary}".strip(),
         "suggestion": suggestion,
     }
 
@@ -250,9 +251,11 @@ def _summarize_ip_user_result(items: list[dict]) -> str:
     if len(items) == 1:
         item = items[0]
         verdict = item.get("user_verdict")
-        prefix = f"{item.get('ip')} {verdict}。" if verdict else ""
-        return f"{prefix}{item.get('user_summary') or item.get('summary') or '已完成 IP 研判'} 建议：{item.get('suggestion') or '继续结合日志确认。'}"
-    risky = [item for item in items if item.get("user_verdict") in {"高风险，建议拦截", "可疑，需人工确认", "可疑，建议复核"}]
+        detail = item.get("user_summary") or item.get("summary") or "已完成 IP 研判"
+        if verdict and verdict not in str(detail):
+            detail = f"{verdict}。{detail}"
+        return f"{detail} 建议：{item.get('suggestion') or '继续结合日志确认。'}"
+    risky = [item for item in items if item.get("user_verdict") in {"恶意 IP，高风险，建议拦截", "可疑，需人工确认", "可疑，建议复核"}]
     internal = [item for item in items if item.get("risk_level") == "internal"]
     if risky:
         return f"已研判 {len(items)} 个 IP，其中 {len(risky)} 个需要重点关注。"

@@ -2,6 +2,8 @@ from io import BytesIO
 
 from openpyxl import Workbook
 
+from app.services import threatbook
+
 
 def test_threat_intel_quick_query_rule_jinan_confirm(client, admin_headers, monkeypatch):
     def fake_batch_query_ip_reputation(raw_items, lang="zh", realtime_verdict=True):
@@ -79,3 +81,41 @@ def test_threat_intel_excel_import(client, admin_headers, monkeypatch):
     body = resp.json()
     assert body["import"]["filename"] == "ips.xlsx"
     assert body["summary"]["high_risk"] == 1
+
+
+def test_threatbook_ip_key_response_and_scanner_judgment_are_malicious(monkeypatch):
+    def fake_fetch_ip_reputation(ips, lang="zh", realtime_verdict=True):
+        assert ips == ["66.240.205.34"]
+        return {
+            "response_code": 0,
+            "verbose_msg": "成功",
+            "data": {
+                "66.240.205.34": {
+                    "is_malicious": False,
+                    "judgments": ["Scanner"],
+                    "severity": "high",
+                    "confidence_level": "high",
+                    "basic": {
+                        "location": {
+                            "country": "United States",
+                            "province": "California",
+                            "city": "San Jose",
+                        }
+                    },
+                }
+            },
+        }
+
+    monkeypatch.setattr(threatbook, "fetch_ip_reputation", fake_fetch_ip_reputation)
+
+    result = threatbook.batch_query_ip_reputation(["66.240.205.34"])
+
+    item = result["items"][0]
+    assert item["is_malicious"] is True
+    assert item["risk_level"] == "high_risk"
+    assert item["should_block"] is True
+    assert item["decision"] == "block"
+    assert item["malicious_judgments"] == ["Scanner"]
+    assert result["summary"]["malicious"] == 1
+    assert result["summary"]["high_risk"] == 1
+    assert result["summary"]["block_candidates"] == ["66.240.205.34"]

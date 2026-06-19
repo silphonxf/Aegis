@@ -38,10 +38,10 @@
 - systems 1:N selfcheck_records
 - systems 1:N system_status_snapshots
 
-## 达梦数据库适配建议
-- 主键使用 BIGINT（或 NUMBER(19)）
+## 数据库适配建议
+- 主键使用 BIGINT
 - 时间字段统一 TIMESTAMP
-- 枚举采用 VARCHAR + CHECK 约束（避免方言风险）
+- 枚举采用 VARCHAR + CHECK 约束
 - 关键索引：
   - inspection_records(system_id, inspected_at)
   - selfcheck_records(system_id, checked_at)

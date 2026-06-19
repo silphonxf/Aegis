@@ -76,6 +76,30 @@ def fetch_ip_reputation(ips: List[str], lang: str = "zh", realtime_verdict: bool
     return data
 
 
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "是", "恶意"}
+    return False
+
+
+def _extract_ip_records(data: Dict[str, Any]) -> Dict[str, Any]:
+    payload = data.get("data")
+    if isinstance(payload, dict):
+        nested_ips = payload.get("ips")
+        if isinstance(nested_ips, dict):
+            return nested_ips
+        return payload
+
+    top_level_ips = data.get("ips")
+    if isinstance(top_level_ips, dict):
+        return top_level_ips
+    return {}
+
+
 def summarize_ip_record(ip: str, record: Dict[str, Any]) -> Dict[str, Any]:
     basic = record.get("basic") or {}
     location = basic.get("location") or {}
@@ -94,7 +118,8 @@ def summarize_ip_record(ip: str, record: Dict[str, Any]) -> Dict[str, Any]:
     severity = str(record.get("severity") or "info").lower()
     asn = record.get("asn") or {}
     asn_rank = asn.get("rank")
-    is_malicious = bool(record.get("is_malicious"))
+    threatbook_malicious = _as_bool(record.get("is_malicious"))
+    is_malicious = threatbook_malicious or bool(malicious_hits)
 
     risk_score = 0
     if is_malicious:
@@ -121,7 +146,7 @@ def summarize_ip_record(ip: str, record: Dict[str, Any]) -> Dict[str, Any]:
     location_text = " / ".join(filter(None, [location.get("country"), location.get("province"), location.get("city")])) or "-"
 
     reasons: List[str] = []
-    if is_malicious:
+    if threatbook_malicious:
         reasons.append("微步判定为恶意 IP")
     if severity:
         reasons.append(f"严重级别：{severity}")
@@ -137,7 +162,7 @@ def summarize_ip_record(ip: str, record: Dict[str, Any]) -> Dict[str, Any]:
     if city == "济南" and risk_level in {"high_risk", "medium_risk", "suspicious"}:
         reasons.append("归属地为济南，高危时需二次确认后再封禁")
     elif should_block:
-        reasons.append("is_malicious=true 且归属地非济南，满足自动封禁条件")
+        reasons.append("命中恶意情报且归属地非济南，满足自动封禁条件")
 
     return {
         "ip": ip,
@@ -180,7 +205,7 @@ def summarize_ip_record(ip: str, record: Dict[str, Any]) -> Dict[str, Any]:
 def batch_query_ip_reputation(raw_items: List[str], lang: str = "zh", realtime_verdict: bool = True) -> Dict[str, Any]:
     ips = normalize_ip_list(raw_items)
     data = fetch_ip_reputation(ips, lang=lang, realtime_verdict=realtime_verdict)
-    ip_map = data.get("data", {}).get("ips") or data.get("ips") or {}
+    ip_map = _extract_ip_records(data)
     items = [summarize_ip_record(ip, ip_map.get(ip) or {}) for ip in ips]
     high_risk_count = sum(1 for item in items if item["risk_level"] == "high_risk")
     malicious_count = sum(1 for item in items if item["is_malicious"])

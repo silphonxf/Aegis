@@ -9,7 +9,7 @@ Aegis 是一个运维助手系统，包含：
 - 移动端（巡检、自检、报表）
 - 管理后台（看板、资产、规则、审计、审批）
 - 后端 API（Python）
-- 达梦数据库适配（含连接、迁移、验证脚本）
+- 数据库层默认 SQLite，本地/部署可按需使用 MySQL
 
 仓库：`git@github.com:silphonxf/Aegis.git`
 
@@ -22,12 +22,9 @@ Aegis 是一个运维助手系统，包含：
 
 ## 3. 关键结论（重要）
 
-1. 达梦支持两种配置：
-   - `DATABASE_URL`
-   - `DM_HOST/DM_PORT/DM_NAME/DM_USER/DM_PASSWORD`（优先级更高）
+1. 达梦对接已取消：仓库不再保留达梦接入文档、脚本、环境示例、CI 可选检查和 `DM_*` 配置入口。
 
-2. 达梦一键检查脚本已存在：
-   - `scripts/check_dm_connection.sh`
+2. 当前数据库策略：本地默认 SQLite；外部数据库保留 MySQL 配置路径。
 
 3. 本地验证过的检查链路：
    - 端口连通
@@ -55,14 +52,6 @@ Aegis 是一个运维助手系统，包含：
 - `docs/DOCS_INDEX.md`
 - `docs/project-progress.md`
 
-### 达梦接入
-- `docs/dameng-setup.md`
-- `backend/dameng.env.example`
-- `backend/app/core/config.py`
-- `backend/app/db/session.py`
-- `backend/alembic/env.py`
-- `scripts/check_dm_connection.sh`
-
 ### 验收与联调
 - `docs/integration-quickstart.md`
 - `docs/offline-ai-setup.md`
@@ -75,25 +64,50 @@ Aegis 是一个运维助手系统，包含：
 1. `git -C code/aegis status -sb` 看分支与脏区
 2. 读 `docs/AGENT_CONTEXT.md`（本文件）
 3. 读 `docs/project-progress.md` 获取最新进展
-4. 按任务类型打开相关文档（达梦/前端/验收）
-5. 如需环境验证：执行 `./scripts/check_dm_connection.sh`
+4. 按任务类型打开相关文档（前端/验收/部署）
+5. 如需环境验证：执行 `./scripts/dev-check.sh` 或对应回归测试
 6. 变更后更新本文件“7. 最近更新记录”
 
 ## 6. 当前建议待办（可滚动维护）
 
-- [x] 达梦接入加入 CI 可选检查（环境变量开关）
 - [x] 登录常见误区文档补充（应用账号 vs 数据库账号）
 - [x] 启动自动 seed 最小数据，恢复本地默认登录能力
 - [x] 补充 `backend/.env.example`
 - [ ] 按 `docs/phase1-development-plan.md` 推进第一阶段开发
-- [ ] 关键写库接口补充达梦集成测试
 - [x] 共享主数据第一优先级缺口补齐：机房、点位、资产共享字段与测试
 - [x] 共享主数据 CRUD 第二步：系统、机房、巡检点、资产后端更新/停用接口，资产前端编辑/停用入口
 - [x] 补关键接口回归测试与 smoke 增强
 - [x] 整理本地开发脚本（up/stop/reset/status）
-- [ ] 完成第一阶段 C：工具箱 / 审批流闭环剩余交互与展示优化
+- [x] 完成第一阶段 C：工具箱 / 审批流闭环剩余交互与展示优化
 
 ## 7. 最近更新记录（倒序）
+
+### 2026-06-18（管理端巡检闭环补齐）
+- 新增管理端巡检记录审阅接口 `GET /api/v1/admin/inspection-records`，返回系统/机房/点位/巡检人展示字段和结构化巡检项
+- 新增巡检点重新启用接口 `PATCH /api/v1/admin/inspection-points/{point_id}/active`
+- 管理端新增“巡检记录”菜单和审阅页，支持系统、机房、点位、结果、时间范围筛选
+- 巡检点列表支持启用/停用切换，并显示机房/系统名称
+- 巡检点新增/编辑弹窗补齐所属机房和关联系统下拉，提交真实 `room_id` / `system_id`
+- 已跑通：`python3 -m py_compile backend/app/api/admin.py backend/app/api/inspections.py`
+- 已跑通：`node --check frontend-admin/js/inspection-points.js && node --check frontend-admin/js/inspection-records.js && node --check frontend-admin/app.js`
+- 已跑通：`./.venv/bin/pytest backend/tests/test_rooms_points.py backend/tests/test_inspections.py -q`（13 passed）
+
+### 2026-06-18（取消达梦对接）
+- 删除 `docs/dameng-setup.md`、`backend/dameng.env.example`、`scripts/check_dm_connection.sh`、`scripts/dameng_init.sql`、`scripts/run_backend_dm.sh`
+- 移除 GitHub Actions 达梦可选检查 job、`RUN_DM_CHECK` / `DM_*` 入口
+- 移除应急数据库动作配置中的 `dameng` 类型选项
+- 文档改为 SQLite 本地默认、MySQL 外部数据库路径，不再指向达梦
+
+### 2026-06-18（管理端工具任务行内审批操作）
+- 接续第一阶段 C：工具箱 / 审批流闭环剩余交互优化
+- 管理端运维审批表格新增“下一步操作”列
+- 根据任务当前状态展示合法状态迁移按钮：待审批可通过/驳回/取消，已通过可开始/取消，运行中可完成/失败/取消
+- 行内按钮复用现有 `PUT /api/v1/toolbox/tasks/{task_id}/status` 接口，点击后自动回填任务 ID、状态与备注并刷新列表
+- 补充终态任务的“无可用操作”展示，避免误导继续流转
+- 已跑通：`node --check frontend-admin/js/toolbox.js`（通过 `/tmp` 副本检查）
+- 未跑通：项目路径下直接执行 `node` / `git` / `grep` 被当前沙箱 `bwrap: loopback: Failed RTM_NEWADDR` 拦截
+
+
 
 ### 2026-06-07（移动端 AI 自检触发、报告文件与定时配置）
 - 移动端系统自检页不再在打开页面或切换系统时自动发起 AI 自检
@@ -114,7 +128,7 @@ Aegis 是一个运维助手系统，包含：
 - 巡检点页面支持关键词/启用状态筛选、列表、编辑、新增、停用
 - 巡检点表单支持绑定机房和系统，下拉数据来自管理端共享主数据接口
 - 已跑通：`node --check frontend-admin/js/inspection-points.js` 与 `node --check frontend-admin/app.js`（通过 `/tmp` 副本绕开隐藏路径检查限制）
-- 剩余：巡检记录审阅页、巡检点重新启用接口/按钮、机房/巡检点命名从旧 asset 模块进一步收敛
+- 剩余：机房/巡检点命名从旧 asset 模块进一步收敛
 
 
 ### 2026-06-03（系统配置与移动端日志路径）
@@ -187,11 +201,8 @@ Aegis 是一个运维助手系统，包含：
 - 新增文件：`backend/app/services/offline_llm.py`、`docs/offline-ai-setup.md`、`scripts/setup_offline_ai.sh`
 - 配置扩展：新增 `OFFLINE_AI_*` 参数（enabled/provider/model/base_url/timeout）
 - 稳健性补强：provider 大小写无关、LLM 空建议判错并自动回退规则引擎
-- 达梦验收增强：`scripts/check_dm_connection.sh` 新增写库接口检查（profile/change-password）并带密码回滚
 - 文档补充：新增 `docs/login-common-pitfalls.md`，明确应用账号与数据库账号区别
-- 观测性增强：达梦检查脚本支持输出 JSON 报告（成功/失败均可落盘）
 - API观测性增强：`/ai/diagnose` 与 `/ai/offline/analyze` 返回并记录 `elapsed_ms`、`fallback_reason`
-- 当前分支：`feat/dameng-integration`（持续新增提交，待 push）
 
 ### 2026-03-06
 - 新增AI离线错误日志分析MVP：规则引擎+任务结果表+离线分析API
@@ -202,7 +213,6 @@ Aegis 是一个运维助手系统，包含：
 - 同步时间：2026-03-06 13:46:23 +0800
 - 接续开发：新增 CI 工作流 `.github/workflows/backend-ci.yml`
 - 默认跑 SQLite 冒烟检查（迁移 + 启动 + healthz）
-- 新增达梦可选检查开关：`workflow_dispatch.run_dm_check` 或仓库变量 `RUN_DM_CHECK=true`
 - 同步时间：2026-03-06 13:40 +0800
 - 新增一键同步命令
 - 同步时间：2026-03-06 11:58:55 +0800

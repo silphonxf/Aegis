@@ -106,6 +106,22 @@ def _list_report_files(system_id: Optional[int], start_at: Optional[datetime], e
     return sorted(rows, key=lambda item: str(item.get("checked_at") or ""), reverse=True)
 
 
+def _load_report_payload(file_name: str) -> Dict[str, Any]:
+    if Path(file_name).name != file_name or not file_name.endswith(".json"):
+        raise HTTPException(status_code=400, detail={"code": "INVALID_REPORT_FILE", "message": "报告文件名非法"})
+    path = REPORT_DIR / file_name
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail={"code": "REPORT_NOT_FOUND", "message": "AI 自检报告不存在或已过期"})
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("读取 AI 自检报告失败: path=%s error=%s", path, exc)
+        raise HTTPException(status_code=500, detail={"code": "REPORT_READ_FAILED", "message": "AI 自检报告读取失败"}) from exc
+    data["report_file"] = _serialize_report_file(path)
+    data["alarm_count"] = len(data.get("alarms") or [])
+    return data
+
+
 def _visible_system_query(db: Session, user: User):
     q = db.query(System).filter(System.is_active.is_(True))
     if user.role.code in {"admin", "super_admin"}:
@@ -189,13 +205,7 @@ def _build_selfcheck_prompt(system: System, range_minutes: int, latest: Optional
     )
 
 
-@router.get("/run")
-def run_system_selfcheck(
-    system_id: int,
-    range_minutes: int = 60,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def _build_selfcheck_status_payload(db: Session, current_user: User, system_id: int, range_minutes: int) -> Dict[str, Any]:
     range_minutes = min(max(range_minutes, 1), 360)
     system = _visible_system_query(db, current_user).filter(System.id == system_id).first()
     if not system:
@@ -228,13 +238,7 @@ def run_system_selfcheck(
         if related_ids else None
     )
     alarms = _build_alarm_items(snapshots)
-    has_skill = bool((getattr(system, "selfcheck_skill", None) or "").strip())
-    report = None
-    if has_skill:
-        prompt = _build_selfcheck_prompt(system, range_minutes, latest, alarms)
-        report = run_chat(ChatRequest(message=prompt, conversation_id=f"selfcheck-{system.id}"))
-    log_action(db, "run_system_selfcheck", "selfcheck", current_user, {"system_id": system.id, "range_minutes": range_minutes, "alarm_count": len(alarms)})
-    response_payload = {
+    return {
         "system": {
             "system_id": system.id,
             "system_code": system.system_code,
@@ -250,11 +254,48 @@ def run_system_selfcheck(
             "source_system_ids": related_ids,
         },
         "alarms": alarms,
-        "ai_report": report,
+        "alarm_count": len(alarms),
     }
+
+
+@router.get("/run")
+def run_system_selfcheck(
+    system_id: int,
+    range_minutes: int = 60,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    response_payload = _build_selfcheck_status_payload(db, current_user, system_id, range_minutes)
+    system_payload = response_payload["system"]
+    system = _visible_system_query(db, current_user).filter(System.id == system_payload["system_id"]).first()
+    alarms = response_payload["alarms"]
+    has_skill = bool((getattr(system, "selfcheck_skill", None) or "").strip())
+    report = None
+    if has_skill:
+        latest_payload = response_payload["status"]["latest"]
+        latest = None
+        if latest_payload:
+            latest = (
+                db.query(SystemStatusSnapshot)
+                .filter(SystemStatusSnapshot.id == latest_payload["id"])
+                .first()
+            )
+        prompt = _build_selfcheck_prompt(system, response_payload["range_minutes"], latest, alarms)
+        report = run_chat(ChatRequest(message=prompt, conversation_id=f"selfcheck-{system.id}"))
+    log_action(db, "run_system_selfcheck", "selfcheck", current_user, {"system_id": system.id, "range_minutes": response_payload["range_minutes"], "alarm_count": len(alarms)})
+    response_payload["ai_report"] = report
     response_payload["report_file"] = _save_selfcheck_report(response_payload)
     _cleanup_old_reports()
     return response_payload
+
+@router.get("/status")
+def get_system_selfcheck_status(
+    system_id: int,
+    range_minutes: int = 60,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return _build_selfcheck_status_payload(db, current_user, system_id, range_minutes)
 
 @router.get("/reports")
 def list_selfcheck_reports(
@@ -286,6 +327,19 @@ def list_selfcheck_reports(
         "default_lookback_hours": DEFAULT_REPORT_LOOKBACK_HOURS,
         "items": page_items,
     }
+
+@router.get("/reports/{file_name}")
+def get_selfcheck_report(
+    file_name: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    data = _load_report_payload(file_name)
+    visible_ids = {row.id for row in _visible_system_query(db, current_user).all()}
+    system_id = (data.get("system") or {}).get("system_id")
+    if system_id not in visible_ids:
+        raise HTTPException(status_code=404, detail={"code": "REPORT_NOT_FOUND", "message": "AI 自检报告不存在或无权访问"})
+    return data
 
 @router.get("/templates")
 def list_templates(

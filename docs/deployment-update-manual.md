@@ -313,6 +313,6 @@ git log --oneline -n 10
 ## 13. 当前部署建议
 
 - 默认优先用 SQLite 跑通
-- 正式切信创库时再切达梦
+- 正式部署如需外部数据库，按 MySQL 配置切换
 - 后续开发与部署默认保持 **Python 3.9 兼容**
 - 日常更新优先遵循：`git pull ->（必要时 pip install / alembic）-> restart service`
