@@ -8,7 +8,10 @@ def test_toolbox_ping_and_port_check(client, admin_headers):
         json={"host": "127.0.0.1", "count": 1},
     )
     assert ping.status_code == 200, ping.text
-    assert ping.json()["host"] == "127.0.0.1"
+    ping_body = ping.json()
+    assert ping_body["host"] == "127.0.0.1"
+    assert ping_body["count"] == 1
+    assert "packet_stats" in ping_body
 
     port = client.post(
         "/api/v1/toolbox/port-check",
@@ -17,6 +20,17 @@ def test_toolbox_ping_and_port_check(client, admin_headers):
     )
     assert port.status_code == 200, port.text
     assert port.json()["port"] == 65535
+
+
+def test_parse_ping_packet_stats():
+    output = "4 packets transmitted, 3 received, 25% packet loss, time 3004ms"
+
+    assert toolbox._parse_ping_packet_stats(output) == {
+        "sent": 4,
+        "received": 3,
+        "lost": 1,
+        "loss_percent": 25.0,
+    }
 
 
 def test_toolbox_restart_task_status_flow(client, admin_headers):

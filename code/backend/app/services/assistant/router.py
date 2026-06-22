@@ -157,7 +157,14 @@ class AssistantRouter:
         return self.fallback_router.route(text)
 
     def _route_via_ai(self, text: str, history: list[dict], attachments: list[dict]) -> Optional[RouteResult]:
-        if settings.AI_PROVIDER.lower() != 'openclaw' or not (settings.OPENCLAW_BASE_URL or '').strip():
+        provider = settings.AI_PROVIDER.lower()
+        if provider == 'openclaw':
+            configured = bool((settings.OPENCLAW_BASE_URL or '').strip())
+        elif provider == 'internal_gateway':
+            configured = bool((settings.INTERNAL_AI_GATEWAY_BASE_URL or '').strip())
+        else:
+            configured = False
+        if not configured:
             return None
         if not text and not attachments:
             return None

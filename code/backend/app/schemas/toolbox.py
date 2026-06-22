@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 class PingRequest(BaseModel):
     host: str = Field(default="127.0.0.1", min_length=1, max_length=255)
-    count: int = Field(default=1, ge=1, le=4)
+    count: int = Field(default=1, ge=1, le=10)
 
 
 class PortCheckRequest(BaseModel):

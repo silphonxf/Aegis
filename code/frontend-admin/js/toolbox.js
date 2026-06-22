@@ -132,5 +132,117 @@ window.AegisAdmin = window.AegisAdmin || {};
     return updateTask();
   }
 
-  ns.toolbox = { escapeHtml, renderToolTaskTable, renderTaskActions, formatTaskRow, listTasks, updateTask, quickUpdateTask };
+  function setPingBusyNotice(visible) {
+    let notice = document.getElementById('netPingBusyNotice');
+    if (visible) {
+      if (!notice) {
+        notice = document.createElement('div');
+        notice.id = 'netPingBusyNotice';
+        notice.className = 'inline-busy-notice';
+        notice.textContent = '正在进行检测请稍等';
+        document.body.appendChild(notice);
+      }
+      notice.classList.remove('hidden');
+      return;
+    }
+    notice?.classList.add('hidden');
+  }
+
+
+  async function runNetworkPing() {
+    const host = document.getElementById('netPingHost')?.value.trim();
+    const count = Number(document.getElementById('netPingCount')?.value || 1);
+    const button = document.getElementById('btnNetPingRun');
+    if (!host) throw new Error('请先输入 Ping 目标地址');
+    if (button?.disabled) return null;
+    const originalText = button?.textContent || '执行 Ping';
+    if (button) {
+      button.disabled = true;
+      button.textContent = '检测中...';
+    }
+    setPingBusyNotice(true);
+    try {
+      const data = await ns.api.request('/api/v1/toolbox/ping', {
+        method: 'POST',
+        headers: ns.api.headers(),
+        body: JSON.stringify({ host, count }),
+      });
+      const statusText = data.ok ? '接通' : '可能异常';
+      const targetEl = document.getElementById('netPingTarget');
+      const statusEl = document.getElementById('netPingStatus');
+      const latencyEl = document.getElementById('netPingLatency');
+      const packetLossEl = document.getElementById('netPingPacketLoss');
+      const resultEl = document.getElementById('netPingResult');
+      const packetStats = data.packet_stats || {};
+      if (targetEl) targetEl.textContent = data.host || host;
+      if (statusEl) statusEl.textContent = statusText;
+      if (latencyEl) latencyEl.textContent = `${data.latency_ms ?? 0} ms`;
+      if (packetLossEl) {
+        const sent = packetStats.sent ?? data.count ?? count;
+        const received = packetStats.received ?? '-';
+        const loss = packetStats.loss_percent ?? '-';
+        packetLossEl.textContent = `${received}/${sent}，丢包 ${loss}%`;
+      }
+      if (resultEl) resultEl.textContent = JSON.stringify(data, null, 2);
+      return data;
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+      setPingBusyNotice(false);
+    }
+  }
+
+  async function fetchNetworkCapture() {
+    const url = document.getElementById('netCaptureUrl')?.value.trim();
+    const note = document.getElementById('netCaptureNote')?.value.trim() || null;
+    if (!url) throw new Error('请先输入要抓取的 URL');
+    const data = await ns.api.request('/api/v1/toolbox/capture/fetch', {
+      method: 'POST',
+      headers: ns.api.headers(),
+      body: JSON.stringify({ url, note }),
+    });
+    const contentEl = document.getElementById('netCaptureContent');
+    const statusEl = document.getElementById('netCaptureStatus');
+    const latencyEl = document.getElementById('netCaptureLatency');
+    const resultEl = document.getElementById('netCaptureResult');
+    if (contentEl) contentEl.value = data.content || '';
+    if (statusEl) statusEl.textContent = data.status_code ? `HTTP ${data.status_code}` : '--';
+    if (latencyEl) latencyEl.textContent = `${data.elapsed_ms ?? 0} ms`;
+    if (resultEl) resultEl.textContent = JSON.stringify(data, null, 2);
+    return data;
+  }
+
+  async function analyzeNetworkCapture() {
+    const content = document.getElementById('netCaptureContent')?.value.trim();
+    const targetUrl = document.getElementById('netCaptureUrl')?.value.trim();
+    const source = 'admin_capture';
+    const severity = document.getElementById('netCaptureSeverity')?.value || 'medium';
+    const rawNote = document.getElementById('netCaptureNote')?.value.trim();
+    const note = [targetUrl ? `URL: ${targetUrl}` : '', rawNote || ''].filter(Boolean).join('\n') || null;
+    if (!content) throw new Error('请先抓取 URL 或粘贴抓包内容');
+    const severityEl = document.getElementById('netCaptureSeverityText');
+    if (severityEl) severityEl.textContent = severity;
+    const data = await ns.api.request('/api/v1/toolbox/capture/analyze', {
+      method: 'POST',
+      headers: ns.api.headers(),
+      body: JSON.stringify({ title: '管理端抓包结果分析', content, severity, source, note }),
+    });
+    const resultEl = document.getElementById('netCaptureResult');
+    if (resultEl) {
+      const suggestions = (data.suggestions || []).map((item, idx) => `${idx + 1}. ${item}`).join('\n');
+      resultEl.textContent = [
+        `分析模式：${data.mode || '-'}`,
+        `严重级别：${data.severity || severity}`,
+        `摘要：${data.summary || '-'}`,
+        suggestions ? `建议：\n${suggestions}` : '',
+        '',
+        JSON.stringify(data, null, 2),
+      ].filter(Boolean).join('\n');
+    }
+    return data;
+  }
+
+  ns.toolbox = { escapeHtml, renderToolTaskTable, renderTaskActions, formatTaskRow, listTasks, updateTask, quickUpdateTask, runNetworkPing, fetchNetworkCapture, analyzeNetworkCapture };
 })(window.AegisAdmin);

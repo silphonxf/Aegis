@@ -50,6 +50,18 @@ class Settings(BaseSettings):
     OPENCLAW_DIAGNOSE_PATH: str = "/aegis/ai/diagnose"
     OPENCLAW_LOG_ANALYZE_PATH: str = "/aegis/ai/log-analyze"
 
+    # Internal AI gateway. Use AI_PROVIDER=internal_gateway to route all AI
+    # requests through a server-side gateway that can adapt to pi-agent or
+    # other provider-specific APIs.
+    INTERNAL_AI_GATEWAY_BASE_URL: Optional[str] = None
+    INTERNAL_AI_GATEWAY_API_KEY: Optional[str] = None
+    INTERNAL_AI_GATEWAY_TIMEOUT_SECONDS: int = 120
+    INTERNAL_AI_GATEWAY_PROVIDER: str = "pi-agent"
+    INTERNAL_AI_GATEWAY_MODEL: str = "pi-agent"
+    INTERNAL_AI_GATEWAY_CHAT_PATH: str = "/v1/chat"
+    INTERNAL_AI_GATEWAY_DIAGNOSE_PATH: str = "/v1/diagnose"
+    INTERNAL_AI_GATEWAY_LOG_ANALYZE_PATH: str = "/v1/log-analyze"
+
     # 离线 AI（默认开启，优先走本地 Ollama）
     OFFLINE_AI_ENABLED: bool = True
     OFFLINE_AI_PROVIDER: str = "ollama"

@@ -37,6 +37,132 @@ def test_ai_offline_analyze_and_detail(client, admin_headers):
     assert detail.json()["task"]["id"] == body["task_id"]
 
 
+def test_internal_gateway_routes_chat_to_pi_agent(monkeypatch):
+    import json
+    import urllib.request
+
+    from app.schemas.ai import ChatRequest
+    from app.services import ai_provider
+
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "conversation_id": "gw-chat-1",
+                    "reply": "pi-agent reply",
+                    "summary": "gateway summary",
+                    "suggestions": ["检查服务状态"],
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(req, timeout):
+        captured["url"] = req.full_url
+        captured["headers"] = dict(req.header_items())
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(ai_provider.settings, "AI_PROVIDER", "internal_gateway")
+    monkeypatch.setattr(ai_provider.settings, "INTERNAL_AI_GATEWAY_BASE_URL", "https://gateway.local")
+    monkeypatch.setattr(ai_provider.settings, "INTERNAL_AI_GATEWAY_API_KEY", "test-token")
+    monkeypatch.setattr(ai_provider.settings, "INTERNAL_AI_GATEWAY_PROVIDER", "pi-agent")
+    monkeypatch.setattr(ai_provider.settings, "INTERNAL_AI_GATEWAY_MODEL", "pi-agent-ops")
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    result = ai_provider.run_chat(ChatRequest(message="分析 CPU 告警", conversation_id="conv-1"))
+
+    assert result["mode"] == "internal_gateway"
+    assert result["conversation_id"] == "gw-chat-1"
+    assert result["reply"] == "pi-agent reply"
+    assert captured["url"] == "https://gateway.local/v1/chat"
+    assert captured["headers"]["Authorization"] == "Bearer test-token"
+    assert captured["headers"]["X-aegis-ai-provider"] == "pi-agent"
+    assert captured["payload"]["provider"] == "pi-agent"
+    assert captured["payload"]["model"] == "pi-agent-ops"
+    assert captured["payload"]["task"] == "chat"
+    assert captured["payload"]["message"] == "分析 CPU 告警"
+
+
+def test_internal_gateway_routes_diagnose_and_log_analyze(monkeypatch):
+    import json
+    import urllib.request
+
+    from app.schemas.offline_ai import OfflineAnalyzeRequest
+    from app.services import ai_provider
+
+    calls = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    def fake_urlopen(req, timeout):
+        body = json.loads(req.data.decode("utf-8"))
+        calls.append({"url": req.full_url, "payload": body})
+        if body["task"] == "diagnose":
+            return FakeResponse({"summary": "诊断完成", "severity": "high", "suggestions": ["先看日志"]})
+        return FakeResponse(
+            {
+                "summary": "日志分析完成",
+                "severity": "medium",
+                "matched_rules": [{"code": "TIMEOUT", "severity": "medium"}],
+                "suggestions": ["检查下游"],
+                "excerpt": "timeout",
+            }
+        )
+
+    monkeypatch.setattr(ai_provider.settings, "AI_PROVIDER", "internal_gateway")
+    monkeypatch.setattr(ai_provider.settings, "INTERNAL_AI_GATEWAY_BASE_URL", "https://gateway.local")
+    monkeypatch.setattr(ai_provider.settings, "INTERNAL_AI_GATEWAY_PROVIDER", "pi-agent")
+    monkeypatch.setattr(ai_provider.settings, "INTERNAL_AI_GATEWAY_MODEL", "pi-agent-ops")
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    diagnose = ai_provider.run_diagnose("故障", "timeout", "medium")
+    log_result = ai_provider.run_offline_analyze(
+        OfflineAnalyzeRequest(title="日志", detail="timeout", severity="low")
+    )
+
+    assert diagnose["mode"] == "internal_gateway"
+    assert diagnose["severity"] == "high"
+    assert diagnose["suggestions"] == ["先看日志"]
+    assert log_result["mode"] == "internal_gateway"
+    assert log_result["matched_rules"] == [{"code": "TIMEOUT", "severity": "medium"}]
+    assert calls[0]["url"] == "https://gateway.local/v1/diagnose"
+    assert calls[1]["url"] == "https://gateway.local/v1/log-analyze"
+    assert calls[0]["payload"]["provider"] == "pi-agent"
+    assert calls[1]["payload"]["provider"] == "pi-agent"
+
+
+def test_internal_gateway_falls_back_when_unconfigured(monkeypatch):
+    from app.schemas.ai import ChatRequest
+    from app.services import ai_provider
+
+    monkeypatch.setattr(ai_provider.settings, "AI_PROVIDER", "internal_gateway")
+    monkeypatch.setattr(ai_provider.settings, "INTERNAL_AI_GATEWAY_BASE_URL", "")
+
+    result = ai_provider.run_chat(ChatRequest(message="hello"))
+
+    assert result["mode"] == "rule_fallback"
+    assert "INTERNAL_AI_GATEWAY_BASE_URL" in result["fallback_reason"]
+
+
 def test_assistant_chat_requires_login(client, admin_headers):
     anonymous = client.post(
         "/api/v1/assistant/chat",

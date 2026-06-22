@@ -36,7 +36,9 @@ const VIEW_GROUP_MAP = {
   'view-tool-rules': 'approval-audit',
   'view-tool-ai': 'approval-audit',
   'view-ai-external-keys': 'approval-audit',
-  'view-tool-threatbook': 'approval-audit',
+  'view-net-ping': 'network-security',
+  'view-net-capture': 'network-security',
+  'view-tool-threatbook': 'network-security',
   'view-tool-debug': 'approval-audit',
 };
 
@@ -170,6 +172,9 @@ bindClick('btnEmergencyCustomClear', () => ns.emergencyConfig?.clearSearch?.('cu
 bindClick('btnEmergencyCustomCancel', () => ns.emergencyConfig?.cancelEdit?.('custom'));
 bindClick('btnToolTaskList', () => ns.toolbox.listTasks().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
 bindClick('btnToolTaskUpdate', () => ns.toolbox.updateTask().catch((e) => { $('toolTaskResult').textContent = formatError('工具任务', e); }));
+bindClick('btnNetPingRun', () => ns.toolbox.runNetworkPing().catch((e) => { $('netPingResult').textContent = formatError('Ping 工具', e); }));
+bindClick('btnNetCaptureFetch', () => ns.toolbox.fetchNetworkCapture().catch((e) => { $('netCaptureResult').textContent = formatError('抓包 URL 抓取', e); }));
+bindClick('btnNetCaptureAnalyze', () => ns.toolbox.analyzeNetworkCapture().catch((e) => { $('netCaptureResult').textContent = formatError('抓包 AI 分析', e); }));
 bindClick('btnListInspectionPoints', () => ns.inspectionPoints.listInspectionPoints().catch((e) => {
   $('pointListSummary').textContent = formatError('巡检点列表', e);
   $('pointListTbody').innerHTML = '<tr><td colspan="11">查询失败</td></tr>';
@@ -244,14 +249,9 @@ bindClick('btnRefreshHistory', () => ns.api.renderHistory());
 bindClick('btnClearHistory', () => ns.debug.clearHistory());
 bindClick('btnDebugHealthz', () => ns.debug.checkHealthz().catch((e) => { $('debugPanelResult').textContent = e.message; }));
 bindClick('btnDebugMe', () => ns.debug.loadCurrentUser().catch((e) => { $('debugPanelResult').textContent = e.message; }));
-bindClick('btnThreatbookQuery', () => ns.threatbook.queryThreatbook().catch((e) => { $('threatbookResult').textContent = formatError('高危IP研判', e); }));
+bindClick('btnThreatbookQuery', () => ns.threatbook.queryThreatbook().catch((e) => { $('threatbookResult').textContent = formatError('IP恶意研判', e); }));
 bindClick('btnThreatbookFillDemo', () => ns.threatbook.fillDemo());
-bindClick('btnThreatbookUploadExcel', () => ns.threatbook.uploadExcel().catch((e) => { $('threatbookResult').textContent = formatError('Excel导入研判', e); }));
-bindClick('btnThreatbookApplyFilter', () => ns.threatbook.applyFilter());
-bindClick('btnThreatbookResetFilter', () => ns.threatbook.resetFilter());
-bindClick('btnThreatbookBlock', () => ns.threatbook.blockIp().catch((e) => { $('threatbookResult').textContent = formatError('模拟封禁', e); }));
-bindClick('btnThreatbookBatchBlock', () => ns.threatbook.batchBlockAutoCandidates().catch((e) => { $('threatbookResult').textContent = formatError('批量模拟封禁', e); }));
-bindClick('btnThreatbookExport', () => ns.threatbook.exportJson());
+bindClick('btnThreatbookBatchBlock', () => ns.threatbook.batchBlockAutoCandidates().catch((e) => { $('threatbookResult').textContent = formatError('一键封禁预留接口', e); }));
 
 bindClick('btnToggleAutoRefresh', () => {
   ns.state.autoRefreshEnabled = !ns.state.autoRefreshEnabled;

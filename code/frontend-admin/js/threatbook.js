@@ -28,13 +28,11 @@ window.AegisAdmin = window.AegisAdmin || {};
         <td>${escapeHtml(item.ip)}</td>
         <td><span class="status-chip ${riskClass(item.risk_level)}">${escapeHtml(item.risk_level)}</span></td>
         <td>${item.is_malicious ? '是' : '否'}</td>
-        <td>${escapeHtml(item.severity || '-')}</td>
-        <td>${escapeHtml(item.confidence_level || '-')}</td>
         <td>${escapeHtml(item.decision || '-')}</td>
         <td>${escapeHtml(item.summary || '-')}</td>
       </tr>
     `).join('');
-    tbody.innerHTML = rows || '<tr><td colspan="7">暂无结果</td></tr>';
+    tbody.innerHTML = rows || '<tr><td colspan="5">暂无结果</td></tr>';
   }
 
   function getAllItems() {
@@ -45,54 +43,34 @@ window.AegisAdmin = window.AegisAdmin || {};
     return getAllItems().filter((item) => item.should_block);
   }
 
-  function getManualConfirmItems() {
-    return getAllItems().filter((item) => item.needs_manual_confirmation);
-  }
-
-  function getMaliciousItems() {
-    return getAllItems().filter((item) => item.is_malicious);
-  }
-
-  function filterItems(mode) {
-    if (mode === 'auto_block') return getAutoBlockItems();
-    if (mode === 'manual_confirm') return getManualConfirmItems();
-    if (mode === 'malicious') return getMaliciousItems();
-    return getAllItems();
+  function updateSummaryCards(data) {
+    const blockCount = getAutoBlockItems().length;
+    const totalEl = document.getElementById('threatbookTotal');
+    const maliciousEl = document.getElementById('threatbookMalicious');
+    const blockEl = document.getElementById('threatbookBlockCandidates');
+    if (totalEl) totalEl.textContent = data?.summary?.total ?? 0;
+    if (maliciousEl) maliciousEl.textContent = data?.summary?.malicious ?? 0;
+    if (blockEl) blockEl.textContent = blockCount;
   }
 
   function renderResultText(data, extra = '') {
     const blockCandidates = getAutoBlockItems().map((i) => i.ip).join(', ') || '无';
-    const confirmCandidates = getManualConfirmItems().map((i) => i.ip).join(', ') || '无';
-    document.getElementById('threatbookResult').textContent = [
+    updateSummaryCards(data);
+    const resultEl = document.getElementById('threatbookResult');
+    if (!resultEl) return;
+    resultEl.textContent = [
       `查询总数：${data.summary?.total ?? 0}`,
       `恶意 IP：${data.summary?.malicious ?? 0}`,
       `高危 IP：${data.summary?.high_risk ?? 0}`,
-      `自动封禁候选：${blockCandidates}`,
-      `需二次确认（济南）：${confirmCandidates}`,
-      `当前表格展示：${displayedItems.length} 条`,
+      `封禁候选：${blockCandidates}`,
       extra,
-      '',
-      JSON.stringify(data, null, 2),
     ].filter(Boolean).join('\n');
   }
 
-  function applyFilter() {
-    if (!latestResult) {
-      document.getElementById('threatbookResult').textContent = '暂无查询结果，无法筛选';
-      return;
-    }
-    const mode = document.getElementById('threatbookResultFilter')?.value || 'all';
-    const items = filterItems(mode);
-    renderTable(items);
-    renderResultText(latestResult, `当前筛选：${mode}`);
-  }
-
-  function resetFilter() {
-    const filter = document.getElementById('threatbookResultFilter');
-    if (filter) filter.value = 'all';
+  function renderResult() {
     if (latestResult) {
       renderTable(getAllItems());
-      renderResultText(latestResult, '当前筛选：all');
+      renderResultText(latestResult);
     }
   }
 
@@ -106,30 +84,7 @@ window.AegisAdmin = window.AegisAdmin || {};
       body: JSON.stringify({ raw_input: rawInput, lang, realtime_verdict: realtimeVerdict }),
     });
     latestResult = data;
-    resetFilter();
-    return data;
-  }
-
-  async function uploadExcel() {
-    const fileInput = document.getElementById('threatbookExcelFile');
-    const file = fileInput?.files?.[0];
-    if (!file) throw new Error('请先选择 Excel 文件');
-    const lang = document.getElementById('threatbookLang')?.value || 'zh';
-    const realtimeVerdict = (document.getElementById('threatbookRealtimeVerdict')?.value || 'true') === 'true';
-    const form = new FormData();
-    form.append('file', file);
-    const resp = await fetch(`${ns.api.base()}/api/v1/admin/threat-intel/ip-reputation/excel?lang=${encodeURIComponent(lang)}&realtime_verdict=${realtimeVerdict}`, {
-      method: 'POST',
-      headers: ns.state.token ? { Authorization: `Bearer ${ns.state.token}` } : {},
-      body: form,
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      throw new Error(data?.message || `HTTP ${resp.status}`);
-    }
-    latestResult = data;
-    resetFilter();
-    renderResultText(data, `导入文件：${data.import?.filename || file.name}`);
+    renderResult();
     return data;
   }
 
@@ -163,36 +118,15 @@ window.AegisAdmin = window.AegisAdmin || {};
 
   function fillDemo() {
     const input = document.getElementById('threatbookRawInput');
-    if (input) input.value = '8.8.8.8\n1.1.1.1\n127.0.0.1';
-  }
-
-  function exportJson() {
-    if (!latestResult) {
-      document.getElementById('threatbookResult').textContent = '暂无可导出的查询结果';
-      return;
-    }
-    const blob = new Blob([JSON.stringify(latestResult, null, 2)], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `threatbook-ip-result-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (input) input.value = '66.240.205.34\n8.8.8.8\n1.1.1.1';
   }
 
   ns.threatbook = {
     queryThreatbook,
-    uploadExcel,
     blockIp,
     batchBlockAutoCandidates,
     fillDemo,
-    exportJson,
     renderTable,
-    applyFilter,
-    resetFilter,
     getAutoBlockItems,
-    getManualConfirmItems,
   };
 })(window.AegisAdmin);

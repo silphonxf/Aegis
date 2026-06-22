@@ -243,6 +243,28 @@ def _decode_log_bytes(raw: bytes) -> str:
     return raw.decode("latin-1", errors="replace")
 
 
+def _parse_ping_packet_stats(output: str) -> Dict[str, Any]:
+    match = re.search(
+        r"(?P<sent>\d+)\s+packets transmitted,\s+"
+        r"(?P<received>\d+)\s+(?:packets\s+)?received,"
+        r"(?:\s+\+\d+\s+errors,)?\s+"
+        r"(?P<loss>[0-9.]+)%\s+packet loss",
+        output or "",
+        re.IGNORECASE,
+    )
+    if not match:
+        return {"sent": None, "received": None, "lost": None, "loss_percent": None}
+
+    sent = int(match.group("sent"))
+    received = int(match.group("received"))
+    return {
+        "sent": sent,
+        "received": received,
+        "lost": max(sent - received, 0),
+        "loss_percent": float(match.group("loss")),
+    }
+
+
 def _read_log_tail(path: str, max_lines: int = 20000) -> list[str]:
     with open(path, "rb") as fh:
         raw = fh.read()
@@ -354,11 +376,15 @@ def ping_host(
     elapsed_ms = int((time.time() - started) * 1000)
 
     ok = proc.returncode == 0
+    output = proc.stdout or proc.stderr
+    packet_stats = _parse_ping_packet_stats(output)
     result = {
         "host": payload.host,
+        "count": payload.count,
         "ok": ok,
         "latency_ms": elapsed_ms,
-        "output": (proc.stdout or proc.stderr)[-500:],
+        "packet_stats": packet_stats,
+        "output": output[-500:],
     }
     logger.info("Ping检测完成: host=%s ok=%s latency_ms=%s", payload.host, ok, elapsed_ms)
     log_action(db, "toolbox_ping", "toolbox", current_user, {"host": payload.host, "ok": ok})

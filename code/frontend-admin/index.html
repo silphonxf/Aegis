@@ -88,6 +88,17 @@
           </div>
         </div>
 
+        <div class="menu-group" data-group="network-security">
+          <button class="menu-btn group-btn" data-group-target="network-security">
+            <span class="menu-icon">🛡️</span><span class="menu-label">网络安全</span>
+          </button>
+          <div class="submenu-list">
+            <button class="submenu-btn" data-view="view-net-ping">Ping 工具</button>
+            <button class="submenu-btn" data-view="view-net-capture">抓包分析</button>
+            <button class="submenu-btn" data-view="view-tool-threatbook">IP 恶意研判</button>
+          </div>
+        </div>
+
         <div class="menu-group" data-group="approval-audit">
           <button class="menu-btn group-btn" data-group-target="approval-audit">
             <span class="menu-icon">🧾</span><span class="menu-label">运维审批与审计</span>
@@ -97,7 +108,6 @@
             <button class="submenu-btn" data-view="view-tool-rules">规则与审计</button>
             <button class="submenu-btn" data-view="view-tool-ai">AI诊断</button>
             <button class="submenu-btn" data-view="view-ai-external-keys">AI 对外接口 Key</button>
-            <button class="submenu-btn" data-view="view-tool-threatbook">高危IP研判</button>
             <button class="submenu-btn" data-view="view-tool-debug">调试与错误码</button>
           </div>
         </div>
@@ -823,76 +833,109 @@
         </section>
       </section>
 
-      <section id="view-tool-threatbook" class="view-panel" data-view-title="高危IP研判" data-view-desc="查询 IP 风险情报，支持 Excel 导入与封禁候选筛选。">
+      <section id="view-net-ping" class="view-panel" data-view-title="Ping 工具" data-view-desc="从管理端发起网络连通性检测，复用移动端工具箱 Ping 能力。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>Ping 工具</h2>
+              <p class="muted">输入域名或 IP，后端执行 Ping 并返回连通状态、耗时和原始输出。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnNetPingRun">执行 Ping</button>
+            </div>
+          </div>
+          <div class="grid2">
+            <input id="netPingHost" placeholder="目标地址，例如 127.0.0.1 / example.com" value="127.0.0.1" />
+            <select id="netPingCount">
+              <option value="1">1 次</option>
+              <option value="2">2 次</option>
+              <option value="3">3 次</option>
+              <option value="4">4 次</option>
+              <option value="5">5 次</option>
+              <option value="10">10 次</option>
+            </select>
+          </div>
+          <div class="summary-strip">
+            <div class="summary-card"><span>检测目标</span><strong id="netPingTarget">--</strong></div>
+            <div class="summary-card"><span>连通状态</span><strong id="netPingStatus">未检测</strong></div>
+            <div class="summary-card"><span>总耗时</span><strong id="netPingLatency">--</strong></div>
+            <div class="summary-card"><span>丢包情况</span><strong id="netPingPacketLoss">--</strong></div>
+          </div>
+          <pre id="netPingResult">输入目标地址后点击“执行 Ping”。</pre>
+        </section>
+      </section>
+
+      <section id="view-net-capture" class="view-panel" data-view-title="抓包分析" data-view-desc="抓取 URL 响应摘要并调用 AI 分析抓包内容，复用移动端抓包分析能力。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>抓包分析</h2>
+              <p class="muted">先抓取 URL 生成响应摘要，也可以粘贴已有抓包内容后直接分析。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnNetCaptureFetch">抓取 URL</button>
+              <button id="btnNetCaptureAnalyze">AI 分析</button>
+            </div>
+          </div>
+          <div class="grid2">
+            <input id="netCaptureUrl" placeholder="https://example.com" value="https://example.com" />
+            <select id="netCaptureSeverity">
+              <option value="low">low</option>
+              <option value="medium" selected>medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+          <input id="netCaptureNote" placeholder="备注（可选）" />
+          <textarea id="netCaptureContent" rows="10" placeholder="URL 抓取结果或手工粘贴的抓包内容"></textarea>
+          <div class="summary-strip">
+            <div class="summary-card"><span>HTTP 状态</span><strong id="netCaptureStatus">--</strong></div>
+            <div class="summary-card"><span>抓取耗时</span><strong id="netCaptureLatency">--</strong></div>
+            <div class="summary-card"><span>分析级别</span><strong id="netCaptureSeverityText">medium</strong></div>
+          </div>
+          <pre id="netCaptureResult">输入 URL 后点击“抓取 URL”，再点击“AI 分析”。</pre>
+        </section>
+      </section>
+
+      <section id="view-tool-threatbook" class="view-panel" data-view-title="IP 恶意研判" data-view-desc="输入单个或批量 IP，查询微步情报并预留一键封禁入口。">
         <section class="card">
           <div class="section-head">
             <div>
-              <h2>高危IP研判</h2>
-              <p class="muted">把查询、筛选和封禁动作放在一页，但按“输入 / 结果 / 操作”三段组织，避免一眼看上去太满。</p>
+              <h2>IP 恶意研判</h2>
+              <p class="muted">保留 IP 输入、批量查询和一键封禁预留接口，减少研判页操作噪音。</p>
             </div>
           </div>
           <div class="form-section">
-            <h3>查询输入</h3>
-            <div class="grid2">
-              <select id="threatbookLang"><option value="zh">中文</option><option value="en">英文</option></select>
-              <select id="threatbookRealtimeVerdict"><option value="true">仅当前有效情报</option><option value="false">包含历史过期情报</option></select>
-            </div>
-            <label>单个 / 批量 IP 输入（支持逗号、空格、换行分隔）
-              <textarea id="threatbookRawInput" rows="6" style="width:100%;padding:10px;">127.0.0.1</textarea>
+            <h3>IP 查询</h3>
+            <label>IP 输入（支持单个或批量，逗号、空格、换行分隔）
+              <textarea id="threatbookRawInput" rows="8" style="width:100%;padding:10px;" placeholder="例如：&#10;66.240.205.34&#10;8.8.8.8"></textarea>
             </label>
             <div class="action-row compact">
-              <button id="btnThreatbookQuery">查询 IP 风险</button>
+              <button id="btnThreatbookQuery">批量查询</button>
               <button id="btnThreatbookFillDemo">填充示例</button>
-            </div>
-            <p class="muted">支持直接粘贴批量 IP，也支持导入 Excel（默认读取首个命中 IP 列，列名可为 ip / IP地址 等）。</p>
-            <div class="grid2">
-              <input id="threatbookExcelFile" type="file" accept=".xlsx,.xlsm,.xltx,.xltm" />
-              <button id="btnThreatbookUploadExcel">导入 Excel 并查询</button>
             </div>
           </div>
           <div class="summary-strip">
-            <div class="summary-card"><span>查询模式</span><strong>文本 / Excel</strong></div>
-            <div class="summary-card"><span>重点结果</span><strong>自动封禁 / 二次确认</strong></div>
-            <div class="summary-card"><span>建议流程</span><strong>先筛选，再执行动作</strong></div>
+            <div class="summary-card"><span>查询总数</span><strong id="threatbookTotal">0</strong></div>
+            <div class="summary-card"><span>恶意 IP</span><strong id="threatbookMalicious">0</strong></div>
+            <div class="summary-card"><span>封禁候选</span><strong id="threatbookBlockCandidates">0</strong></div>
           </div>
           <div class="form-section">
-            <h3>结果筛选</h3>
-            <div class="grid3">
-              <select id="threatbookResultFilter">
-                <option value="all">全部结果</option>
-                <option value="auto_block">仅自动封禁</option>
-                <option value="manual_confirm">仅待二次确认</option>
-                <option value="malicious">仅恶意 IP</option>
-              </select>
-              <button id="btnThreatbookApplyFilter">应用筛选</button>
-              <button id="btnThreatbookResetFilter">重置筛选</button>
-            </div>
+            <h3>研判结果</h3>
             <div class="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>IP</th><th>风险等级</th><th>是否恶意</th><th>严重级别</th><th>可信度</th><th>建议动作</th><th>摘要</th>
+                    <th>IP</th><th>风险等级</th><th>是否恶意</th><th>建议动作</th><th>摘要</th>
                   </tr>
                 </thead>
-                <tbody id="threatbookResultTbody"><tr><td colspan="7">暂无结果</td></tr></tbody>
+                <tbody id="threatbookResultTbody"><tr><td colspan="5">暂无结果</td></tr></tbody>
               </table>
             </div>
           </div>
           <div class="form-section">
-            <h3>后续动作</h3>
-            <div class="grid2">
-              <input id="threatbookBlockIp" placeholder="要封禁的 IP（可从结果里复制）" />
-              <input id="threatbookBlockReason" placeholder="封禁原因（可选）" />
-            </div>
-            <div class="grid3">
-              <button id="btnThreatbookBlock">模拟封禁指定 IP</button>
-              <button id="btnThreatbookBatchBlock">模拟封禁自动封禁候选</button>
-              <button id="btnThreatbookExport">导出结果 JSON</button>
-            </div>
-            <details class="details-block" open>
-              <summary>查看查询摘要与原始返回</summary>
-              <pre id="threatbookResult">尚未查询</pre>
-            </details>
+            <h3>封禁预留</h3>
+            <button id="btnThreatbookBatchBlock">一键封禁候选 IP</button>
+            <pre id="threatbookResult">尚未查询</pre>
           </div>
         </section>
       </section>
