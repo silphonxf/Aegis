@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.core.logging import get_logger
 from app.db.session import get_db
-from app.models.selfcheck import ChecklistTemplate, SelfcheckRecord
+from app.models.selfcheck import ChecklistTemplate, SelfcheckRecord, SelfcheckReport
 from app.models.system import System, SystemStatusSnapshot, SystemUserBinding
 from app.models.user import User
 from app.schemas.ai import ChatRequest
@@ -69,19 +69,58 @@ def _serialize_report_file(path: Path) -> Dict[str, Any]:
         "summary": data.get("summary") or ai_report.get("summary") or ai_report.get("reply"),
     }
 
-def _save_selfcheck_report(payload: Dict[str, Any]) -> Dict[str, Any]:
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+def _report_identifier(report_id: int) -> str:
+    return f"report-{report_id}.json"
+
+
+def _serialize_report_row(row: SelfcheckReport) -> Dict[str, Any]:
+    return {
+        "id": row.id,
+        "file_name": _report_identifier(row.id),
+        "file_path": None,
+        "storage": "database",
+        "system_id": row.system_id,
+        "system_code": row.system_code,
+        "system_name": row.system_name,
+        "checked_at": row.checked_at.isoformat() if row.checked_at else None,
+        "range_minutes": row.range_minutes,
+        "alarm_count": row.alarm_count,
+        "summary": row.summary,
+    }
+
+
+def _save_selfcheck_report(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
     checked_at = datetime.utcnow()
     system = payload.get("system") or {}
-    system_part = _safe_file_part(f"{system.get('system_code') or system.get('system_id')}-{system.get('system_name') or ''}")
-    timestamp = checked_at.strftime("%Y%m%d%H%M%S")
-    file_name = f"{system_part}_{timestamp}.json"
     report = dict(payload)
     report["checked_at"] = checked_at.isoformat()
     report["summary"] = (payload.get("ai_report") or {}).get("reply") or (payload.get("ai_report") or {}).get("summary") or ""
-    path = REPORT_DIR / file_name
-    path.write_text(json.dumps(report, ensure_ascii=False, default=str, indent=2), encoding="utf-8")
-    return _serialize_report_file(path)
+    row = SelfcheckReport(
+        system_id=system.get("system_id"),
+        system_code=system.get("system_code"),
+        system_name=system.get("system_name"),
+        range_minutes=payload.get("range_minutes"),
+        alarm_count=len(payload.get("alarms") or []),
+        summary=report["summary"],
+        payload_json=json.dumps(report, ensure_ascii=False, default=str),
+        checked_at=checked_at,
+    )
+    db.add(row)
+    db.flush()
+    return _serialize_report_row(row)
+
+
+def _list_report_rows(db: Session, system_id: Optional[int], start_at: Optional[datetime], end_at: Optional[datetime]) -> List[Dict[str, Any]]:
+    q = db.query(SelfcheckReport)
+    if system_id is not None:
+        q = q.filter(SelfcheckReport.system_id == system_id)
+    if start_at:
+        q = q.filter(SelfcheckReport.checked_at >= start_at)
+    if end_at:
+        q = q.filter(SelfcheckReport.checked_at <= end_at)
+    rows = q.order_by(SelfcheckReport.checked_at.desc(), SelfcheckReport.id.desc()).all()
+    return [_serialize_report_row(row) for row in rows]
 
 
 def _list_report_files(system_id: Optional[int], start_at: Optional[datetime], end_at: Optional[datetime]) -> List[Dict[str, Any]]:
@@ -118,6 +157,23 @@ def _load_report_payload(file_name: str) -> Dict[str, Any]:
         logger.warning("读取 AI 自检报告失败: path=%s error=%s", path, exc)
         raise HTTPException(status_code=500, detail={"code": "REPORT_READ_FAILED", "message": "AI 自检报告读取失败"}) from exc
     data["report_file"] = _serialize_report_file(path)
+    data["alarm_count"] = len(data.get("alarms") or [])
+    return data
+
+
+def _load_report_row_payload(db: Session, file_name: str) -> Dict[str, Any]:
+    match = re.fullmatch(r"(?:report-)?(\d+)(?:\.json)?", file_name or "")
+    if not match:
+        raise HTTPException(status_code=400, detail={"code": "INVALID_REPORT_FILE", "message": "报告标识非法"})
+    row = db.query(SelfcheckReport).filter(SelfcheckReport.id == int(match.group(1))).first()
+    if not row:
+        raise HTTPException(status_code=404, detail={"code": "REPORT_NOT_FOUND", "message": "AI 自检报告不存在"})
+    try:
+        data = json.loads(row.payload_json)
+    except Exception as exc:
+        logger.warning("读取数据库 AI 自检报告失败: report_id=%s error=%s", row.id, exc)
+        raise HTTPException(status_code=500, detail={"code": "REPORT_READ_FAILED", "message": "AI 自检报告读取失败"}) from exc
+    data["report_file"] = _serialize_report_row(row)
     data["alarm_count"] = len(data.get("alarms") or [])
     return data
 
@@ -284,8 +340,8 @@ def run_system_selfcheck(
         report = run_chat(ChatRequest(message=prompt, conversation_id=f"selfcheck-{system.id}"))
     log_action(db, "run_system_selfcheck", "selfcheck", current_user, {"system_id": system.id, "range_minutes": response_payload["range_minutes"], "alarm_count": len(alarms)})
     response_payload["ai_report"] = report
-    response_payload["report_file"] = _save_selfcheck_report(response_payload)
-    _cleanup_old_reports()
+    response_payload["report_file"] = _save_selfcheck_report(db, response_payload)
+    db.commit()
     return response_payload
 
 @router.get("/status")
@@ -314,7 +370,7 @@ def list_selfcheck_reports(
         raise HTTPException(status_code=404, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在或无权访问"})
     if start_at is None and end_at is None:
         start_at = datetime.utcnow() - timedelta(hours=DEFAULT_REPORT_LOOKBACK_HOURS)
-    items = _list_report_files(system_id, start_at, end_at)
+    items = _list_report_rows(db, system_id, start_at, end_at)
     if system_id is None:
         items = [item for item in items if item.get("system_id") in visible_ids]
     total = len(items)
@@ -334,7 +390,7 @@ def get_selfcheck_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    data = _load_report_payload(file_name)
+    data = _load_report_row_payload(db, file_name)
     visible_ids = {row.id for row in _visible_system_query(db, current_user).all()}
     system_id = (data.get("system") or {}).get("system_id")
     if system_id not in visible_ids:
