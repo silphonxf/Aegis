@@ -9,6 +9,7 @@ from app.models.system import System, SystemLogConfig, SystemStatusSnapshot, Sys
 from app.models.user import User
 from app.schemas.system import StatusSnapshotCreate
 from app.services.audit import log_action
+from app.services.cache import get_json, set_json
 
 router = APIRouter(prefix="/systems", tags=["systems"])
 
@@ -47,8 +48,12 @@ def _calc_color(levels: List[str], host_online: str, port_ok: str, last_inspecti
 
 @router.get("/accessible")
 def list_accessible_systems(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    cache_key = f"aegis:cache:systems:accessible:user:{current_user.id}:v1"
+    cached = get_json(cache_key)
+    if cached is not None:
+        return cached
     systems = _visible_system_query(db, current_user).order_by(System.id.asc()).all()
-    return {
+    payload = {
         "items": [
             {
                 "system_id": s.id,
@@ -61,10 +66,16 @@ def list_accessible_systems(db: Session = Depends(get_db), current_user: User = 
             for s in systems
         ]
     }
+    set_json(cache_key, payload)
+    return payload
 
 
 @router.get("/accessible-log-configs")
 def list_accessible_system_log_configs(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    cache_key = f"aegis:cache:systems:accessible-log-configs:user:{current_user.id}:v1"
+    cached = get_json(cache_key)
+    if cached is not None:
+        return cached
     systems = _visible_system_query(db, current_user).order_by(System.id.asc()).all()
     system_ids = [item.id for item in systems]
     log_rows = (
@@ -78,7 +89,7 @@ def list_accessible_system_log_configs(db: Session = Depends(get_db), current_us
     for row in log_rows:
         logs_by_system.setdefault(row.system_id, []).append(row)
 
-    return {
+    payload = {
         "items": [
             {
                 "system_id": s.id,
@@ -101,10 +112,16 @@ def list_accessible_system_log_configs(db: Session = Depends(get_db), current_us
             for s in systems
         ]
     }
+    set_json(cache_key, payload)
+    return payload
 
 
 @router.get("/{system_id}/log-configs")
 def list_system_log_configs(system_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    cache_key = f"aegis:cache:systems:log-configs:user:{current_user.id}:system:{system_id}:v1"
+    cached = get_json(cache_key)
+    if cached is not None:
+        return cached
     system = _visible_system_query(db, current_user).filter(System.id == system_id).first()
     if not system:
         raise HTTPException(status_code=404, detail={"code": "SYSTEM_NOT_FOUND", "message": "系统不存在或无权访问"})
@@ -114,7 +131,7 @@ def list_system_log_configs(system_id: int, db: Session = Depends(get_db), curre
         .order_by(SystemLogConfig.id.asc())
         .all()
     )
-    return {
+    payload = {
         "system_id": system.id,
         "system_name": system.name,
         "host_address": system.host_address,
@@ -129,6 +146,8 @@ def list_system_log_configs(system_id: int, db: Session = Depends(get_db), curre
             for item in rows
         ],
     }
+    set_json(cache_key, payload)
+    return payload
 
 
 @router.get("/status/overview")

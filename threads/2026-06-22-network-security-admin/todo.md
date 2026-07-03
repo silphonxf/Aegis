@@ -8,3 +8,17 @@
 - [ ] 后续按反馈调整 Ping 工具
 - [ ] 后续按反馈调整抓包工具
 - [ ] 后续按反馈调整 IP 恶意研判
+- [x] 记录当前 Redis、日志路径、自检报告入库和东八区时间戳进度
+- [x] 梳理 TapeManage 中华为地址组 SSH 封禁命令
+- [x] 梳理 HiSecEngine YANG API 中 `huawei-address-set` 相关节点
+- [x] 找到 Aegis 当前未提交的防火墙 RESTCONF 服务实现
+- [x] 梳理 TapeManage 封禁、解封、FOC 加白、批量写入功能到 RESTCONF API 的对应关系
+- [x] 写入 Postman 直连防火墙封禁 IP 的 PATCH 请求草案
+- [ ] 配置真实防火墙 RESTCONF 凭据
+- [ ] 用 Postman 验证直连防火墙 PATCH 请求是否能封禁测试 IP
+- [ ] dry-run 验证 `/api/v1/admin/threat-intel/block-ip` 生成的 URL 和 XML
+- [ ] GET 验证真实防火墙地址集路径
+- [ ] 用测试 IP 执行真实封禁 PATCH
+- [ ] 实现 Aegis 通用地址组接口：单 IP 添加、单 IP 删除、批量添加、地址组查询
+- [ ] 增加本地封禁/解封审计记录表，替代 TapeManage 的 `IpTable` / `IpFocTable` 记录方式
+- [ ] 根据联调结果补解封能力和封禁记录表

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
-from app.api.selfchecks import _build_alarm_items, _build_selfcheck_prompt, _snapshot_payload
+from app.api.selfchecks import _build_alarm_items, _build_selfcheck_prompt, _is_mysql_selfcheck, _normalize_selfcheck_report, _run_mysql_selfcheck_report, _snapshot_payload
 import app.db.session as db_session_module
 from app.models.selfcheck import SelfcheckRecord
 from app.models.system import System, SystemStatusSnapshot
@@ -108,8 +108,12 @@ def run_system_selfcheck_report(system_name: Optional[str] = None, system_id: Op
           .first()
       )
       alarms = _build_alarm_items(snapshots)
-      prompt = _build_selfcheck_prompt(system, range_minutes, latest, alarms)
-      report = run_chat(ChatRequest(message=prompt, conversation_id=f"assistant-selfcheck-{system.id}"))
+      if _is_mysql_selfcheck(system):
+          report = _run_mysql_selfcheck_report(system)
+      else:
+          prompt = _build_selfcheck_prompt(system, range_minutes, latest, alarms)
+          report = run_chat(ChatRequest(message=prompt, conversation_id=f"assistant-selfcheck-{system.id}"))
+          report = _normalize_selfcheck_report(report, system, range_minutes, latest, alarms)
       reply = report.get("reply") or report.get("summary") or "已完成智能自检。"
       html = _build_selfcheck_html(system, range_minutes, latest, alarms, reply)
       return {

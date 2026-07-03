@@ -92,14 +92,15 @@ window.AegisAdmin = window.AegisAdmin || {};
     const targetIp = ip || document.getElementById('threatbookBlockIp')?.value.trim();
     const inputReason = document.getElementById('threatbookBlockReason')?.value.trim() || null;
     const targetReason = reason ?? inputReason;
+    const dryRun = document.getElementById('threatbookFirewallDryRun')?.checked ?? true;
     if (!targetIp) throw new Error('请先输入要封禁的 IP');
     const data = await ns.api.request('/api/v1/admin/threat-intel/block-ip', {
       method: 'POST',
       headers: ns.api.headers(),
-      body: JSON.stringify({ ip: targetIp, reason: targetReason, risk_level: riskLevel, source: 'threatbook', dry_run: true }),
+      body: JSON.stringify({ ip: targetIp, reason: targetReason, risk_level: riskLevel, source: 'threatbook', dry_run: dryRun }),
     });
     const resultEl = document.getElementById('threatbookResult');
-    resultEl.textContent = `${resultEl.textContent}\n\n--- 模拟封禁返回 ---\n${JSON.stringify(data, null, 2)}`;
+    resultEl.textContent = `${resultEl.textContent}\n\n--- ${dryRun ? '演练封禁返回' : '防火墙封禁返回'} ---\n${JSON.stringify(data, null, 2)}`;
     return data;
   }
 
@@ -112,7 +113,7 @@ window.AegisAdmin = window.AegisAdmin || {};
       results.push(data);
     }
     const resultEl = document.getElementById('threatbookResult');
-    resultEl.textContent = `${resultEl.textContent}\n\n--- 批量模拟封禁汇总 ---\n${JSON.stringify(results, null, 2)}`;
+    resultEl.textContent = `${resultEl.textContent}\n\n--- 批量封禁汇总 ---\n${JSON.stringify(results, null, 2)}`;
     return results;
   }
 

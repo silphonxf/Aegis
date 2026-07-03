@@ -3,6 +3,7 @@ from io import BytesIO
 from openpyxl import Workbook
 
 from app.services import threatbook
+from app.core.config import settings
 
 
 def test_threat_intel_quick_query_rule_jinan_confirm(client, admin_headers, monkeypatch):
@@ -81,6 +82,90 @@ def test_threat_intel_excel_import(client, admin_headers, monkeypatch):
     body = resp.json()
     assert body["import"]["filename"] == "ips.xlsx"
     assert body["summary"]["high_risk"] == 1
+
+
+def test_threat_intel_block_ip_dry_run_returns_firewall_plan(client, admin_headers):
+    resp = client.post(
+        "/api/v1/admin/threat-intel/block-ip",
+        headers=admin_headers,
+        json={"ip": "8.8.8.8", "risk_level": "high_risk", "reason": "unit test", "dry_run": True},
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "dry_run"
+    assert body["dry_run"] is True
+    assert body["ip"] == "8.8.8.8"
+    assert body["firewall_host"] == "192.168.100.18"
+    assert "huawei-address-set:address-set" in body["url"]
+    assert "<address-ipv4>8.8.8.8</address-ipv4>" in body["body"]
+    assert "<mask>255.255.255.255</mask>" in body["body"]
+
+
+def test_threat_intel_block_ip_requires_firewall_credentials(client, admin_headers, monkeypatch):
+    monkeypatch.setattr(settings, "FIREWALL_RESTCONF_USERNAME", None)
+    monkeypatch.setattr(settings, "FIREWALL_RESTCONF_PASSWORD", None)
+
+    resp = client.post(
+        "/api/v1/admin/threat-intel/block-ip",
+        headers=admin_headers,
+        json={"ip": "8.8.4.4", "dry_run": False},
+    )
+
+    assert resp.status_code == 503, resp.text
+    assert resp.json()["code"] == "FIREWALL_CONFIG_MISSING"
+    assert "FIREWALL_RESTCONF_USERNAME" in resp.json()["message"]
+
+
+def test_threat_intel_block_ip_calls_huawei_restconf(client, admin_headers, monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        def __init__(self, status_code=200, content=b""):
+            self.status_code = status_code
+            self.content = content
+
+        def raise_for_status(self):
+            return None
+
+    def fake_get(url, **kwargs):
+        calls.append(("GET", url, kwargs))
+        return FakeResponse(
+            content=b"""
+            <address-object xmlns="urn:huawei:yang:huawei-address-set">
+              <name>aegis-blocked-ip</name>
+              <elements>
+                <element><elem-id>7</elem-id><address-ipv4>1.1.1.1</address-ipv4><mask>255.255.255.255</mask></element>
+              </elements>
+            </address-object>
+            """
+        )
+
+    def fake_patch(url, **kwargs):
+        calls.append(("PATCH", url, kwargs))
+        return FakeResponse(status_code=204)
+
+    monkeypatch.setattr(settings, "FIREWALL_RESTCONF_USERNAME", "admin")
+    monkeypatch.setattr(settings, "FIREWALL_RESTCONF_PASSWORD", "secret")
+    monkeypatch.setattr("app.services.firewall.requests.get", fake_get)
+    monkeypatch.setattr("app.services.firewall.requests.patch", fake_patch)
+
+    resp = client.post(
+        "/api/v1/admin/threat-intel/block-ip",
+        headers=admin_headers,
+        json={"ip": "9.9.9.9", "reason": "risk & block", "dry_run": False},
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "blocked"
+    assert body["elem_id"] == 8
+    assert body["http_status"] == 204
+    assert [call[0] for call in calls] == ["GET", "PATCH"]
+    patch_body = calls[1][2]["data"].decode("utf-8")
+    assert "<elem-id>8</elem-id>" in patch_body
+    assert "<address-ipv4>9.9.9.9</address-ipv4>" in patch_body
+    assert "risk &amp; block" in patch_body
 
 
 def test_threatbook_ip_key_response_and_scanner_judgment_are_malicious(monkeypatch):

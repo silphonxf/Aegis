@@ -14,6 +14,7 @@ from app.models.shared_data import EmergencyHost, Runbook
 from app.models.system import System, SystemUserBinding
 from app.models.tool_task import ToolTask
 from app.models.user import User
+from app.services.cache import delete_prefix, get_json, set_json
 from app.schemas.emergency_config import (
     EmergencyDbActionItem,
     EmergencyOpsConfig,
@@ -24,6 +25,8 @@ from app.schemas.emergency_config import (
 )
 
 _CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "emergency_ops.json"
+EMERGENCY_CONFIG_CACHE_KEY = "aegis:cache:emergency_config:public:v1"
+EMERGENCY_CONFIG_CACHE_PREFIX = "aegis:cache:emergency_config:"
 
 
 def _ensure_parent():
@@ -173,13 +176,24 @@ def load_emergency_config(db: Optional[Session] = None) -> EmergencyOpsConfig:
 
 
 def list_public_config(db: Optional[Session] = None) -> Dict:
+    if db is not None:
+        cached = get_json(EMERGENCY_CONFIG_CACHE_KEY)
+        if cached is not None:
+            return cached
     config = load_emergency_config(db)
-    return {
+    payload = {
         "ssh_hosts": [_public_host(item) for item in config.ssh_hosts],
         "server_actions": [item.dict() for item in config.server_actions],
         "database_actions": [item.dict() for item in config.database_actions],
         "process_actions": [item.dict() for item in config.process_actions],
     }
+    if db is not None:
+        set_json(EMERGENCY_CONFIG_CACHE_KEY, payload)
+    return payload
+
+
+def invalidate_emergency_config_cache() -> None:
+    delete_prefix(EMERGENCY_CONFIG_CACHE_PREFIX)
 
 
 def _resolve_host_id(db: Session, host_code: Optional[str]) -> Optional[int]:
@@ -234,6 +248,7 @@ def upsert_ssh_host(payload: EmergencySshHostSaveRequest, db: Optional[Session] 
     host.remark = item.remark
     db.commit()
     db.refresh(host)
+    invalidate_emergency_config_cache()
     return _public_host(_host_from_model(host))
 
 
@@ -261,6 +276,7 @@ def upsert_server_action(payload: EmergencyServerActionItem, db: Optional[Sessio
     runbook.remark = payload.remark
     db.commit()
     db.refresh(runbook)
+    invalidate_emergency_config_cache()
     return payload.dict()
 
 
@@ -287,6 +303,7 @@ def upsert_db_action(payload: EmergencyDbActionItem, db: Optional[Session] = Non
     runbook.remark = payload.remark
     db.commit()
     db.refresh(runbook)
+    invalidate_emergency_config_cache()
     return payload.dict()
 
 
@@ -315,6 +332,7 @@ def upsert_process_action(payload: EmergencyProcessActionItem, db: Optional[Sess
     runbook.remark = payload.remark
     db.commit()
     db.refresh(runbook)
+    invalidate_emergency_config_cache()
     return payload.dict()
 
 
@@ -334,6 +352,7 @@ def delete_ssh_host(host_code: str, db: Optional[Session] = None) -> Dict:
     host.is_active = False
     db.query(Runbook).filter(Runbook.target_host_id == host.id).update({"enabled": False})
     db.commit()
+    invalidate_emergency_config_cache()
     return {"host_code": host_code, "deleted": True}
 
 
@@ -352,6 +371,7 @@ def delete_server_action(action_code: str, db: Optional[Session] = None) -> Dict
         raise HTTPException(status_code=404, detail={"code": "RUNBOOK_NOT_FOUND", "message": "应急动作不存在"})
     runbook.enabled = False
     db.commit()
+    invalidate_emergency_config_cache()
     return {"action_code": action_code, "deleted": True}
 
 
@@ -370,6 +390,7 @@ def delete_db_action(action_code: str, db: Optional[Session] = None) -> Dict:
         raise HTTPException(status_code=404, detail={"code": "RUNBOOK_NOT_FOUND", "message": "应急动作不存在"})
     runbook.enabled = False
     db.commit()
+    invalidate_emergency_config_cache()
     return {"action_code": action_code, "deleted": True}
 
 
@@ -388,24 +409,38 @@ def delete_process_action(action_code: str, db: Optional[Session] = None) -> Dic
         raise HTTPException(status_code=404, detail={"code": "RUNBOOK_NOT_FOUND", "message": "应急动作不存在"})
     runbook.enabled = False
     db.commit()
+    invalidate_emergency_config_cache()
     return {"action_code": action_code, "deleted": True}
 
 
-def import_emergency_json_to_db(db: Session) -> Dict:
+def import_emergency_json_to_db(db: Session, overwrite: bool = True) -> Dict:
     config = _load_json_config()
-    imported = {"ssh_hosts": 0, "server_actions": 0, "database_actions": 0, "process_actions": 0}
+    imported = {"ssh_hosts": 0, "server_actions": 0, "database_actions": 0, "process_actions": 0, "skipped": 0}
     for item in config.ssh_hosts:
+        if not overwrite and db.query(EmergencyHost).filter(EmergencyHost.host_code == item.host_code).first():
+            imported["skipped"] += 1
+            continue
         upsert_ssh_host(EmergencySshHostSaveRequest(**item.dict()), db=db)
         imported["ssh_hosts"] += 1
     for item in config.server_actions:
+        if not overwrite and db.query(Runbook).filter(Runbook.runbook_code == item.action_code).first():
+            imported["skipped"] += 1
+            continue
         upsert_server_action(item, db=db)
         imported["server_actions"] += 1
     for item in config.database_actions:
+        if not overwrite and db.query(Runbook).filter(Runbook.runbook_code == item.action_code).first():
+            imported["skipped"] += 1
+            continue
         upsert_db_action(item, db=db)
         imported["database_actions"] += 1
     for item in config.process_actions:
+        if not overwrite and db.query(Runbook).filter(Runbook.runbook_code == item.action_code).first():
+            imported["skipped"] += 1
+            continue
         upsert_process_action(item, db=db)
         imported["process_actions"] += 1
+    invalidate_emergency_config_cache()
     return imported
 
 

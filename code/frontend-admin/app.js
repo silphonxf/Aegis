@@ -23,6 +23,7 @@ const VIEW_GROUP_MAP = {
   'view-dashboard-overview': 'dashboard',
   'view-ops-workbench': 'ops-workbench',
   'view-systems': 'ops-workbench',
+  'view-db-selfchecks': 'ops-workbench',
   'view-inspection-points': 'ops-workbench',
   'view-inspection-records': 'ops-workbench',
   'view-users': 'ops-workbench',
@@ -99,6 +100,7 @@ function switchView(viewId, groupId) {
     ns.dashboard?.stopDashboardAutoRefresh?.();
   }
 
+  if (viewId === 'view-db-selfchecks') ns.databaseSelfchecks?.list?.();
   if (viewId === 'view-inspection-points') ns.inspectionPoints?.listInspectionPoints?.();
   if (viewId === 'view-inspection-records') ns.inspectionRecords?.listInspectionRecords?.();
   if (viewId === 'view-emergency-ssh') ns.emergencyConfig?.listSshHosts?.();
@@ -202,6 +204,15 @@ bindClick('btnFindSystems', () => ns.systems.findSystems($('systemSearchKeyword2
   $('systemListSummary').textContent = formatError('系统查询', e);
   $('systemListTbody').innerHTML = '<tr><td colspan="9">查询失败</td></tr>';
 }));
+bindClick('btnDbSelfcheckSearch', () => ns.databaseSelfchecks?.list?.().catch((e) => {
+  $('dbSelfcheckSummary').textContent = formatError('数据库自检查询', e);
+  $('dbSelfcheckTbody').innerHTML = '<tr><td colspan="10">查询失败</td></tr>';
+}));
+bindClick('btnDbSelfcheckAdd', () => ns.databaseSelfchecks?.openCreate?.());
+bindClick('btnDbSelfcheckSave', () => ns.databaseSelfchecks?.save?.().catch((e) => {
+  $('dbSelfcheckFormResult').textContent = formatError('数据库自检保存', e);
+}));
+bindClick('btnDbSelfcheckCancel', () => ns.databaseSelfchecks?.cancel?.());
 bindClick('btnLoadRules', () => ns.rulesAudit.loadRules().catch((e) => { $('ruleResult').textContent = formatError('规则配置', e); }));
 bindClick('btnSaveRules', () => ns.rulesAudit.saveRules().catch((e) => { $('ruleResult').textContent = formatError('规则配置', e); }));
 bindClick('btnAudit', () => ns.rulesAudit.loadAudit().catch((e) => { $('audit').textContent = formatError('审计日志', e); }));

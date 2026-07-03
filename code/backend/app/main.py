@@ -16,6 +16,7 @@ from app.db.session import SessionLocal
 from app.models.inspection import InspectionPoint
 from app.models.system import System
 from app.models.user import Role, User
+from app.services.emergency_config import import_emergency_json_to_db, list_public_config
 
 configure_logging()
 logger = get_logger("app")
@@ -133,6 +134,10 @@ def on_startup():
     db = SessionLocal()
     try:
         init_seed(db)
+        if settings.EMERGENCY_CONFIG_AUTO_IMPORT_JSON and settings.APP_ENV != "test":
+            imported = import_emergency_json_to_db(db, overwrite=False)
+            logger.info("应急配置 JSON 导入数据库完成: %s", imported)
+            list_public_config(db)
         logger.info("启动初始化完成")
     finally:
         db.close()

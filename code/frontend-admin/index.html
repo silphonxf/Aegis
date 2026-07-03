@@ -69,6 +69,7 @@
           </button>
           <div class="submenu-list">
             <button class="submenu-btn" data-view="view-systems">系统</button>
+            <button class="submenu-btn" data-view="view-db-selfchecks">数据库自检</button>
             <button class="submenu-btn" data-view="view-inspection-points">巡检点</button>
             <button class="submenu-btn" data-view="view-inspection-records">巡检记录</button>
             <button class="submenu-btn" data-view="view-users">用户</button>
@@ -282,6 +283,92 @@
             <table>
               <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>地址/IP</th><th>环境</th><th>管理员ID</th><th>日志位置</th><th>状态</th><th>操作</th></tr></thead>
               <tbody id="systemListTbody"><tr><td colspan="9">暂无数据</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-db-selfchecks" class="view-panel" data-view-title="数据库自检" data-view-desc="维护数据库连接、自检频次和 AI 自检要求，供系统自检生成数据库健康报告。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>数据库自检配置</h2>
+              <p class="muted">仿照系统配置维护数据库目标。第一版复用系统记录保存 MySQL 自检参数。</p>
+            </div>
+          </div>
+          <div class="search-toolbar wide-toolbar">
+            <input id="dbSelfcheckKeyword" class="search-input" placeholder="搜索编号 / 名称 / 主机 / 库名" />
+            <select id="dbSelfcheckActive">
+              <option value="">全部状态</option>
+              <option value="true">启用</option>
+              <option value="false">停用</option>
+            </select>
+            <button id="btnDbSelfcheckSearch" class="toolbar-btn">搜索</button>
+            <button id="btnDbSelfcheckAdd" class="toolbar-btn secondary">新增</button>
+          </div>
+          <form id="dbSelfcheckForm" class="inline-config-form hidden">
+            <div class="grid2">
+              <label>配置编号
+                <input id="dbSelfcheckCode" placeholder="例如 DB-MYSQL-AEGIS" />
+              </label>
+              <label>配置名称
+                <input id="dbSelfcheckName" placeholder="例如 Aegis 主库" />
+              </label>
+              <label>数据库类型
+                <select id="dbSelfcheckType">
+                  <option value="mysql">MySQL</option>
+                  <option value="mariadb">MariaDB</option>
+                </select>
+              </label>
+              <label>环境
+                <select id="dbSelfcheckEnv">
+                  <option value="prod">生产</option>
+                  <option value="test">测试</option>
+                  <option value="dev">开发</option>
+                </select>
+              </label>
+              <label>主机/IP
+                <input id="dbSelfcheckHost" placeholder="例如 192.168.1.20" />
+              </label>
+              <label>端口
+                <input id="dbSelfcheckPort" type="number" min="1" max="65535" placeholder="3306" />
+              </label>
+              <label>数据库名
+                <input id="dbSelfcheckDatabase" placeholder="例如 aegis" />
+              </label>
+              <label>用户名
+                <input id="dbSelfcheckUser" placeholder="例如 aegis_monitor" />
+              </label>
+              <label>密码
+                <input id="dbSelfcheckPassword" type="password" autocomplete="new-password" placeholder="数据库连接密码" />
+              </label>
+              <label>检查频次
+                <select id="dbSelfcheckFrequency">
+                  <option value="">不设置</option>
+                  <option value="hourly">每小时</option>
+                  <option value="daily">每天</option>
+                  <option value="weekly">每周</option>
+                  <option value="monthly">每月</option>
+                </select>
+              </label>
+            </div>
+            <label>自检要求
+              <textarea id="dbSelfcheckInstruction" rows="4" placeholder="例如重点检查连接数、Threads_running、锁等待、死锁、慢 SQL 和异常连接。"></textarea>
+            </label>
+            <label>备注
+              <input id="dbSelfcheckRemark" placeholder="补充说明（可选）" />
+            </label>
+            <div class="inline-form-actions">
+              <button id="btnDbSelfcheckSave" class="toolbar-btn" type="button">保存配置</button>
+              <button id="btnDbSelfcheckCancel" class="toolbar-btn secondary" type="button">取消</button>
+              <span id="dbSelfcheckFormResult" class="inline-result"></span>
+            </div>
+          </form>
+          <div id="dbSelfcheckSummary" class="result-line"></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>序号</th><th>配置编号</th><th>名称</th><th>类型</th><th>主机</th><th>库名</th><th>用户</th><th>频次</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="dbSelfcheckTbody"><tr><td colspan="10">暂无数据库自检配置</td></tr></tbody>
             </table>
           </div>
         </section>
@@ -933,7 +1020,8 @@
             </div>
           </div>
           <div class="form-section">
-            <h3>封禁预留</h3>
+            <h3>防火墙封禁</h3>
+            <label class="inline-check"><input type="checkbox" id="threatbookFirewallDryRun" checked> 演练模式</label>
             <button id="btnThreatbookBatchBlock">一键封禁候选 IP</button>
             <pre id="threatbookResult">尚未查询</pre>
           </div>
@@ -1137,6 +1225,7 @@
   <script defer src="./js/inspection-records.js"></script>
   <script defer src="./js/users.js"></script>
   <script defer src="./js/systems.js"></script>
+  <script defer src="./js/database-selfchecks.js"></script>
   <script defer src="./js/rules-audit.js"></script>
   <script defer src="./js/templates.js"></script>
   <script defer src="./js/modals.js"></script>

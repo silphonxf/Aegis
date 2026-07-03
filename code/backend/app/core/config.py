@@ -73,6 +73,25 @@ class Settings(BaseSettings):
     THREATBOOK_API_KEY: Optional[str] = None
     THREATBOOK_TIMEOUT_SECONDS: int = 30
 
+    # Redis cache. Used for DB-backed configuration and selector/reference data.
+    REDIS_CACHE_ENABLED: bool = True
+    REDIS_URL: str = "redis://127.0.0.1:6379/0"
+    REDIS_CACHE_TTL_SECONDS: int = 300
+    EMERGENCY_CONFIG_AUTO_IMPORT_JSON: bool = True
+
+    # Huawei USG RESTCONF firewall blocking. The default host follows the
+    # TapeManage primary block-device hint; credentials must be injected.
+    FIREWALL_RESTCONF_ENABLED: bool = True
+    FIREWALL_RESTCONF_SCHEME: str = "https"
+    FIREWALL_RESTCONF_HOST: str = "192.168.100.18"
+    FIREWALL_RESTCONF_PORT: int = 443
+    FIREWALL_RESTCONF_USERNAME: Optional[str] = None
+    FIREWALL_RESTCONF_PASSWORD: Optional[str] = None
+    FIREWALL_RESTCONF_VERIFY_SSL: bool = False
+    FIREWALL_RESTCONF_TIMEOUT_SECONDS: int = 15
+    FIREWALL_RESTCONF_VSYS: str = "public"
+    FIREWALL_ADDRESS_SET_NAME: str = "aegis-blocked-ip"
+
     # CORS
     CORS_ALLOW_ORIGINS: str = "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174"
     CORS_ALLOW_ORIGIN_REGEX: Optional[str] = (
