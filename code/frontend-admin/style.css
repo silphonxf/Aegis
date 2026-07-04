@@ -563,6 +563,14 @@ th { background: #113654; color: #7dd3fc; }
 .status-chip.cancelled { background: #163c58; color: #8ea9c3; border-color: #2a5a7a; }
 
 .result-line { color: #c7e6ff; margin: 6px 0 10px; }
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 10px 0;
+  color: #c7e6ff;
+  font-size: 13px;
+}
 .summary-strip {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -749,4 +757,8 @@ th { background: #113654; color: #7dd3fc; }
 
 #createSystemModal .modal-card textarea {
   resize: vertical;
+}
+
+#firewallConfigModal .modal-card {
+  width: min(560px, calc(100vw - 24px));
 }

@@ -385,6 +385,9 @@ def test_assistant_can_route_system_selfcheck(client, admin_headers):
     body = resp.json()
     assert body["tool_calls"][0]["tool"] == "run_system_selfcheck_report"
     assert body["cards"][0]["html_report"].startswith("<!doctype html>")
+    assert "关键指标" in body["cards"][0]["html_report"]
+    assert "当前仍使用本地 fallback 规则回复" not in body["cards"][0]["summary"]
+    assert "当前仍使用本地 fallback 规则回复" not in body["cards"][0]["html_report"]
 
 
 def test_assistant_ip_reputation_private_ip_is_user_friendly(client, admin_headers):

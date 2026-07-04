@@ -3,11 +3,12 @@ from .ai_external_key import AIExternalApiKey
 from .asset import Asset
 from .audit import AuditLog
 from .base import Base
+from .firewall import FirewallBlockConfig
 from .inspection import InspectionPoint, InspectionRecord
 from .shared_data import EmergencyHost, Room, Runbook
 from .offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from .rule import StatusRule
-from .selfcheck import ChecklistTemplate, SelfcheckRecord
+from .selfcheck import ChecklistTemplate, SelfcheckRecord, SelfcheckReport
 from .system import System, SystemLogConfig, SystemStatusSnapshot, SystemUserBinding
 from .tool_task import ToolTask
 from .user import Role, User
@@ -29,10 +30,12 @@ __all__ = [
     "OfflineAnalysisResult",
     "ChecklistTemplate",
     "SelfcheckRecord",
+    "SelfcheckReport",
     "AuditLog",
     "StatusRule",
     "Asset",
     "ToolTask",
     "AIDiagnosis",
     "AIExternalApiKey",
+    "FirewallBlockConfig",
 ]

@@ -30,3 +30,17 @@ class SelfcheckRecord(Base):
     reviewed_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     checked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class SelfcheckReport(Base):
+    __tablename__ = "selfcheck_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    system_id: Mapped[int] = mapped_column(Integer, ForeignKey("systems.id"), nullable=False, index=True)
+    system_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    system_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    range_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    alarm_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    checked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)

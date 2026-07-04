@@ -517,7 +517,7 @@ def read_error_logs(
         "line_count": len(excerpt_lines),
         "truncated": len(content) >= 120000,
         "matched_keywords": keywords,
-        "available_files": [os.path.basename(path) for path in _collect_log_files(payload.source)],
+        "available_files": [os.path.basename(path) for path in (configured_paths if payload.source == "system" else _collect_log_files(payload.source))],
     }
 
 

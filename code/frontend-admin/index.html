@@ -69,6 +69,7 @@
           </button>
           <div class="submenu-list">
             <button class="submenu-btn" data-view="view-systems">系统</button>
+            <button class="submenu-btn" data-view="view-db-selfchecks">数据库自检</button>
             <button class="submenu-btn" data-view="view-inspection-points">巡检点</button>
             <button class="submenu-btn" data-view="view-inspection-records">巡检记录</button>
             <button class="submenu-btn" data-view="view-users">用户</button>
@@ -108,7 +109,6 @@
             <button class="submenu-btn" data-view="view-tool-rules">规则与审计</button>
             <button class="submenu-btn" data-view="view-tool-ai">AI诊断</button>
             <button class="submenu-btn" data-view="view-ai-external-keys">AI 对外接口 Key</button>
-            <button class="submenu-btn" data-view="view-tool-debug">调试与错误码</button>
           </div>
         </div>
       </nav>
@@ -282,6 +282,92 @@
             <table>
               <thead><tr><th>序号</th><th>系统编号</th><th>系统名称</th><th>地址/IP</th><th>环境</th><th>管理员ID</th><th>日志位置</th><th>状态</th><th>操作</th></tr></thead>
               <tbody id="systemListTbody"><tr><td colspan="9">暂无数据</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-db-selfchecks" class="view-panel" data-view-title="数据库自检" data-view-desc="维护数据库连接、自检频次和 AI 自检要求，供系统自检生成数据库健康报告。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>数据库自检配置</h2>
+              <p class="muted">仿照系统配置维护数据库目标。第一版复用系统记录保存 MySQL 自检参数。</p>
+            </div>
+          </div>
+          <div class="search-toolbar wide-toolbar">
+            <input id="dbSelfcheckKeyword" class="search-input" placeholder="搜索编号 / 名称 / 主机 / 库名" />
+            <select id="dbSelfcheckActive">
+              <option value="">全部状态</option>
+              <option value="true">启用</option>
+              <option value="false">停用</option>
+            </select>
+            <button id="btnDbSelfcheckSearch" class="toolbar-btn">搜索</button>
+            <button id="btnDbSelfcheckAdd" class="toolbar-btn secondary">新增</button>
+          </div>
+          <form id="dbSelfcheckForm" class="inline-config-form hidden">
+            <div class="grid2">
+              <label>配置编号
+                <input id="dbSelfcheckCode" placeholder="例如 DB-MYSQL-AEGIS" />
+              </label>
+              <label>配置名称
+                <input id="dbSelfcheckName" placeholder="例如 Aegis 主库" />
+              </label>
+              <label>数据库类型
+                <select id="dbSelfcheckType">
+                  <option value="mysql">MySQL</option>
+                  <option value="mariadb">MariaDB</option>
+                </select>
+              </label>
+              <label>环境
+                <select id="dbSelfcheckEnv">
+                  <option value="prod">生产</option>
+                  <option value="test">测试</option>
+                  <option value="dev">开发</option>
+                </select>
+              </label>
+              <label>主机/IP
+                <input id="dbSelfcheckHost" placeholder="例如 192.168.1.20" />
+              </label>
+              <label>端口
+                <input id="dbSelfcheckPort" type="number" min="1" max="65535" placeholder="3306" />
+              </label>
+              <label>数据库名
+                <input id="dbSelfcheckDatabase" placeholder="例如 aegis" />
+              </label>
+              <label>用户名
+                <input id="dbSelfcheckUser" placeholder="例如 aegis_monitor" />
+              </label>
+              <label>密码
+                <input id="dbSelfcheckPassword" type="password" autocomplete="new-password" placeholder="数据库连接密码" />
+              </label>
+              <label>检查频次
+                <select id="dbSelfcheckFrequency">
+                  <option value="">不设置</option>
+                  <option value="hourly">每小时</option>
+                  <option value="daily">每天</option>
+                  <option value="weekly">每周</option>
+                  <option value="monthly">每月</option>
+                </select>
+              </label>
+            </div>
+            <label>自检要求
+              <textarea id="dbSelfcheckInstruction" rows="4" placeholder="例如重点检查连接数、Threads_running、锁等待、死锁、慢 SQL 和异常连接。"></textarea>
+            </label>
+            <label>备注
+              <input id="dbSelfcheckRemark" placeholder="补充说明（可选）" />
+            </label>
+            <div class="inline-form-actions">
+              <button id="btnDbSelfcheckSave" class="toolbar-btn" type="button">保存配置</button>
+              <button id="btnDbSelfcheckCancel" class="toolbar-btn secondary" type="button">取消</button>
+              <span id="dbSelfcheckFormResult" class="inline-result"></span>
+            </div>
+          </form>
+          <div id="dbSelfcheckSummary" class="result-line"></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>序号</th><th>配置编号</th><th>名称</th><th>类型</th><th>主机</th><th>库名</th><th>用户</th><th>频次</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="dbSelfcheckTbody"><tr><td colspan="10">暂无数据库自检配置</td></tr></tbody>
             </table>
           </div>
         </section>
@@ -933,56 +1019,22 @@
             </div>
           </div>
           <div class="form-section">
-            <h3>封禁预留</h3>
+            <div class="section-head">
+              <div>
+                <h3>防火墙封禁</h3>
+                <p class="muted" id="threatbookFirewallConfigSummary">防火墙配置未读取</p>
+              </div>
+              <div class="action-row compact">
+                <button id="btnOpenThreatbookFirewallConfig" class="toolbar-btn secondary" type="button">配置</button>
+              </div>
+            </div>
+            <label class="inline-check"><input type="checkbox" id="threatbookFirewallDryRun" checked> 演练模式</label>
             <button id="btnThreatbookBatchBlock">一键封禁候选 IP</button>
             <pre id="threatbookResult">尚未查询</pre>
           </div>
         </section>
       </section>
 
-      <section id="view-tool-debug" class="view-panel" data-view-title="调试与错误码" data-view-desc="查看当前连接状态、常见错误码和接口调试历史。">
-        <section class="card narrow-card">
-          <div class="section-head">
-            <div>
-              <h2>调试与错误码</h2>
-              <p class="muted">保留给联调和排障使用，避免干扰常规管理操作。</p>
-            </div>
-            <div class="action-row compact">
-              <button id="btnDebugHealthz">检测 healthz</button>
-              <button id="btnDebugMe">读取当前用户</button>
-            </div>
-          </div>
-          <div class="debug-grid">
-            <div class="debug-card"><span>API Base</span><strong id="debugApiBase">--</strong></div>
-            <div class="debug-card"><span>Token 状态</span><strong id="debugTokenState">未登录</strong></div>
-            <div class="debug-card"><span>当前用户</span><strong id="debugCurrentUser">--</strong></div>
-            <div class="debug-card"><span>最近请求时间</span><strong id="debugLastRequestAt">--</strong></div>
-          </div>
-          <details class="details-block">
-            <summary>查看调试输出</summary>
-            <pre id="debugPanelResult">尚未执行调试检查</pre>
-          </details>
-
-          <h3>错误码说明</h3>
-          <ul class="code-list">
-            <li><code>TOKEN_EXPIRED</code>：Token 过期，需要重新登录</li>
-            <li><code>TOKEN_INVALID</code>：Token 无效或格式错误</li>
-            <li><code>USER_DISABLED</code>：账号已禁用</li>
-            <li><code>USER_NOT_FOUND</code>：账号不存在</li>
-            <li><code>FORBIDDEN</code>：权限不足</li>
-            <li><code>VALIDATION_ERROR</code>：参数校验失败</li>
-            <li><code>HTTP_ERROR</code>：通用业务错误</li>
-          </ul>
-          <div class="action-row compact">
-            <button id="btnRefreshHistory">刷新历史</button>
-            <button id="btnClearHistory">清空历史</button>
-          </div>
-          <details class="details-block">
-            <summary>查看接口调试历史</summary>
-            <pre id="requestHistory"></pre>
-          </details>
-        </section>
-      </section>
     </main>
   </div>
 
@@ -1084,6 +1136,60 @@
     </div>
   </div>
 
+  <div id="firewallConfigModal" class="modal hidden" hidden aria-hidden="true">
+    <div class="modal-card">
+      <h3>防火墙封禁配置</h3>
+      <label>启用状态
+        <select id="modalFirewallEnabled">
+          <option value="true">启用</option>
+          <option value="false">停用</option>
+        </select>
+      </label>
+      <div class="grid2">
+        <label>协议
+          <select id="modalFirewallScheme">
+            <option value="https">https</option>
+            <option value="http">http</option>
+          </select>
+        </label>
+        <label>端口
+          <input id="modalFirewallPort" type="number" min="1" max="65535" value="443" />
+        </label>
+      </div>
+      <label>防火墙 IP
+        <input id="modalFirewallIp" placeholder="例如 10.67.82.6" />
+      </label>
+      <label>地址簿名
+        <input id="modalFirewallAddressBook" placeholder="例如 xdr_soar_in_v4" />
+      </label>
+      <label>账号
+        <input id="modalFirewallUsername" autocomplete="off" placeholder="留空则不修改已保存账号" />
+      </label>
+      <label>密码
+        <input id="modalFirewallPassword" type="password" autocomplete="new-password" placeholder="留空则不修改已保存密码" />
+      </label>
+      <div class="grid2">
+        <label>SSL 校验
+          <select id="modalFirewallVerifySsl">
+            <option value="false">关闭</option>
+            <option value="true">开启</option>
+          </select>
+        </label>
+        <label>超时时间（秒）
+          <input id="modalFirewallTimeout" type="number" min="1" max="120" value="15" />
+        </label>
+      </div>
+      <label>地址簿接口路径
+        <input id="modalFirewallAddrbookPath" value="/api/addrbook" />
+      </label>
+      <div id="modalFirewallSecretSummary" class="selection-summary">账号密码不回显。</div>
+      <div class="action-row compact">
+        <button id="btnSaveThreatbookFirewallConfig" type="button">保存配置</button>
+        <button id="btnCloseThreatbookFirewallConfig" class="toolbar-btn ghost" type="button">取消</button>
+      </div>
+    </div>
+  </div>
+
   <div id="createPointModal" class="modal hidden" hidden aria-hidden="true">
     <div class="modal-card">
       <h3 id="pointModalTitle">新增巡检点</h3>
@@ -1137,11 +1243,11 @@
   <script defer src="./js/inspection-records.js"></script>
   <script defer src="./js/users.js"></script>
   <script defer src="./js/systems.js"></script>
+  <script defer src="./js/database-selfchecks.js"></script>
   <script defer src="./js/rules-audit.js"></script>
   <script defer src="./js/templates.js"></script>
   <script defer src="./js/modals.js"></script>
   <script defer src="./js/threatbook.js"></script>
-  <script defer src="./js/debug.js"></script>
   <script defer src="./js/emergency-config.js"></script>
   <script defer src="./js/shared-data.js"></script>
   <script defer src="./app.js"></script>

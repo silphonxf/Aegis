@@ -74,6 +74,83 @@ window.AegisAdmin = window.AegisAdmin || {};
     }
   }
 
+  function setValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value ?? '';
+  }
+
+  function setFirewallConfigSummary(data) {
+    const el = document.getElementById('threatbookFirewallConfigSummary');
+    if (!el) return;
+    if (!data) {
+      el.textContent = '防火墙配置未读取';
+      return;
+    }
+    const authState = data.has_username && data.has_password ? '账号密码已配置' : '账号密码未完整配置';
+    el.textContent = `${data.enabled ? '已启用' : '已停用'} / ${data.firewall_ip || '-'} / ${data.address_book_name || '-'} / ${authState}`;
+  }
+
+  function fillFirewallConfigModal(data) {
+    setValue('modalFirewallEnabled', data.enabled === false ? 'false' : 'true');
+    setValue('modalFirewallScheme', data.scheme || 'https');
+    setValue('modalFirewallPort', data.port || 443);
+    setValue('modalFirewallIp', data.firewall_ip || '');
+    setValue('modalFirewallAddressBook', data.address_book_name || '');
+    setValue('modalFirewallUsername', '');
+    setValue('modalFirewallPassword', '');
+    setValue('modalFirewallVerifySsl', data.verify_ssl ? 'true' : 'false');
+    setValue('modalFirewallTimeout', data.timeout_seconds || 15);
+    setValue('modalFirewallAddrbookPath', data.addrbook_path || '/api/addrbook');
+    const secretEl = document.getElementById('modalFirewallSecretSummary');
+    if (secretEl) {
+      const usernameText = data.has_username ? '账号已保存' : '账号未保存';
+      const passwordText = data.has_password ? '密码已保存' : '密码未保存';
+      secretEl.textContent = `${usernameText}，${passwordText}。账号和密码不回显，输入新值才会覆盖。`;
+    }
+  }
+
+  async function loadFirewallConfig() {
+    const data = await ns.api.request('/api/v1/admin/threat-intel/firewall-config', {
+      headers: ns.api.headers(),
+    });
+    setFirewallConfigSummary(data);
+    return data;
+  }
+
+  async function openFirewallConfigModal() {
+    const data = await loadFirewallConfig();
+    fillFirewallConfigModal(data);
+    ns.modals.openModal('firewallConfigModal');
+  }
+
+  async function saveFirewallConfig() {
+    const username = document.getElementById('modalFirewallUsername')?.value ?? '';
+    const password = document.getElementById('modalFirewallPassword')?.value ?? '';
+    const payload = {
+      enabled: (document.getElementById('modalFirewallEnabled')?.value || 'true') === 'true',
+      scheme: document.getElementById('modalFirewallScheme')?.value || 'https',
+      firewall_ip: document.getElementById('modalFirewallIp')?.value.trim() || '',
+      port: Number(document.getElementById('modalFirewallPort')?.value || 443),
+      address_book_name: document.getElementById('modalFirewallAddressBook')?.value.trim() || '',
+      verify_ssl: (document.getElementById('modalFirewallVerifySsl')?.value || 'false') === 'true',
+      timeout_seconds: Number(document.getElementById('modalFirewallTimeout')?.value || 15),
+      addrbook_path: document.getElementById('modalFirewallAddrbookPath')?.value.trim() || '/api/addrbook',
+    };
+    if (username.trim()) payload.username = username.trim();
+    if (password) payload.password = password;
+    const data = await ns.api.request('/api/v1/admin/threat-intel/firewall-config', {
+      method: 'PUT',
+      headers: ns.api.headers(),
+      body: JSON.stringify(payload),
+    });
+    setFirewallConfigSummary(data);
+    fillFirewallConfigModal(data);
+    ns.modals.closeModal('firewallConfigModal');
+    const resultEl = document.getElementById('threatbookResult');
+    if (resultEl) resultEl.textContent = `${resultEl.textContent}\n\n--- 防火墙配置已保存 ---\n账号密码已加密保存，界面不回显。`;
+    return data;
+  }
+
   async function queryThreatbook() {
     const rawInput = document.getElementById('threatbookRawInput')?.value || '';
     const lang = document.getElementById('threatbookLang')?.value || 'zh';
@@ -92,14 +169,15 @@ window.AegisAdmin = window.AegisAdmin || {};
     const targetIp = ip || document.getElementById('threatbookBlockIp')?.value.trim();
     const inputReason = document.getElementById('threatbookBlockReason')?.value.trim() || null;
     const targetReason = reason ?? inputReason;
+    const dryRun = document.getElementById('threatbookFirewallDryRun')?.checked ?? true;
     if (!targetIp) throw new Error('请先输入要封禁的 IP');
     const data = await ns.api.request('/api/v1/admin/threat-intel/block-ip', {
       method: 'POST',
       headers: ns.api.headers(),
-      body: JSON.stringify({ ip: targetIp, reason: targetReason, risk_level: riskLevel, source: 'threatbook', dry_run: true }),
+      body: JSON.stringify({ ip: targetIp, reason: targetReason, risk_level: riskLevel, source: 'threatbook', dry_run: dryRun }),
     });
     const resultEl = document.getElementById('threatbookResult');
-    resultEl.textContent = `${resultEl.textContent}\n\n--- 模拟封禁返回 ---\n${JSON.stringify(data, null, 2)}`;
+    resultEl.textContent = `${resultEl.textContent}\n\n--- ${dryRun ? '演练封禁返回' : '防火墙封禁返回'} ---\n${JSON.stringify(data, null, 2)}`;
     return data;
   }
 
@@ -112,7 +190,7 @@ window.AegisAdmin = window.AegisAdmin || {};
       results.push(data);
     }
     const resultEl = document.getElementById('threatbookResult');
-    resultEl.textContent = `${resultEl.textContent}\n\n--- 批量模拟封禁汇总 ---\n${JSON.stringify(results, null, 2)}`;
+    resultEl.textContent = `${resultEl.textContent}\n\n--- 批量封禁汇总 ---\n${JSON.stringify(results, null, 2)}`;
     return results;
   }
 
@@ -126,6 +204,9 @@ window.AegisAdmin = window.AegisAdmin || {};
     blockIp,
     batchBlockAutoCandidates,
     fillDemo,
+    loadFirewallConfig,
+    openFirewallConfigModal,
+    saveFirewallConfig,
     renderTable,
     getAutoBlockItems,
   };

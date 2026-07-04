@@ -8,3 +8,20 @@
 - [ ] 后续按反馈调整 Ping 工具
 - [ ] 后续按反馈调整抓包工具
 - [ ] 后续按反馈调整 IP 恶意研判
+- [x] 记录当前 Redis、日志路径、自检报告入库和东八区时间戳进度
+- [x] 梳理 TapeManage 中山石地址簿 SSH 封禁命令
+- [x] 读取山石 Python REST API 登录示例
+- [x] 修正 Aegis 防火墙实现：从华为 RESTCONF 改为山石 StoneOS REST API
+- [x] 将 `/api/v1/admin/threat-intel/block-ip` 接到山石登录 + 地址簿更新流程
+- [x] 写入 Postman 直连山石防火墙登录和地址簿更新请求草案
+- [x] 更新防火墙配置项为 `HILLSTONE_*`
+- [x] 配置真实山石防火墙主机和账号密码
+- [x] 验证 `POST /rest/api/login`
+- [x] 验证 `GET /rest/api/addrbook` schema 为 `member: ["IP/32"]`
+- [x] 保存 Bruno 封禁请求模板
+- [ ] 有 admin 权限后验证 `PUT /rest/api/addrbook` 数组 body 是否能封禁测试 IP
+- [x] dry-run 验证 `/api/v1/admin/threat-intel/block-ip` 生成的 URL 和 JSON body
+- [x] 如实机路径不一致，调整 `HILLSTONE_ADDRBOOK_PATH` / `HILLSTONE_ADDRBOOK_METHOD` / payload 字段
+- [ ] 实现解封能力：从山石地址簿删除 IP/32
+- [ ] 实现 Aegis 通用地址组接口：单 IP 添加、单 IP 删除、批量添加、地址组查询
+- [ ] 增加本地封禁/解封审计记录表，替代 TapeManage 的 `IpTable` / `IpFocTable` 记录方式

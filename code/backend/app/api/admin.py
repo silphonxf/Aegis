@@ -30,6 +30,7 @@ from app.schemas.admin import (
     CreateInspectionPointRequest,
     CreateRoomRequest,
     CreateUserRequest,
+    FirewallBlockConfigRequest,
     ThreatIntelBlockRequest,
     ThreatIntelQueryRequest,
     ThreatIntelQuickInputRequest,
@@ -56,14 +57,18 @@ from app.services.emergency_config import (
     upsert_ssh_host,
 )
 from app.services.threatbook import ThreatbookError, batch_query_ip_reputation
+from app.services.firewall import FirewallClientError, FirewallConfigError, FirewallError, block_ip_with_firewall
+from app.services.firewall_config import serialize_firewall_config, upsert_firewall_config
 from app.schemas.system import SystemCreate, SystemUpdate
 from app.services.audit import log_action
+from app.services.cache import delete_prefix, get_json, set_json
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 logger = get_logger("admin")
 
 
 IP_HEADER_CANDIDATES = {"ip", "ip地址", "ip_address", "地址", "目标ip", "ipv4", "ipv6"}
+SYSTEM_LIST_CACHE_PREFIX = "aegis:cache:admin:systems:"
 
 
 def _hash_external_api_key(value: str) -> str:
@@ -228,6 +233,10 @@ def list_systems(
     logger.info("查询系统列表: page=%s size=%s keyword=%s env=%s owner_user_id=%s", page, size, keyword, env, owner_user_id)
     page = max(page, 1)
     size = min(max(size, 1), 100)
+    cache_key = _system_list_cache_key(page, size, keyword, env, owner_user_id, is_active, sort_by, sort_order)
+    cached = get_json(cache_key)
+    if cached is not None:
+        return cached
     q = db.query(System)
     if keyword:
         like = f"%{keyword}%"
@@ -256,12 +265,14 @@ def list_systems(
     logger.info("查询系统列表完成: total=%s returned=%s", total, len(items))
     owner_map = _system_owner_map(db)
     log_map = _system_log_map(db, [item.id for item in items])
-    return {
+    payload = {
         "page": page,
         "size": size,
         "total": total,
         "items": [_serialize_system(item, owner_map, log_map) for item in items],
     }
+    set_json(cache_key, payload)
+    return payload
 
 
 @router.post("/systems")
@@ -295,6 +306,7 @@ def create_system(
     db.refresh(system)
     logger.info("创建系统成功: system_id=%s system_code=%s", system.id, system.system_code)
     log_action(db, "create_system", "system", current_user, {"system_id": system.id, "system_code": system.system_code})
+    _invalidate_system_reference_cache()
     return {"id": system.id}
 
 
@@ -327,6 +339,7 @@ def update_system(
     db.commit()
     db.refresh(system)
     log_action(db, "update_system", "system", current_user, {"system_id": system.id, "system_code": system.system_code})
+    _invalidate_system_reference_cache()
     return {"id": system.id}
 
 
@@ -343,6 +356,7 @@ def deactivate_system(
     system.updated_at = datetime.utcnow()
     db.commit()
     log_action(db, "deactivate_system", "system", current_user, {"system_id": system.id, "system_code": system.system_code})
+    _invalidate_system_reference_cache()
     return {"id": system.id, "is_active": system.is_active}
 
 
@@ -360,6 +374,7 @@ def set_system_active(
     system.updated_at = datetime.utcnow()
     db.commit()
     log_action(db, "set_system_active", "system", current_user, {"system_id": system.id, "system_code": system.system_code, "is_active": is_active})
+    _invalidate_system_reference_cache()
     return {"id": system.id, "is_active": system.is_active}
 
 
@@ -509,6 +524,35 @@ def _apply_updates(instance, values: Dict[str, Any]) -> None:
         setattr(instance, key, value)
     if hasattr(instance, "updated_at"):
         instance.updated_at = datetime.utcnow()
+
+
+def _system_list_cache_key(
+    page: int,
+    size: int,
+    keyword: Optional[str],
+    env: Optional[str],
+    owner_user_id: Optional[int],
+    is_active: Optional[bool],
+    sort_by: str,
+    sort_order: str,
+) -> str:
+    payload = {
+        "page": page,
+        "size": size,
+        "keyword": keyword or "",
+        "env": env or "",
+        "owner_user_id": owner_user_id,
+        "is_active": is_active,
+        "sort_by": sort_by,
+        "sort_order": sort_order,
+    }
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
+    return f"{SYSTEM_LIST_CACHE_PREFIX}{digest}"
+
+
+def _invalidate_system_reference_cache() -> None:
+    delete_prefix(SYSTEM_LIST_CACHE_PREFIX)
+    delete_prefix("aegis:cache:systems:")
 
 
 def _normalize_owner_ids(owner_user_id: Optional[int], owner_user_ids: Optional[List[int]]) -> List[int]:
@@ -1416,14 +1460,52 @@ def block_high_risk_ip(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
-    result = {
-        "status": "mocked",
-        "dry_run": payload.dry_run,
-        "ip": payload.ip,
-        "risk_level": payload.risk_level,
-        "reason": payload.reason,
-        "source": payload.source,
-        "message": "已预留防火墙封禁接口，当前为 mock 返回，后续可替换为真实执行器。",
-    }
+    try:
+        result = block_ip_with_firewall(ip=payload.ip, reason=payload.reason, dry_run=payload.dry_run, db=db)
+    except FirewallConfigError as exc:
+        raise HTTPException(status_code=503, detail={"code": "FIREWALL_CONFIG_MISSING", "message": str(exc)}) from exc
+    except FirewallClientError as exc:
+        raise HTTPException(status_code=502, detail={"code": "FIREWALL_REQUEST_FAILED", "message": str(exc)}) from exc
+    except FirewallError as exc:
+        raise HTTPException(status_code=400, detail={"code": "FIREWALL_BLOCK_INVALID", "message": str(exc)}) from exc
+
+    result.update(
+        {
+            "risk_level": payload.risk_level,
+            "reason": payload.reason,
+            "source": payload.source,
+        }
+    )
     log_action(db, "block_ip_request", "threat_intel", current_user, result)
+    return result
+
+
+@router.get("/threat-intel/firewall-config")
+def get_threat_intel_firewall_config(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    return serialize_firewall_config(db)
+
+
+@router.put("/threat-intel/firewall-config")
+def save_threat_intel_firewall_config(
+    payload: FirewallBlockConfigRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    result = upsert_firewall_config(db, payload)
+    log_action(
+        db,
+        "save_firewall_block_config",
+        "threat_intel",
+        current_user,
+        {
+            "enabled": result["enabled"],
+            "firewall_ip": result["firewall_ip"],
+            "address_book_name": result["address_book_name"],
+            "has_username": result["has_username"],
+            "has_password": result["has_password"],
+        },
+    )
     return result

@@ -6,10 +6,11 @@ from app.models.ai_diagnosis import AIDiagnosis
 from app.models.ai_external_key import AIExternalApiKey
 from app.models.asset import Asset
 from app.models.audit import AuditLog
+from app.models.firewall import FirewallBlockConfig
 from app.models.inspection import InspectionPoint, InspectionRecord
 from app.models.offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from app.models.rule import StatusRule
-from app.models.selfcheck import ChecklistTemplate, SelfcheckRecord
+from app.models.selfcheck import ChecklistTemplate, SelfcheckRecord, SelfcheckReport
 from app.models.system import System, SystemStatusSnapshot
 from app.models.tool_task import ToolTask
 from app.models.user import Role, User
@@ -24,8 +25,10 @@ __all__ = [
     "OfflineAnalysisResult",
     "ChecklistTemplate",
     "SelfcheckRecord",
+    "SelfcheckReport",
     "SystemStatusSnapshot",
     "AuditLog",
+    "FirewallBlockConfig",
     "StatusRule",
     "Asset",
     "ToolTask",

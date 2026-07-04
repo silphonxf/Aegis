@@ -1,0 +1,15 @@
+meta {
+  name: 01 Query Addrbook
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/rest/api/addrbook?query=%7B%22start%22%3A0%2C%22limit%22%3A500%7D
+  body: none
+  auth: none
+}
+
+headers {
+  Cookie: token={{token}}; role={{role}}; vsysId={{vsysId}}; fromrootvsys={{fromrootvsys}}; username={{username}}
+}

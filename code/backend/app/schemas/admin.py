@@ -120,3 +120,23 @@ class ThreatIntelBlockRequest(BaseModel):
     reason: Optional[str] = Field(default=None, max_length=500)
     source: str = Field(default="threatbook", max_length=64)
     dry_run: bool = True
+
+
+class FirewallBlockConfigRequest(BaseModel):
+    enabled: bool = True
+    scheme: str = Field(default="https", pattern="^https?$")
+    firewall_ip: str = Field(min_length=1, max_length=128)
+    port: int = Field(default=443, ge=1, le=65535)
+    address_book_name: str = Field(min_length=1, max_length=128)
+    username: Optional[str] = Field(default=None, max_length=128)
+    password: Optional[str] = Field(default=None, max_length=256)
+    verify_ssl: bool = False
+    timeout_seconds: int = Field(default=15, ge=1, le=120)
+    addrbook_path: str = Field(default="/api/addrbook", min_length=1, max_length=128)
+
+    @validator("firewall_ip", "address_book_name", "addrbook_path")
+    def normalize_required_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("配置项不能为空")
+        return cleaned

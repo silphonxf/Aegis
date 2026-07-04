@@ -19,4 +19,3 @@ python3 -m http.server 5174
 - 审计日志筛选查询
 - 工具任务审批（pending_approval -> approved/rejected -> done）
 - AI诊断记录查询（按严重级别筛选）
-- 错误码说明 + 接口调试历史

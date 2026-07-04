@@ -73,6 +73,27 @@ class Settings(BaseSettings):
     THREATBOOK_API_KEY: Optional[str] = None
     THREATBOOK_TIMEOUT_SECONDS: int = 30
 
+    # Redis cache. Used for DB-backed configuration and selector/reference data.
+    REDIS_CACHE_ENABLED: bool = True
+    REDIS_URL: str = "redis://127.0.0.1:6379/0"
+    REDIS_CACHE_TTL_SECONDS: int = 300
+    EMERGENCY_CONFIG_AUTO_IMPORT_JSON: bool = True
+
+    # Hillstone StoneOS REST API firewall blocking. TapeManage blocks by
+    # adding an IP /32 into a configured address book.
+    HILLSTONE_ENABLED: bool = True
+    HILLSTONE_SCHEME: str = "https"
+    HILLSTONE_HOST: str = "192.168.100.18"
+    HILLSTONE_PORT: int = 443
+    HILLSTONE_USERNAME: Optional[str] = None
+    HILLSTONE_PASSWORD: Optional[str] = None
+    HILLSTONE_VERIFY_SSL: bool = False
+    HILLSTONE_TIMEOUT_SECONDS: int = 15
+    HILLSTONE_ADDRESS_BOOK_NAME: str = "aegis-blocked-ip"
+    HILLSTONE_ADDRBOOK_PATH: str = "/api/addrbook"
+    HILLSTONE_ADDRBOOK_METHOD: str = "PUT"
+    HILLSTONE_ADDRBOOK_TYPE: str = "1"
+
     # CORS
     CORS_ALLOW_ORIGINS: str = "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174"
     CORS_ALLOW_ORIGIN_REGEX: Optional[str] = (
