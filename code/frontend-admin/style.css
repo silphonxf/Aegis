@@ -758,3 +758,7 @@ th { background: #113654; color: #7dd3fc; }
 #createSystemModal .modal-card textarea {
   resize: vertical;
 }
+
+#firewallConfigModal .modal-card {
+  width: min(560px, calc(100vw - 24px));
+}

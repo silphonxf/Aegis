@@ -3,12 +3,14 @@ from __future__ import annotations
 import base64
 import json
 from ipaddress import IPv4Address, ip_address
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
 import requests
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.services.firewall_config import FirewallRuntimeConfig, get_runtime_firewall_config
 
 
 class FirewallError(Exception):
@@ -36,23 +38,25 @@ def validate_block_ip(value: str) -> str:
 class HillstoneRestClient:
     """Hillstone StoneOS REST client for TapeManage-style address-book blocking."""
 
-    def __init__(self) -> None:
-        self.scheme = settings.HILLSTONE_SCHEME.strip() or "https"
-        self.host = settings.HILLSTONE_HOST.strip()
-        self.port = settings.HILLSTONE_PORT
-        self.username = settings.HILLSTONE_USERNAME
-        self.password = settings.HILLSTONE_PASSWORD
-        self.verify_ssl = settings.HILLSTONE_VERIFY_SSL
-        self.timeout = settings.HILLSTONE_TIMEOUT_SECONDS
-        self.address_book_name = settings.HILLSTONE_ADDRESS_BOOK_NAME.strip()
-        self.addrbook_path = settings.HILLSTONE_ADDRBOOK_PATH.strip() or "/api/addrbook"
+    def __init__(self, config: Optional[FirewallRuntimeConfig] = None) -> None:
+        runtime = config or get_runtime_firewall_config(None)
+        self.enabled = runtime.enabled
+        self.scheme = runtime.scheme.strip() or "https"
+        self.host = runtime.host.strip()
+        self.port = runtime.port
+        self.username = runtime.username
+        self.password = runtime.password
+        self.verify_ssl = runtime.verify_ssl
+        self.timeout = runtime.timeout_seconds
+        self.address_book_name = runtime.address_book_name.strip()
+        self.addrbook_path = runtime.addrbook_path.strip() or "/api/addrbook"
 
     @property
     def is_configured(self) -> bool:
-        return bool(settings.HILLSTONE_ENABLED and self.host and self.username and self.password and self.address_book_name)
+        return bool(self.enabled and self.host and self.username and self.password and self.address_book_name)
 
     def _require_config(self) -> None:
-        if not settings.HILLSTONE_ENABLED:
+        if not self.enabled:
             raise FirewallConfigError("山石防火墙 API 封禁未启用")
         missing = []
         if not self.host:
@@ -84,14 +88,79 @@ class HillstoneRestClient:
             "password": base64.b64encode((self.password or "").encode("utf-8")).decode("ascii"),
         }
 
-    def build_addrbook_payload(self, ip: str, reason: Optional[str], existing: Optional[Dict[str, Any]] = None) -> Any:
-        description = (reason or f"Aegis block {ip}")[:120]
-        member = list((existing or {}).get("member") or [])
-        cidr = f"{ip}/32"
-        if cidr not in member:
-            member.append(cidr)
+    def _addrbook_int(self, value: Any, default: int) -> int:
+        if value in (None, ""):
+            return default
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
 
-        return [{"name": self.address_book_name, "member": member}]
+    def _normalize_ip_entries(self, existing: Optional[Dict[str, Any]], ip: str) -> List[Dict[str, Any]]:
+        entries: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+
+        for item in (existing or {}).get("ip") or []:
+            if not isinstance(item, dict):
+                continue
+            ip_addr = str(item.get("ip_addr") or item.get("ip") or "").strip()
+            if not ip_addr:
+                continue
+            try:
+                ip_addr = validate_block_ip(ip_addr)
+            except FirewallError:
+                continue
+            if ip_addr in seen:
+                continue
+            seen.add(ip_addr)
+            entries.append(
+                {
+                    "ip_addr": ip_addr,
+                    "netmask": self._addrbook_int(item.get("netmask"), 32),
+                    "flag": self._addrbook_int(item.get("flag"), 0),
+                }
+            )
+
+        # Older docs/tests used member: ["1.2.3.4/32"]. Keep this fallback so
+        # the client can migrate data returned by mixed StoneOS versions.
+        for member in (existing or {}).get("member") or []:
+            cidr = str(member).strip()
+            if not cidr:
+                continue
+            ip_part, _, mask_part = cidr.partition("/")
+            try:
+                ip_addr = validate_block_ip(ip_part)
+            except FirewallError:
+                continue
+            if ip_addr in seen:
+                continue
+            seen.add(ip_addr)
+            entries.append(
+                {
+                    "ip_addr": ip_addr,
+                    "netmask": self._addrbook_int(mask_part, 32),
+                    "flag": 0,
+                }
+            )
+
+        if ip not in seen:
+            entries.append({"ip_addr": ip, "netmask": 32, "flag": 0})
+        return entries
+
+    def build_addrbook_payload(self, ip: str, reason: Optional[str], existing: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        current = existing or {}
+        return {
+            "is_ipv6": self._addrbook_int(current.get("is_ipv6"), 0),
+            "type": self._addrbook_int(current.get("type"), 0),
+            "name": str(current.get("name") or self.address_book_name),
+            "description": str(current.get("description") or ""),
+            "entry": list(current.get("entry") or []),
+            "ip": self._normalize_ip_entries(current, ip),
+            "range": list(current.get("range") or []),
+            "host": list(current.get("host") or []),
+            "wildcard": list(current.get("wildcard") or []),
+            "country": list(current.get("country") or []),
+        }
 
     def dry_run_plan(self, ip: str, reason: Optional[str]) -> Dict[str, Any]:
         normalized_ip = validate_block_ip(ip)
@@ -112,11 +181,11 @@ class HillstoneRestClient:
                 },
             },
             "request": {
-                "method": "GET + PUT/POST",
+                "method": "LOGIN + GET + PUT",
                 "url": self.addrbook_url(),
                 "body": self.build_addrbook_payload(normalized_ip, reason),
             },
-            "message": "dry_run=true，未调用山石防火墙；按 TapeManage 逻辑将 IP 加入指定地址簿。",
+            "message": "dry_run=true，未调用山石防火墙；真实执行时会先登录，再查询地址簿并把 IP 合并到 ip 数组后整体 PUT 更新。",
         }
 
     def _login(self) -> Dict[str, str]:
@@ -182,12 +251,12 @@ class HillstoneRestClient:
 
     def _send_addrbook_update(self, cookie: Dict[str, str], ip: str, reason: Optional[str]) -> tuple[str, requests.Response]:
         existing = self._fetch_addrbook(cookie)
-        method = "PUT" if existing else "POST"
+        if not existing:
+            raise FirewallClientError(f"山石地址簿不存在：{self.address_book_name}")
+        method = "PUT"
         request_kwargs = self._request_kwargs(cookie)
         request_kwargs["data"] = json.dumps(self.build_addrbook_payload(ip, reason, existing), ensure_ascii=False)
-        if existing:
-            return method, requests.put(self.addrbook_url(), **request_kwargs)
-        return method, requests.post(self.addrbook_url(), **request_kwargs)
+        return method, requests.put(self.addrbook_url(), **request_kwargs)
 
     def block_ip(self, ip: str, reason: Optional[str], dry_run: bool) -> Dict[str, Any]:
         normalized_ip = validate_block_ip(ip)
@@ -225,5 +294,5 @@ class HillstoneRestClient:
         }
 
 
-def block_ip_with_firewall(ip: str, reason: Optional[str] = None, dry_run: bool = True) -> Dict[str, Any]:
-    return HillstoneRestClient().block_ip(ip=ip, reason=reason, dry_run=dry_run)
+def block_ip_with_firewall(ip: str, reason: Optional[str] = None, dry_run: bool = True, db: Optional[Session] = None) -> Dict[str, Any]:
+    return HillstoneRestClient(get_runtime_firewall_config(db)).block_ip(ip=ip, reason=reason, dry_run=dry_run)

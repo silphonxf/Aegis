@@ -3,6 +3,7 @@ from .ai_external_key import AIExternalApiKey
 from .asset import Asset
 from .audit import AuditLog
 from .base import Base
+from .firewall import FirewallBlockConfig
 from .inspection import InspectionPoint, InspectionRecord
 from .shared_data import EmergencyHost, Room, Runbook
 from .offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
@@ -36,4 +37,5 @@ __all__ = [
     "ToolTask",
     "AIDiagnosis",
     "AIExternalApiKey",
+    "FirewallBlockConfig",
 ]

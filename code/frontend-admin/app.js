@@ -40,7 +40,6 @@ const VIEW_GROUP_MAP = {
   'view-net-ping': 'network-security',
   'view-net-capture': 'network-security',
   'view-tool-threatbook': 'network-security',
-  'view-tool-debug': 'approval-audit',
 };
 
 function formatError(moduleName, e) {
@@ -124,7 +123,6 @@ bindClick('btnLogin', async () => {
   try {
     await ns.auth.login($('username').value, $('password').value);
     $('state').textContent = '登录成功';
-    ns.debug?.syncDebugMeta?.();
     openGroup('dashboard');
     switchView('view-dashboard-overview', 'dashboard');
     Promise.allSettled([
@@ -256,13 +254,15 @@ bindClick('btnSubmitCreateSystem', () => ns.modals.submitCreateSystem().catch((e
   $('systemListTbody').innerHTML = '<tr><td colspan="9">操作失败</td></tr>';
 }));
 
-bindClick('btnRefreshHistory', () => ns.api.renderHistory());
-bindClick('btnClearHistory', () => ns.debug.clearHistory());
-bindClick('btnDebugHealthz', () => ns.debug.checkHealthz().catch((e) => { $('debugPanelResult').textContent = e.message; }));
-bindClick('btnDebugMe', () => ns.debug.loadCurrentUser().catch((e) => { $('debugPanelResult').textContent = e.message; }));
 bindClick('btnThreatbookQuery', () => ns.threatbook.queryThreatbook().catch((e) => { $('threatbookResult').textContent = formatError('IP恶意研判', e); }));
 bindClick('btnThreatbookFillDemo', () => ns.threatbook.fillDemo());
 bindClick('btnThreatbookBatchBlock', () => ns.threatbook.batchBlockAutoCandidates().catch((e) => { $('threatbookResult').textContent = formatError('一键封禁预留接口', e); }));
+bindClick('btnOpenThreatbookFirewallConfig', () => ns.threatbook.openFirewallConfigModal().catch((e) => { $('threatbookResult').textContent = formatError('读取防火墙配置', e); }));
+bindClick('btnSaveThreatbookFirewallConfig', () => ns.threatbook.saveFirewallConfig().catch((e) => {
+  const el = $('modalFirewallSecretSummary');
+  if (el) el.textContent = formatError('保存防火墙配置', e);
+}));
+bindClick('btnCloseThreatbookFirewallConfig', () => ns.modals.closeModal('firewallConfigModal'));
 
 bindClick('btnToggleAutoRefresh', () => {
   ns.state.autoRefreshEnabled = !ns.state.autoRefreshEnabled;
@@ -317,15 +317,12 @@ function safeBoot(task, onError) {
   }
 }
 
-ns.api.renderHistory();
-safeBoot(() => ns.debug?.syncDebugMeta?.(), console.error);
 safeBoot(async () => {
   const me = await ns.auth.restoreSession();
   if (!me) return;
 
   const stateEl = $('state');
   if (stateEl) stateEl.textContent = `已恢复登录：${me.username || 'admin'}`;
-  ns.debug?.syncDebugMeta?.();
   openGroup('dashboard');
   switchView('view-dashboard-overview', 'dashboard');
   Promise.allSettled([

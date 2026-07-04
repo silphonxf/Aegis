@@ -1,5 +1,5 @@
 meta {
-  name: 02 Block IP PUT Array
+  name: 02 Block IP PUT Addrbook
   type: http
   seq: 2
 }
@@ -16,14 +16,32 @@ headers {
 }
 
 body:json {
-  [
-    {
-      "name": "{{addrbookName}}",
-      "member": [
-        "216.250.248.88/32",
-        "16.163.96.158/32",
-        "{{targetIp}}/32"
-      ]
-    }
-  ]
+  {
+    "is_ipv6": 0,
+    "type": 0,
+    "name": "{{addrbookName}}",
+    "description": "",
+    "entry": [],
+    "ip": [
+      {
+        "ip_addr": "216.250.248.88",
+        "netmask": 32,
+        "flag": 0
+      },
+      {
+        "ip_addr": "16.163.96.158",
+        "netmask": 32,
+        "flag": 0
+      },
+      {
+        "ip_addr": "{{targetIp}}",
+        "netmask": 32,
+        "flag": 0
+      }
+    ],
+    "range": [],
+    "host": [],
+    "wildcard": [],
+    "country": []
+  }
 }

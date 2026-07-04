@@ -30,6 +30,7 @@ from app.schemas.admin import (
     CreateInspectionPointRequest,
     CreateRoomRequest,
     CreateUserRequest,
+    FirewallBlockConfigRequest,
     ThreatIntelBlockRequest,
     ThreatIntelQueryRequest,
     ThreatIntelQuickInputRequest,
@@ -57,6 +58,7 @@ from app.services.emergency_config import (
 )
 from app.services.threatbook import ThreatbookError, batch_query_ip_reputation
 from app.services.firewall import FirewallClientError, FirewallConfigError, FirewallError, block_ip_with_firewall
+from app.services.firewall_config import serialize_firewall_config, upsert_firewall_config
 from app.schemas.system import SystemCreate, SystemUpdate
 from app.services.audit import log_action
 from app.services.cache import delete_prefix, get_json, set_json
@@ -1459,7 +1461,7 @@ def block_high_risk_ip(
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
     try:
-        result = block_ip_with_firewall(ip=payload.ip, reason=payload.reason, dry_run=payload.dry_run)
+        result = block_ip_with_firewall(ip=payload.ip, reason=payload.reason, dry_run=payload.dry_run, db=db)
     except FirewallConfigError as exc:
         raise HTTPException(status_code=503, detail={"code": "FIREWALL_CONFIG_MISSING", "message": str(exc)}) from exc
     except FirewallClientError as exc:
@@ -1475,4 +1477,35 @@ def block_high_risk_ip(
         }
     )
     log_action(db, "block_ip_request", "threat_intel", current_user, result)
+    return result
+
+
+@router.get("/threat-intel/firewall-config")
+def get_threat_intel_firewall_config(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    return serialize_firewall_config(db)
+
+
+@router.put("/threat-intel/firewall-config")
+def save_threat_intel_firewall_config(
+    payload: FirewallBlockConfigRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    result = upsert_firewall_config(db, payload)
+    log_action(
+        db,
+        "save_firewall_block_config",
+        "threat_intel",
+        current_user,
+        {
+            "enabled": result["enabled"],
+            "firewall_ip": result["firewall_ip"],
+            "address_book_name": result["address_book_name"],
+            "has_username": result["has_username"],
+            "has_password": result["has_password"],
+        },
+    )
     return result

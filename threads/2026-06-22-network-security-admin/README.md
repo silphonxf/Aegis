@@ -34,8 +34,8 @@ Aegis REST 实现等价为：
 
 1. `POST https://<firewall>/rest/api/login` 登录，用户名和密码按山石 Python 示例做 Base64。
 2. 从登录响应中取 `token`、`role`、`vsysId`、`fromrootvsys`，作为后续请求 cookie。
-3. `GET https://<firewall>/rest/api/addrbook?query=...` 查询目标地址簿当前 `member`。
-4. 把待封禁 IP 合并成 `IP/32` 追加到 `member`，再尝试 `PUT https://<firewall>/rest/api/addrbook` 更新。
+3. `GET https://<firewall>/rest/api/addrbook?query=...` 查询目标地址簿当前内容。
+4. 把待封禁 IP 合并进地址簿 `ip` 数组，再 `PUT https://<firewall>/rest/api/addrbook` 整体更新。
 
 已有 Aegis 进度：
 
@@ -108,21 +108,29 @@ GET https://10.67.82.6/rest/api/addrbook?query=%7B%22start%22%3A0%2C%22limit%22%
 Cookie: token=<token>; role=<role>; vsysId=<vsysId>; fromrootvsys=<fromrootvsys>; username=<username>
 ```
 
-2026-07-04 实机确认：`addrbook` 返回结构使用 `member` 数组，不使用顶层 `ip` / `netmask` 字段。
+2026-07-04 后续抓包确认：修改地址簿的请求体应使用顶层对象，并把地址项写入 `ip` 数组，每项包含 `ip_addr`、`netmask`、`flag`。旧文档中的 `member` 数组与实机修改接口不一致。
 
 ```json
 {
+  "is_ipv6": 0,
+  "type": 0,
   "name": "xdr_soar_in_v4",
-  "member": ["216.250.248.88/32", "16.163.96.158/32"],
-  "is_ipv6": "0",
-  "is_ordered": "0",
-  "predefined": "0"
+  "description": "",
+  "entry": [],
+  "ip": [
+    {"ip_addr": "216.250.248.88", "netmask": 32, "flag": 0},
+    {"ip_addr": "16.163.96.158", "netmask": 32, "flag": 0}
+  ],
+  "range": [],
+  "host": [],
+  "wildcard": [],
+  "country": []
 }
 ```
 
 ### 3. Add IP To Address Book
 
-候选请求 1：collection URL + 数组 body。待 admin 权限账号验证。
+正式请求：collection URL + 对象 body。每次真实封禁都重新登录获取 token，查询现有地址簿，根据查询结果保留已有字段并追加新 IP 后整体 PUT。
 
 ```http
 PUT https://10.67.82.6/rest/api/addrbook
@@ -130,15 +138,25 @@ Content-Type: application/json
 Cookie: token=<token>; role=<role>; vsysId=<vsysId>; fromrootvsys=<fromrootvsys>; username=<username>
 ```
 
-Body 必须保留当前已有 `member`，再追加新 IP，避免覆盖地址簿：
+Body 必须保留当前已有地址项，再追加新 IP，避免覆盖地址簿：
 
 ```json
-[
-  {
-    "name": "xdr_soar_in_v4",
-    "member": ["216.250.248.88/32", "16.163.96.158/32", "203.0.113.10/32"]
-  }
-]
+{
+  "is_ipv6": 0,
+  "type": 0,
+  "name": "xdr_soar_in_v4",
+  "description": "",
+  "entry": [],
+  "ip": [
+    {"ip_addr": "216.250.248.88", "netmask": 32, "flag": 0},
+    {"ip_addr": "16.163.96.158", "netmask": 32, "flag": 0},
+    {"ip_addr": "203.0.113.10", "netmask": 32, "flag": 0}
+  ],
+  "range": [],
+  "host": [],
+  "wildcard": [],
+  "country": []
+}
 ```
 
 候选请求 2：命名 URL + 对象 body。2026-07-04 operator 角色实测返回 `success:true`，但查询 `xdr_soar_in_v4` 未看到新增成员，因此记录为未生效候选。
@@ -158,8 +176,9 @@ Cookie: token=<token>; role=<role>; vsysId=<vsysId>; fromrootvsys=<fromrootvsys>
 
 已排除的错误 body：
 
-- 顶层 `ip` + `netmask` 返回 `Index object netmask of ip can not be empty`。
-- 顶层 `ip` + `netmask: 32` 返回 `Index object netmask of ip can not be empty`。
+- 数组 body + `member` 未按实机接口生效。
+- 顶层 `ip` + 单独 `netmask` 返回 `Index object netmask of ip can not be empty`。
+- 顶层 `ip` + 单独 `netmask: 32` 返回 `Index object netmask of ip can not be empty`。
 - 嵌套 `ip: {ip, netmask}` 返回 `"ip" is invalid element`。
 - 带 `is_ordered: "0"` 的 PUT 返回 `Invalid is_ordered: "0"`。
 

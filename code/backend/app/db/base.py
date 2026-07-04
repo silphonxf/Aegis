@@ -6,6 +6,7 @@ from app.models.ai_diagnosis import AIDiagnosis
 from app.models.ai_external_key import AIExternalApiKey
 from app.models.asset import Asset
 from app.models.audit import AuditLog
+from app.models.firewall import FirewallBlockConfig
 from app.models.inspection import InspectionPoint, InspectionRecord
 from app.models.offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from app.models.rule import StatusRule
@@ -27,6 +28,7 @@ __all__ = [
     "SelfcheckReport",
     "SystemStatusSnapshot",
     "AuditLog",
+    "FirewallBlockConfig",
     "StatusRule",
     "Asset",
     "ToolTask",
