@@ -85,6 +85,8 @@ def test_threat_intel_excel_import(client, admin_headers, monkeypatch):
 
 
 def test_threat_intel_block_ip_dry_run_returns_firewall_plan(client, admin_headers):
+    settings.HILLSTONE_HOST = "192.168.100.18"
+
     resp = client.post(
         "/api/v1/admin/threat-intel/block-ip",
         headers=admin_headers,
@@ -95,16 +97,17 @@ def test_threat_intel_block_ip_dry_run_returns_firewall_plan(client, admin_heade
     body = resp.json()
     assert body["status"] == "dry_run"
     assert body["dry_run"] is True
+    assert body["vendor"] == "hillstone"
     assert body["ip"] == "8.8.8.8"
     assert body["firewall_host"] == "192.168.100.18"
-    assert "huawei-address-set:address-set" in body["url"]
-    assert "<address-ipv4>8.8.8.8</address-ipv4>" in body["body"]
-    assert "<mask>255.255.255.255</mask>" in body["body"]
+    assert body["request"]["url"].endswith("/rest/api/addrbook")
+    assert body["request"]["body"][0]["name"] == "aegis-blocked-ip"
+    assert body["request"]["body"][0]["member"] == ["8.8.8.8/32"]
 
 
 def test_threat_intel_block_ip_requires_firewall_credentials(client, admin_headers, monkeypatch):
-    monkeypatch.setattr(settings, "FIREWALL_RESTCONF_USERNAME", None)
-    monkeypatch.setattr(settings, "FIREWALL_RESTCONF_PASSWORD", None)
+    monkeypatch.setattr(settings, "HILLSTONE_USERNAME", None)
+    monkeypatch.setattr(settings, "HILLSTONE_PASSWORD", None)
 
     resp = client.post(
         "/api/v1/admin/threat-intel/block-ip",
@@ -114,41 +117,52 @@ def test_threat_intel_block_ip_requires_firewall_credentials(client, admin_heade
 
     assert resp.status_code == 503, resp.text
     assert resp.json()["code"] == "FIREWALL_CONFIG_MISSING"
-    assert "FIREWALL_RESTCONF_USERNAME" in resp.json()["message"]
+    assert "HILLSTONE_USERNAME" in resp.json()["message"]
 
 
-def test_threat_intel_block_ip_calls_huawei_restconf(client, admin_headers, monkeypatch):
+def test_threat_intel_block_ip_calls_hillstone_addrbook(client, admin_headers, monkeypatch):
     calls = []
 
     class FakeResponse:
-        def __init__(self, status_code=200, content=b""):
+        def __init__(self, status_code=200, body=None):
             self.status_code = status_code
-            self.content = content
+            self._body = body if body is not None else {"success": True, "result": []}
+            self.text = str(self._body)
 
         def raise_for_status(self):
             return None
 
+        def json(self):
+            return self._body
+
+    def fake_post(url, **kwargs):
+        calls.append(("POST", url, kwargs))
+        return FakeResponse(
+            body={
+                "success": True,
+                "result": [{"token": "tok", "role": "admin", "vsysId": "0", "fromrootvsys": "1"}],
+            }
+        )
+
     def fake_get(url, **kwargs):
         calls.append(("GET", url, kwargs))
         return FakeResponse(
-            content=b"""
-            <address-object xmlns="urn:huawei:yang:huawei-address-set">
-              <name>aegis-blocked-ip</name>
-              <elements>
-                <element><elem-id>7</elem-id><address-ipv4>1.1.1.1</address-ipv4><mask>255.255.255.255</mask></element>
-              </elements>
-            </address-object>
-            """
+            body={
+                "success": True,
+                "result": [{"name": "aegis-blocked-ip", "member": ["1.1.1.1/32"], "is_ipv6": "0", "is_ordered": "0"}],
+            }
         )
 
-    def fake_patch(url, **kwargs):
-        calls.append(("PATCH", url, kwargs))
-        return FakeResponse(status_code=204)
+    def fake_put(url, **kwargs):
+        calls.append(("PUT", url, kwargs))
+        return FakeResponse(status_code=200, body={"success": True})
 
-    monkeypatch.setattr(settings, "FIREWALL_RESTCONF_USERNAME", "admin")
-    monkeypatch.setattr(settings, "FIREWALL_RESTCONF_PASSWORD", "secret")
+    monkeypatch.setattr(settings, "HILLSTONE_USERNAME", "admin")
+    monkeypatch.setattr(settings, "HILLSTONE_PASSWORD", "secret")
+    monkeypatch.setattr(settings, "HILLSTONE_HOST", "192.168.100.18")
+    monkeypatch.setattr("app.services.firewall.requests.post", fake_post)
     monkeypatch.setattr("app.services.firewall.requests.get", fake_get)
-    monkeypatch.setattr("app.services.firewall.requests.patch", fake_patch)
+    monkeypatch.setattr("app.services.firewall.requests.put", fake_put)
 
     resp = client.post(
         "/api/v1/admin/threat-intel/block-ip",
@@ -159,13 +173,17 @@ def test_threat_intel_block_ip_calls_huawei_restconf(client, admin_headers, monk
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["status"] == "blocked"
-    assert body["elem_id"] == 8
-    assert body["http_status"] == 204
-    assert [call[0] for call in calls] == ["GET", "PATCH"]
-    patch_body = calls[1][2]["data"].decode("utf-8")
-    assert "<elem-id>8</elem-id>" in patch_body
-    assert "<address-ipv4>9.9.9.9</address-ipv4>" in patch_body
-    assert "risk &amp; block" in patch_body
+    assert body["vendor"] == "hillstone"
+    assert body["http_status"] == 200
+    assert body["method"] == "PUT"
+    assert [call[0] for call in calls] == ["POST", "GET", "PUT"]
+    assert calls[0][1].endswith("/rest/api/login")
+    assert calls[1][1].startswith("https://192.168.100.18:443/rest/api/addrbook?query=")
+    assert calls[2][1].endswith("/rest/api/addrbook")
+    put_body = calls[2][2]["data"]
+    assert '"name": "aegis-blocked-ip"' in put_body
+    assert '"member": ["1.1.1.1/32", "9.9.9.9/32"]' in put_body
+    assert calls[2][2]["cookies"]["token"] == "tok"
 
 
 def test_threatbook_ip_key_response_and_scanner_judgment_are_malicious(monkeypatch):

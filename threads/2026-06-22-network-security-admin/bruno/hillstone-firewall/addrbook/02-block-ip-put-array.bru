@@ -1,0 +1,29 @@
+meta {
+  name: 02 Block IP PUT Array
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/rest/api/addrbook
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: token={{token}}; role={{role}}; vsysId={{vsysId}}; fromrootvsys={{fromrootvsys}}; username={{username}}
+}
+
+body:json {
+  [
+    {
+      "name": "{{addrbookName}}",
+      "member": [
+        "216.250.248.88/32",
+        "16.163.96.158/32",
+        "{{targetIp}}/32"
+      ]
+    }
+  ]
+}

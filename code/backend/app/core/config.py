@@ -79,18 +79,20 @@ class Settings(BaseSettings):
     REDIS_CACHE_TTL_SECONDS: int = 300
     EMERGENCY_CONFIG_AUTO_IMPORT_JSON: bool = True
 
-    # Huawei USG RESTCONF firewall blocking. The default host follows the
-    # TapeManage primary block-device hint; credentials must be injected.
-    FIREWALL_RESTCONF_ENABLED: bool = True
-    FIREWALL_RESTCONF_SCHEME: str = "https"
-    FIREWALL_RESTCONF_HOST: str = "192.168.100.18"
-    FIREWALL_RESTCONF_PORT: int = 443
-    FIREWALL_RESTCONF_USERNAME: Optional[str] = None
-    FIREWALL_RESTCONF_PASSWORD: Optional[str] = None
-    FIREWALL_RESTCONF_VERIFY_SSL: bool = False
-    FIREWALL_RESTCONF_TIMEOUT_SECONDS: int = 15
-    FIREWALL_RESTCONF_VSYS: str = "public"
-    FIREWALL_ADDRESS_SET_NAME: str = "aegis-blocked-ip"
+    # Hillstone StoneOS REST API firewall blocking. TapeManage blocks by
+    # adding an IP /32 into a configured address book.
+    HILLSTONE_ENABLED: bool = True
+    HILLSTONE_SCHEME: str = "https"
+    HILLSTONE_HOST: str = "192.168.100.18"
+    HILLSTONE_PORT: int = 443
+    HILLSTONE_USERNAME: Optional[str] = None
+    HILLSTONE_PASSWORD: Optional[str] = None
+    HILLSTONE_VERIFY_SSL: bool = False
+    HILLSTONE_TIMEOUT_SECONDS: int = 15
+    HILLSTONE_ADDRESS_BOOK_NAME: str = "aegis-blocked-ip"
+    HILLSTONE_ADDRBOOK_PATH: str = "/api/addrbook"
+    HILLSTONE_ADDRBOOK_METHOD: str = "PUT"
+    HILLSTONE_ADDRBOOK_TYPE: str = "1"
 
     # CORS
     CORS_ALLOW_ORIGINS: str = "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174"
