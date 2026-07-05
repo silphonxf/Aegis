@@ -256,6 +256,7 @@ bindClick('btnSubmitCreateSystem', () => ns.modals.submitCreateSystem().catch((e
 
 bindClick('btnThreatbookQuery', () => ns.threatbook.queryThreatbook().catch((e) => { $('threatbookResult').textContent = formatError('IP恶意研判', e); }));
 bindClick('btnThreatbookFillDemo', () => ns.threatbook.fillDemo());
+bindClick('btnThreatbookManualBlock', () => ns.threatbook.blockIp().catch((e) => { $('threatbookResult').textContent = formatError('手动封禁 IP', e); }));
 bindClick('btnThreatbookBatchBlock', () => ns.threatbook.batchBlockAutoCandidates().catch((e) => { $('threatbookResult').textContent = formatError('一键封禁预留接口', e); }));
 bindClick('btnOpenThreatbookFirewallConfig', () => ns.threatbook.openFirewallConfigModal().catch((e) => { $('threatbookResult').textContent = formatError('读取防火墙配置', e); }));
 bindClick('btnSaveThreatbookFirewallConfig', () => ns.threatbook.saveFirewallConfig().catch((e) => {
