@@ -1028,8 +1028,19 @@
                 <button id="btnOpenThreatbookFirewallConfig" class="toolbar-btn secondary" type="button">配置</button>
               </div>
             </div>
+            <div class="grid2">
+              <label>手动封禁 IP
+                <input id="threatbookBlockIp" placeholder="例如：203.0.113.10" />
+              </label>
+              <label>封禁原因
+                <input id="threatbookBlockReason" placeholder="例如：手动确认恶意扫描源" />
+              </label>
+            </div>
             <label class="inline-check"><input type="checkbox" id="threatbookFirewallDryRun" checked> 演练模式</label>
-            <button id="btnThreatbookBatchBlock">一键封禁候选 IP</button>
+            <div class="action-row compact">
+              <button id="btnThreatbookManualBlock" type="button">封禁此 IP</button>
+              <button id="btnThreatbookBatchBlock" type="button">一键封禁候选 IP</button>
+            </div>
             <pre id="threatbookResult">尚未查询</pre>
           </div>
         </section>
