@@ -13,6 +13,18 @@ class CreateAIExternalApiKeyRequest(BaseModel):
     remark: Optional[str] = Field(default=None, max_length=500)
 
 
+class AIEngineConfigRequest(BaseModel):
+    engine_type: str = Field(pattern="^(offline|openclaw|pi_gateway)$")
+    base_url: Optional[str] = Field(default=None, max_length=255)
+    api_key: Optional[str] = Field(default=None, max_length=2048)
+    model: Optional[str] = Field(default=None, max_length=128)
+    timeout_seconds: int = Field(default=120, ge=1, le=600)
+    chat_path: Optional[str] = Field(default=None, max_length=128)
+    diagnose_path: Optional[str] = Field(default=None, max_length=128)
+    log_analyze_path: Optional[str] = Field(default=None, max_length=128)
+    enabled: bool = True
+
+
 class CreateAssetRequest(BaseModel):
     asset_code: str = Field(min_length=2, max_length=64)
     name: str = Field(min_length=1, max_length=128)
@@ -47,6 +59,8 @@ class CreateRoomRequest(BaseModel):
     qr_content: str = Field(min_length=1, max_length=255)
     nfc_tag: Optional[str] = Field(default=None, max_length=255)
     check_items: List[str] = Field(default_factory=list, max_items=50)
+    weekday_inspection_count: int = Field(default=1, ge=0, le=24)
+    holiday_inspection_count: int = Field(default=1, ge=0, le=24)
     building: Optional[str] = Field(default=None, max_length=128)
     floor: Optional[str] = Field(default=None, max_length=64)
     location_detail: Optional[str] = Field(default=None, max_length=255)
@@ -60,6 +74,8 @@ class UpdateRoomRequest(BaseModel):
     qr_content: Optional[str] = Field(default=None, min_length=1, max_length=255)
     nfc_tag: Optional[str] = Field(default=None, max_length=255)
     check_items: Optional[List[str]] = Field(default=None, max_items=50)
+    weekday_inspection_count: Optional[int] = Field(default=None, ge=0, le=24)
+    holiday_inspection_count: Optional[int] = Field(default=None, ge=0, le=24)
     building: Optional[str] = Field(default=None, max_length=128)
     floor: Optional[str] = Field(default=None, max_length=64)
     location_detail: Optional[str] = Field(default=None, max_length=255)

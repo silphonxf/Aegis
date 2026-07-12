@@ -16,6 +16,8 @@ class Room(Base):
     qr_content: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     nfc_tag: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     check_items: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    weekday_inspection_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    holiday_inspection_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     building: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     floor: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     location_detail: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

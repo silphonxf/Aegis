@@ -24,6 +24,7 @@ from app.models.shared_data import Room
 from app.models.system import System, SystemLogConfig, SystemUserBinding
 from app.models.user import Role, User
 from app.schemas.admin import (
+    AIEngineConfigRequest,
     BatchCreateAssetsRequest,
     CreateAIExternalApiKeyRequest,
     CreateAssetRequest,
@@ -38,6 +39,7 @@ from app.schemas.admin import (
     UpdateInspectionPointRequest,
     UpdateRoomRequest,
 )
+from app.services.ai_engine_config import serialize_ai_engine_config, upsert_ai_engine_config
 from app.schemas.emergency_config import (
     EmergencyDbActionSaveRequest,
     EmergencyProcessActionSaveRequest,
@@ -215,6 +217,36 @@ def set_ai_external_api_key_active(
     db.refresh(row)
     log_action(db, "set_ai_external_api_key_active", "ai_external_key", current_user, {"key_id": row.id, "is_active": is_active})
     return _serialize_ai_external_key(row)
+
+
+@router.get("/ai-engine-config")
+def get_ai_engine_config(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    return serialize_ai_engine_config(db)
+
+
+@router.put("/ai-engine-config")
+def save_ai_engine_config(
+    payload: AIEngineConfigRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    result = upsert_ai_engine_config(db, payload)
+    log_action(
+        db,
+        "save_ai_engine_config",
+        "ai_engine_config",
+        current_user,
+        {
+            "engine_type": result["engine_type"],
+            "base_url": result["base_url"],
+            "model": result["model"],
+            "has_api_key": result["has_api_key"],
+        },
+    )
+    return result
 
 
 @router.get("/systems")
@@ -868,6 +900,8 @@ def list_rooms(
                 "qr_content": getattr(item, "qr_content", None),
                 "nfc_tag": getattr(item, "nfc_tag", None),
                 "check_items": _parse_check_items(getattr(item, "check_items", None)),
+                "weekday_inspection_count": getattr(item, "weekday_inspection_count", 1),
+                "holiday_inspection_count": getattr(item, "holiday_inspection_count", 1),
                 "building": item.building,
                 "floor": item.floor,
                 "location_detail": item.location_detail,
@@ -999,9 +1033,11 @@ def list_inspection_points(
         "items": [
             {
                 "id": item.id,
-                "room_id": item.room_id,
-                "room_name": rooms[item.room_id].room_name if item.room_id in rooms else "",
-                "system_id": item.system_id,
+            "room_id": item.room_id,
+            "room_name": rooms[item.room_id].room_name if item.room_id in rooms else "",
+            "room_weekday_inspection_count": rooms[item.room_id].weekday_inspection_count if item.room_id in rooms else 1,
+            "room_holiday_inspection_count": rooms[item.room_id].holiday_inspection_count if item.room_id in rooms else 1,
+            "system_id": item.system_id,
                 "system_name": systems[item.system_id].name if item.system_id in systems else "",
                 "point_code": item.point_code,
                 "point_name": item.point_name,

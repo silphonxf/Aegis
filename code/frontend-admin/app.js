@@ -24,6 +24,7 @@ const VIEW_GROUP_MAP = {
   'view-ops-workbench': 'ops-workbench',
   'view-systems': 'ops-workbench',
   'view-db-selfchecks': 'ops-workbench',
+  'view-rooms': 'ops-workbench',
   'view-inspection-points': 'ops-workbench',
   'view-inspection-records': 'ops-workbench',
   'view-users': 'ops-workbench',
@@ -37,6 +38,7 @@ const VIEW_GROUP_MAP = {
   'view-tool-rules': 'approval-audit',
   'view-tool-ai': 'approval-audit',
   'view-ai-external-keys': 'approval-audit',
+  'view-ai-engine-config': 'approval-audit',
   'view-net-ping': 'network-security',
   'view-net-capture': 'network-security',
   'view-tool-threatbook': 'network-security',
@@ -100,6 +102,7 @@ function switchView(viewId, groupId) {
   }
 
   if (viewId === 'view-db-selfchecks') ns.databaseSelfchecks?.list?.();
+  if (viewId === 'view-rooms') ns.rooms?.listRooms?.();
   if (viewId === 'view-inspection-points') ns.inspectionPoints?.listInspectionPoints?.();
   if (viewId === 'view-inspection-records') ns.inspectionRecords?.listInspectionRecords?.();
   if (viewId === 'view-emergency-ssh') ns.emergencyConfig?.listSshHosts?.();
@@ -108,6 +111,7 @@ function switchView(viewId, groupId) {
   if (viewId === 'view-emergency-process') ns.emergencyConfig?.listProcessActions?.();
   if (viewId === 'view-emergency-custom') ns.emergencyConfig?.listCustomActions?.();
   if (viewId === 'view-ai-external-keys') ns.rulesAudit?.listAiExternalKeys?.();
+  if (viewId === 'view-ai-engine-config') ns.rulesAudit?.loadAiEngineConfig?.();
 }
 
 function openGroup(groupId) {
@@ -182,6 +186,18 @@ bindClick('btnListInspectionPoints', () => ns.inspectionPoints.listInspectionPoi
 bindClick('btnOpenCreatePointModal', () => ns.inspectionPoints.openCreatePointModal().catch((e) => {
   $('pointListSummary').textContent = formatError('巡检点弹窗', e);
 }));
+bindClick('btnListRooms', () => ns.rooms.listRooms().catch((e) => {
+  $('roomListSummary').textContent = formatError('机房列表', e);
+  $('roomListTbody').innerHTML = '<tr><td colspan="10">查询失败</td></tr>';
+}));
+bindClick('btnOpenCreateRoomModal', () => ns.rooms.openCreateRoomModal());
+bindClick('btnCloseCreateRoomModal', () => ns.modals.closeModal('createRoomModal'));
+bindClick('btnSubmitRoom', () => ns.rooms.submitRoom().catch((e) => {
+  $('roomListSummary').textContent = formatError('机房操作', e);
+}));
+bindClick('btnDeleteRoom', () => ns.rooms.deleteRoom().catch((e) => {
+  $('roomListSummary').textContent = formatError('停用机房', e);
+}));
 bindClick('btnCloseCreatePointModal', () => ns.modals.closeModal('createPointModal'));
 bindClick('btnSubmitPoint', () => ns.inspectionPoints.submitPoint().catch((e) => {
   $('pointListSummary').textContent = formatError('巡检点操作', e);
@@ -223,6 +239,9 @@ bindClick('btnAuditClear', () => {
 });
 bindClick('btnListAiExternalKeys', () => ns.rulesAudit.listAiExternalKeys().catch((e) => { $('aiExternalKeyListResult').textContent = formatError('AI 对外 Key 列表', e); }));
 bindClick('btnCreateAiExternalKey', () => ns.rulesAudit.createAiExternalKey().catch((e) => { $('aiExternalKeyCreateResult').textContent = formatError('AI 对外 Key 生成', e); }));
+bindClick('btnLoadAiEngineConfig', () => ns.rulesAudit.loadAiEngineConfig().catch((e) => { $('aiEngineConfigResult').textContent = formatError('AI 引擎配置读取', e); }));
+bindClick('btnSaveAiEngineConfig', () => ns.rulesAudit.saveAiEngineConfig().catch((e) => { $('aiEngineConfigResult').textContent = formatError('AI 引擎配置保存', e); }));
+bindClick('btnFillPiGatewayConfig', () => ns.rulesAudit.fillPiGatewayConfig?.());
 bindClick('btnCreateTemplate', () => ns.templates.createTemplate().catch((e) => { $('templateCreateResult').textContent = formatError('创建模板', e); }));
 bindClick('btnListTemplates', () => ns.templates.listTemplates().catch((e) => { $('templateListResult').textContent = formatError('模板列表', e); }));
 bindClick('btnCreateSnapshot', () => ns.templates.createSnapshot().catch((e) => { $('snapshotResult').textContent = formatError('状态快照', e); }));

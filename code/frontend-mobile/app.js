@@ -44,7 +44,8 @@ function loadAiConversationId() {
 
 function loadActiveTab() {
   const value = sessionStorage.getItem(ACTIVE_TAB_KEY) || '';
-  return value || 'tab-workbench';
+  if (value === 'tab-workbench' || value === 'tab-selfcheck') return 'tab-logs';
+  return value || 'tab-logs';
 }
 
 function loadAiSidebarCollapsed() {
@@ -100,6 +101,7 @@ const state = {
   isRunningScheduledSelfcheck: false,
   latestSelfcheckReports: [],
   lastAiRequestPayload: null,
+  threatResults: [],
 };
 
 function loadStoredToken() {
@@ -207,6 +209,215 @@ function formatErrorAiResult(data) {
     data.suggestions.forEach((item, idx) => lines.push(`${idx + 1}. ${item}`));
   }
   return lines.join('\n');
+}
+
+function extractIpsFromText(text) {
+  const matches = String(text || '').match(/(?:\d{1,3}\.){3}\d{1,3}/g) || [];
+  const seen = new Set();
+  return matches.filter((ip) => {
+    if (seen.has(ip)) return false;
+    seen.add(ip);
+    return true;
+  });
+}
+
+function normalizeThreatItem(item) {
+  const risk = item.risk_level || item.severity || item.level || (item.should_block ? 'high' : item.is_malicious ? 'medium' : 'low');
+  return {
+    ...item,
+    ip: item.ip || item.target || '',
+    risk_level: risk,
+    is_malicious: Boolean(item.is_malicious || item.malicious),
+    should_block: Boolean(item.should_block || risk === 'high' || risk === 'critical'),
+  };
+}
+
+function riskLabel(level) {
+  const value = String(level || '').toLowerCase();
+  if (value === 'critical') return '严重';
+  if (value === 'high') return '高危';
+  if (value === 'medium') return '中危';
+  if (value === 'low') return '低危';
+  return level || '未知';
+}
+
+function renderThreatResults() {
+  const host = $('threatResultList');
+  const summary = $('threatSummary');
+  if (!host) return;
+  const items = state.threatResults || [];
+  const candidates = items.filter((item) => item.should_block);
+  if (summary) summary.textContent = items.length ? `${items.length} 个 IP，${candidates.length} 个建议封禁` : '暂无结果';
+  if (!items.length) {
+    host.innerHTML = '<div class="empty-state">查询后显示风险结果。</div>';
+    return;
+  }
+  host.innerHTML = items.map((item) => {
+    const tags = Array.isArray(item.tags) ? item.tags.join(' / ') : (item.tags || item.categories || item.judgments || '');
+    const status = item.block_status || '';
+    const risk = String(item.risk_level || '').toLowerCase();
+    return `
+      <article class="threat-card ${item.should_block ? 'danger' : ''}">
+        <div class="threat-card-main">
+          <strong>${escapeHtml(item.ip)}</strong>
+          <span class="risk-pill ${escapeHtml(risk)}">${escapeHtml(riskLabel(item.risk_level))}</span>
+        </div>
+        <div class="threat-meta">${escapeHtml(item.summary || item.reason || tags || (item.is_malicious ? '疑似恶意 IP' : '未发现高危结论'))}</div>
+        <div class="threat-actions">
+          <span>${escapeHtml(status || (item.should_block ? '建议封禁' : '建议观察'))}</span>
+          <button class="small ${item.should_block ? 'warn-action' : 'secondary'}" data-block-ip="${escapeHtml(item.ip)}">封禁该 IP</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+async function blockThreatIp(ip) {
+  const item = (state.threatResults || []).find((row) => row.ip === ip) || { ip };
+  item.block_status = '正在封禁...';
+  renderThreatResults();
+  try {
+    const result = await api('/api/v1/admin/threat-intel/block-ip', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        ip,
+        risk_level: item.risk_level || null,
+        reason: item.summary || item.reason || '移动端恶意 IP 封禁',
+        source: 'threatbook',
+        dry_run: false,
+      }),
+      timeoutMs: 150000,
+    });
+    item.block_status = result.dry_run ? 'dry-run 完成' : '封禁已执行';
+    showToast(`${ip} 封禁已提交`, 'success');
+  } catch (e) {
+    item.block_status = explainActionError(e, '恶意 IP 封禁', 'admin / super_admin');
+  }
+  renderThreatResults();
+}
+
+function inspectionResultLabel(value) {
+  return value === 'abnormal' ? '异常' : value === 'normal' ? '正常' : (value || '未知');
+}
+
+function renderInspectionRecords(items) {
+  const host = $('inspectionRecordsList');
+  if (!host) return;
+  if (!items || !items.length) {
+    host.innerHTML = '<div class="empty-state">暂无巡检记录。</div>';
+    return;
+  }
+  host.innerHTML = items.map((item) => {
+    const name = item.room_name || item.point_name || item.point_code || `巡检点 #${item.point_id || '-'}`;
+    const system = item.system_name ? ` · ${item.system_name}` : '';
+    const inspector = item.inspector_name ? ` · ${item.inspector_name}` : '';
+    const time = item.inspected_at || '-';
+    return `
+      <div class="activity-item ${item.result === 'abnormal' ? 'warn' : ''}">
+        <strong>${escapeHtml(name)}</strong>
+        <span>${escapeHtml(time)} · ${escapeHtml(inspectionResultLabel(item.result))}${escapeHtml(system)}${escapeHtml(inspector)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function todayRangeParams() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  return {
+    start_at: start.toISOString(),
+    end_at: end.toISOString(),
+  };
+}
+
+function setInspectionSummary({ pending = '-', done = '-', abnormal = '-', hint = '' } = {}) {
+  if ($('inspectionPendingCount')) $('inspectionPendingCount').textContent = String(pending);
+  if ($('inspectionDoneCount')) $('inspectionDoneCount').textContent = String(done);
+  if ($('inspectionAbnormalCount')) $('inspectionAbnormalCount').textContent = String(abnormal);
+  if ($('inspectionSummaryHint') && hint) $('inspectionSummaryHint').textContent = hint;
+}
+
+function isHolidayInspectionDay(date = new Date()) {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function getRoomDailyInspectionTarget(room) {
+  const isHoliday = isHolidayInspectionDay();
+  const raw = isHoliday ? room.holiday_inspection_count : room.weekday_inspection_count;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : 1;
+}
+
+async function loadInspectionSummary() {
+  if (!state.token) return;
+  setInspectionSummary({ hint: '正在统计今日巡检...' });
+  try {
+    const range = todayRangeParams();
+    let targetTotal = 0;
+    try {
+      const rooms = await api('/api/v1/admin/rooms?include_inactive=false&size=500', { headers: authHeaders() });
+      targetTotal = (rooms.items || []).reduce((sum, room) => sum + getRoomDailyInspectionTarget(room), 0);
+    } catch {
+      targetTotal = 0;
+    }
+
+    const params = new URLSearchParams({ page: '1', size: '100', start_at: range.start_at, end_at: range.end_at });
+    let records;
+    try {
+      records = await api(`/api/v1/admin/inspection-records?${params.toString()}`, { headers: authHeaders() });
+    } catch {
+      records = await api(`/api/v1/inspections/records?${params.toString()}`, { headers: authHeaders() });
+    }
+    const items = records.items || [];
+    const abnormal = items.filter((item) => item.result === 'abnormal').length;
+    const pending = targetTotal ? Math.max(targetTotal - items.length, 0) : '-';
+    const dayLabel = isHolidayInspectionDay() ? '节假日' : '工作日';
+    setInspectionSummary({
+      pending,
+      done: items.length,
+      abnormal,
+      hint: targetTotal ? `今日按${dayLabel}配置需巡检 ${targetTotal} 次。` : `今日已提交 ${items.length} 条巡检记录。`,
+    });
+  } catch (e) {
+    setInspectionSummary({ hint: explainActionError(e, '统计巡检概览', 'inspector / admin / super_admin') });
+  }
+}
+
+async function loadInspectionRecords() {
+  const hint = $('inspectionRecordsHint');
+  if (hint) hint.textContent = '正在加载最近巡检记录...';
+  try {
+    let data;
+    try {
+      data = await api('/api/v1/admin/inspection-records?page=1&size=20', { headers: authHeaders() });
+    } catch {
+      data = await api('/api/v1/inspections/records?page=1&size=20', { headers: authHeaders() });
+    }
+    renderInspectionRecords(data.items || []);
+    if (hint) hint.textContent = `已加载 ${data.items?.length || 0} 条记录。`;
+  } catch (e) {
+    renderInspectionRecords([]);
+    if (hint) hint.textContent = explainActionError(e, '读取巡检记录', 'inspector / admin / super_admin');
+  }
+}
+
+function renderBinaryChoice(name, value = 'normal') {
+  return `
+    <div class="choice-row">
+      <label class="choice-pill">
+        <input type="radio" name="${escapeHtml(name)}" value="normal" ${value === 'abnormal' ? '' : 'checked'} />
+        <span>正常</span>
+      </label>
+      <label class="choice-pill danger">
+        <input type="radio" name="${escapeHtml(name)}" value="abnormal" ${value === 'abnormal' ? 'checked' : ''} />
+        <span>异常</span>
+      </label>
+    </div>
+  `;
 }
 
 function formatAiReply(result) {
@@ -338,9 +549,9 @@ function switchScreen(loggedIn) {
 }
 
 const TAB_META = {
-  'tab-workbench': { title: '工作台', subtitle: '今日待办、快捷操作与辅助工具' },
+  'tab-logs': { title: '日志', subtitle: '故障日志提取与 AI 分析' },
   'tab-inspection': { title: '巡检', subtitle: '扫码巡检、NFC 巡检与最近记录' },
-  'tab-selfcheck': { title: '自检', subtitle: '系统自检与错误日志分析' },
+  'tab-block': { title: '封禁', subtitle: '恶意 IP 查询与山石防火墙封禁' },
   'tab-me': { title: '我的', subtitle: '账号信息、密码修改与登录设置' },
 };
 
@@ -351,7 +562,6 @@ const DETAIL_PAGE_META = {
   'page-inspection-nfc': 'NFC 巡检',
   'page-inspection-records': '最近巡检记录',
   'page-selfcheck-run': '系统自检',
-  'page-selfcheck-errors': '错误日志分析',
   'page-tool-aiqa': 'AI 问答',
   'page-tool-ping': 'Ping 工具',
   'page-tool-capture': '抓包分析',
@@ -360,12 +570,13 @@ const DETAIL_PAGE_META = {
 };
 
 function updateTopbarByTab(tabId) {
-  const meta = TAB_META[tabId] || TAB_META['tab-workbench'];
-  if ($('appTopTitle')) $('appTopTitle').innerHTML = `${meta.title} <span class="badge">v2 UI</span>`;
+  const meta = TAB_META[tabId] || TAB_META['tab-logs'];
+  if ($('appTopTitle')) $('appTopTitle').innerHTML = `${meta.title} <span class="badge">v3</span>`;
   if ($('appTopSubtitle')) $('appTopSubtitle').textContent = meta.subtitle;
 }
 
 function switchTab(tabId) {
+  if (!TAB_META[tabId]) tabId = 'tab-logs';
   state.activeTab = tabId;
   try {
     sessionStorage.setItem(ACTIVE_TAB_KEY, tabId);
@@ -376,6 +587,17 @@ function switchTab(tabId) {
   document.querySelector(`.bottom-tab[data-tab="${tabId}"]`)?.classList.add('active');
   if (!state.activeDetailPage) {
     updateTopbarByTab(tabId);
+  }
+  if (tabId === 'tab-logs') {
+    renderErrorSystemOptions();
+    syncLogFileOptions();
+    if (state.token) refreshErrorSystems().catch(() => {});
+  }
+  if (tabId === 'tab-block') {
+    renderThreatResults();
+  }
+  if (tabId === 'tab-inspection') {
+    loadInspectionSummary();
   }
 }
 
@@ -392,7 +614,7 @@ function openDetailPage(pageId) {
   $(pageId)?.classList.remove('hidden');
   const title = getDetailPageTitle(pageId);
   if (title && $('appTopTitle')) {
-    $('appTopTitle').innerHTML = `${title} <span class="badge">v2 UI</span>`;
+    $('appTopTitle').innerHTML = `${title} <span class="badge">v3</span>`;
   }
   if ($('appTopSubtitle')) {
     $('appTopSubtitle').textContent = '功能页 · 点击返回回到上一层';
@@ -403,7 +625,7 @@ function closeDetailPages() {
   state.activeDetailPage = '';
   stopSelfcheckStatusLoop();
   document.querySelectorAll('.detail-screen').forEach((el) => el.classList.add('hidden'));
-  updateTopbarByTab(state.activeTab || 'tab-workbench');
+  updateTopbarByTab(state.activeTab || 'tab-logs');
 }
 
 function saveAiMessages() {
@@ -982,7 +1204,9 @@ function initSubNavigation() {
         state.qrScanText = '';
         state.qrResolvedPoint = null;
         if ($('inspectionPointName')) $('inspectionPointName').value = '';
-        renderInspectionChecklist([], null);
+        renderInspectionChecklist([]);
+        const normalResult = document.querySelector('input[name="inspectionResult"][value="normal"]');
+        if (normalResult) normalResult.checked = true;
         setQrScanState('点击“调用相机扫码”，识别后会自动填充机房信息。');
         show('inspectionResult', '');
       }
@@ -994,11 +1218,8 @@ function initSubNavigation() {
 
       openDetailPage(pageId);
 
-      if (pageId === 'page-selfcheck-errors') {
-        $('errorAiView').textContent = '先加载系统日志，再点击“AI 分析”生成结论与建议。';
-        renderErrorSystemOptions();
-        syncLogFileOptions();
-        refreshErrorSystems().catch(() => {});
+      if (pageId === 'page-inspection-records') {
+        loadInspectionRecords();
       }
 
       if (pageId === 'page-tool-aiqa') {
@@ -2053,39 +2274,23 @@ async function resolveNfcLocation(tagText) {
   return resolved;
 }
 
-function renderInspectionChecklist(checkItems = [], monitoring = null) {
+function renderInspectionChecklist(checkItems = []) {
   const host = $('inspectionCheckItems');
   if (host) {
     const rows = (checkItems || []).map((item, index) => `
       <div class="check-row" data-check-index="${index}">
         <span>${escapeHtml(item)}</span>
-        <select data-check-result>
-          <option value="normal">正常</option>
-          <option value="abnormal">异常</option>
-        </select>
+        ${renderBinaryChoice(`inspection-check-${index}`)}
       </div>
     `).join('');
     host.innerHTML = rows || '<div class="hint">该机房暂未配置检查项。</div>';
-  }
-
-  const monitorHost = $('inspectionMonitoringItem');
-  if (monitorHost) {
-    const options = monitoring?.options || [{ value: 'monitoring_no_alarm', label: '监控无异常' }];
-    monitorHost.innerHTML = `
-      <div class="check-row">
-        <span>${escapeHtml(monitoring?.label || '监控无异常')}</span>
-        <select id="inspectionMonitoringConfirm">
-          ${options.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join('')}
-        </select>
-      </div>
-    `;
   }
 }
 
 function collectInspectionCheckResults() {
   return Array.from(document.querySelectorAll('#inspectionCheckItems .check-row')).map((row) => ({
     item: row.querySelector('span')?.textContent || '',
-    result: row.querySelector('[data-check-result]')?.value || 'normal',
+    result: row.querySelector('input[type="radio"]:checked')?.value || 'normal',
   }));
 }
 
@@ -2094,7 +2299,7 @@ async function resolveQrPoint(tagText) {
   state.qrResolvedPoint = resolved;
   const roomName = resolved.room_name || resolved.point_name || resolved.location || resolved.point_code || '';
   if ($('inspectionPointName')) $('inspectionPointName').value = roomName;
-  renderInspectionChecklist(resolved.check_items || [], resolved.monitoring_confirmation || null);
+  renderInspectionChecklist(resolved.check_items || []);
   show('inspectionResult', '');
   return resolved;
 }
@@ -2184,7 +2389,7 @@ onClick('btnLogin', async () => {
     setLoginState('登录成功');
     switchScreen(true);
     closeDetailPages();
-    switchTab(state.activeTab || 'tab-workbench');
+    switchTab(state.activeTab || 'tab-logs');
     api('/api/v1/auth/me', { headers: authHeaders() }).then((me) => {
       state.profile.username = me.username || state.profile.username || 'admin';
       state.profile.nickname = me.nickname || '';
@@ -2200,7 +2405,7 @@ function doLogout() {
   state.token = '';
   clearStoredToken();
   state.activeDetailPage = '';
-  state.activeTab = 'tab-workbench';
+  state.activeTab = 'tab-logs';
   try {
     sessionStorage.removeItem(ACTIVE_TAB_KEY);
   } catch {}
@@ -2231,7 +2436,7 @@ async function restoreSession() {
     setLoginState(`已恢复登录：${state.profile.username}`);
     switchScreen(true);
     closeDetailPages();
-    switchTab(state.activeTab || 'tab-workbench');
+    switchTab(state.activeTab || 'tab-logs');
     refreshErrorSystems().catch(() => {});
     return true;
   } catch (e) {
@@ -2308,8 +2513,8 @@ onClick('btnCreateInspection', async () => {
 
     const resolved = state.qrResolvedPoint || await resolveQrPoint(qrText);
     const checkResults = collectInspectionCheckResults();
-    const monitoringConfirmation = $('inspectionMonitoringConfirm')?.value || 'monitoring_no_alarm';
-    const hasAbnormal = checkResults.some((item) => item.result === 'abnormal') || monitoringConfirmation === 'alarm_abnormal_processing';
+    const selectedResult = document.querySelector('input[name="inspectionResult"]:checked')?.value || 'normal';
+    const hasAbnormal = selectedResult === 'abnormal' || checkResults.some((item) => item.result === 'abnormal');
     const payload = {
       system_id: resolved.system_id ? Number(resolved.system_id) : null,
       point_id: Number(resolved.point_id),
@@ -2317,7 +2522,7 @@ onClick('btnCreateInspection', async () => {
       result: hasAbnormal ? 'abnormal' : 'normal',
       note: $('insNote').value || null,
       check_results: checkResults,
-      monitoring_confirmation: monitoringConfirmation,
+      monitoring_confirmation: null,
       inspected_at: new Date().toISOString(),
     };
     await api('/api/v1/inspections/records', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
@@ -2343,7 +2548,7 @@ onClick('btnSubmitNfc', async () => {
     const payload = {
       system_id: Number(resolved.system_id),
       point_id: Number(resolved.point_id),
-      result: $('nfcResult').value,
+      result: document.querySelector('input[name="nfcResult"]:checked')?.value || 'normal',
       note: $('nfcNote').value || null,
       inspected_at: new Date().toISOString(),
     };
@@ -2351,6 +2556,7 @@ onClick('btnSubmitNfc', async () => {
     show('nfcResultView', `NFC 巡检提交成功：${resolved.point_name || resolved.location || resolved.point_code || '当前点位'}。`);
   } catch (e) { show('nfcResultView', e.message); }
 });
+onClick('btnRefreshInspectionRecords', loadInspectionRecords);
 
 // selfcheck
 if ($('scStatusSystem')) {
@@ -2643,6 +2849,55 @@ onClick('btnAnalyzeErrors', async () => {
   }
 });
 
+onClick('btnQueryThreatIps', async () => {
+  const ips = extractIpsFromText($('threatIpInput')?.value || '');
+  if (!ips.length) {
+    if ($('threatStatus')) $('threatStatus').textContent = '请先输入至少一个 IPv4 地址。';
+    return;
+  }
+  if ($('threatStatus')) $('threatStatus').textContent = `正在查询 ${ips.length} 个 IP 的风险...`;
+  setButtonLoading('btnQueryThreatIps', true, '查询中...');
+  try {
+    const data = await api('/api/v1/admin/threat-intel/ip-reputation', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ ips, lang: 'zh', realtime_verdict: true }),
+      timeoutMs: 150000,
+    });
+    state.threatResults = (data.items || []).map(normalizeThreatItem);
+    renderThreatResults();
+    const high = state.threatResults.filter((item) => item.should_block).length;
+    if ($('threatStatus')) $('threatStatus').textContent = `查询完成：${state.threatResults.length} 个 IP，${high} 个建议封禁。`;
+  } catch (e) {
+    state.threatResults = [];
+    renderThreatResults();
+    if ($('threatStatus')) $('threatStatus').textContent = explainActionError(e, '威胁情报查询', 'admin / super_admin');
+  } finally {
+    setButtonLoading('btnQueryThreatIps', false);
+  }
+});
+
+onClick('btnBlockHighRiskIps', async () => {
+  const targets = (state.threatResults || []).filter((item) => item.should_block).map((item) => item.ip).filter(Boolean);
+  if (!targets.length) {
+    if ($('threatStatus')) $('threatStatus').textContent = '当前没有建议封禁的高危 IP。';
+    return;
+  }
+  if ($('threatStatus')) $('threatStatus').textContent = `正在封禁 ${targets.length} 个高危 IP...`;
+  setButtonLoading('btnBlockHighRiskIps', true, '封禁中...');
+  for (const ip of targets) {
+    await blockThreatIp(ip);
+  }
+  setButtonLoading('btnBlockHighRiskIps', false);
+  if ($('threatStatus')) $('threatStatus').textContent = '高危 IP 封禁流程已完成。';
+});
+
+$('threatResultList')?.addEventListener('click', (event) => {
+  const btn = event.target.closest('[data-block-ip]');
+  if (!btn) return;
+  blockThreatIp(btn.dataset.blockIp);
+});
+
 // toolbox
 onClick('btnToolPing', async () => {
   try {
@@ -2728,7 +2983,7 @@ renderAiAttachmentList();
 applyAiSidebarState();
 applyProfileUI();
 closeDetailPages();
-switchTab('tab-workbench');
+switchTab('tab-logs');
 setLoginState(state.token ? '正在恢复登录...' : '未登录');
 switchScreen(Boolean(state.token));
 state.aiSelfcheckTimer = loadSelfcheckTimerConfig();

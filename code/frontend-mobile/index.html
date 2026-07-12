@@ -11,7 +11,7 @@
     <section id="loginScreen" class="screen active">
       <header class="topbar simple">
         <div>
-          <h1>Aegis 运维助手 <span class="badge">v2 UI</span></h1>
+          <h1>Aegis 运维助手 <span class="badge">v3</span></h1>
           <p class="subtitle">山东航空AI+项目：运维助手</p>
         </div>
       </header>
@@ -34,112 +34,122 @@
     <section id="appScreen" class="screen">
       <header class="topbar app-topbar">
         <div>
-          <h1 id="appTopTitle">工作台 <span class="badge">v2 UI</span></h1>
-          <p id="appTopSubtitle" class="subtitle">今日待办、快捷操作与辅助工具</p>
+          <h1 id="appTopTitle">日志 <span class="badge">v3</span></h1>
+          <p id="appTopSubtitle" class="subtitle">故障日志提取与 AI 分析</p>
         </div>
       </header>
 
       <main class="app-main-shell">
-        <section id="tab-workbench" class="tab-screen active">
-          <section class="page-block">
-            <div class="section-head">
-              <h2>今日待办</h2>
-              <span class="section-meta">优先处理高风险项</span>
+        <section id="tab-logs" class="tab-screen active">
+          <section class="page-block feature-head">
+            <div>
+              <h2>故障日志分析</h2>
+              <p class="hint">按系统、日志、时间和级别提取故障日志，再生成分析结论。</p>
             </div>
-            <div class="summary-grid">
-              <button class="summary-card" data-open-page="page-inspection-records">
-                <strong>3</strong>
-                <span>待巡检</span>
-              </button>
-              <button class="summary-card" data-open-page="page-selfcheck-run">
-                <strong>2</strong>
-                <span>待自检</span>
-              </button>
-              <button class="summary-card warn" data-open-page="page-selfcheck-errors">
-                <strong>1</strong>
-                <span>异常提醒</span>
-              </button>
+            <div class="feature-status">
+              <span id="errorTimeSummary">最近 1 小时</span>
             </div>
           </section>
 
-          <section class="page-block">
-            <div class="section-head">
-              <h2>快捷操作</h2>
-              <span class="section-meta">高频任务直达</span>
+          <section class="page-block log-filter-card">
+            <div class="grid two compact-grid">
+              <label>系统
+                <select id="errorSystem">
+                  <option value="" selected disabled>请选择系统</option>
+                </select>
+              </label>
+              <label>日志
+                <select id="errorFileName">
+                  <option value="" selected disabled>请选择日志</option>
+                </select>
+              </label>
             </div>
-            <div class="entry-grid">
-              <button class="entry-card" data-open-page="page-inspection-qr">
-                <span class="entry-title">扫码巡检</span>
-                <span class="entry-desc">调用相机识别二维码</span>
-              </button>
-              <button class="entry-card" data-open-page="page-inspection-nfc">
-                <span class="entry-title">NFC 巡检</span>
-                <span class="entry-desc">碰一碰读取巡检点</span>
-              </button>
-              <button class="entry-card" data-open-page="page-selfcheck-run">
-                <span class="entry-title">系统自检</span>
-                <span class="entry-desc">查看状态、告警与 AI 自检报告</span>
-              </button>
+            <div class="form-row">
+              <label>时间范围
+                <button type="button" id="btnOpenTimeFilter" class="ghost filter-trigger">最近 1 小时</button>
+              </label>
+              <label>日志级别
+                <select id="errorLogLevel">
+                  <option value="info">info</option>
+                  <option value="warning" selected>warning</option>
+                  <option value="error">error</option>
+                </select>
+              </label>
+            </div>
+            <div class="actions">
+              <button id="btnLoadErrors">提取故障日志</button>
+              <button id="btnAnalyzeErrors" class="secondary">AI 分析</button>
+            </div>
+            <div id="errorAiStatus" class="hint">先提取日志，再点击 AI 分析生成结论与建议。</div>
+          </section>
+
+          <section class="page-block result-card">
+            <div class="result-tab-bar">
+              <button type="button" class="result-tab-btn active" data-result-tab="logs">日志内容</button>
+              <button type="button" class="result-tab-btn" data-result-tab="analysis">分析结论</button>
+            </div>
+            <div id="resultLogsPanel" class="result-tab-panel active">
+              <pre id="errorLogsView"></pre>
+            </div>
+            <div id="resultAnalysisPanel" class="result-tab-panel hidden">
+              <pre id="errorAiView"></pre>
             </div>
           </section>
 
-          <section class="page-block">
-            <div class="section-head">
-              <h2>辅助工具</h2>
-              <span class="section-meta">排障与分析</span>
-            </div>
-            <div class="entry-grid tools">
-              <button class="entry-card" data-open-page="page-tool-aiqa">
-                <span class="entry-title">AI 问答</span>
-                <span class="entry-desc">结合附件分析问题</span>
-              </button>
-              <button class="entry-card" data-open-page="page-tool-ping">
-                <span class="entry-title">Ping</span>
-                <span class="entry-desc">快速检测网络连通</span>
-              </button>
-              <button class="entry-card" data-open-page="page-tool-capture">
-                <span class="entry-title">抓包分析</span>
-                <span class="entry-desc">粘贴摘录并交给 AI</span>
-              </button>
-              <button class="entry-card" data-open-page="page-tool-emergency">
-                <span class="entry-title">应急处置</span>
-                <span class="entry-desc">服务器、数据库、进程快速操作</span>
-              </button>
-              <button class="entry-card" data-open-page="page-tool-tasks">
-                <span class="entry-title">工具任务</span>
-                <span class="entry-desc">查看最近执行记录</span>
-              </button>
-            </div>
-          </section>
-
-          <section class="page-block">
-            <div class="section-head">
-              <h2>最近动态</h2>
-              <span class="section-meta">最近 24 小时</span>
-            </div>
-            <div class="activity-list">
-              <div class="activity-item">
-                <strong>巡检记录</strong>
-                <span>最近一次巡检：主机房 A 区 · 正常</span>
+          <div id="errorTimeModal" class="sheet-modal hidden">
+            <div class="sheet-backdrop" data-close-time-modal></div>
+            <div class="sheet-panel">
+              <div class="sheet-head">
+                <h3>时间范围</h3>
+                <button type="button" class="ghost small" data-close-time-modal>关闭</button>
               </div>
-              <div class="activity-item">
-                <strong>自检记录</strong>
-                <span>最近一次自检：航班调度系统 · 正常</span>
+              <div class="quick-range-row">
+                <span class="range-label">快捷时间</span>
+                <div class="quick-range-group">
+                  <button type="button" class="quick-range-btn active" data-range="1h">1h</button>
+                  <button type="button" class="quick-range-btn" data-range="3h">3h</button>
+                  <button type="button" class="quick-range-btn" data-range="6h">6h</button>
+                  <button type="button" class="quick-range-btn" data-range="all">全量</button>
+                </div>
               </div>
-              <div class="activity-item warn">
-                <strong>异常摘要</strong>
-                <span>检测到 1 条高优先级错误日志待分析</span>
+              <div class="grid two compact-grid">
+                <label>开始时间
+                  <input id="errorStartAt" type="datetime-local" />
+                </label>
+                <label>结束时间
+                  <input id="errorEndAt" type="datetime-local" />
+                </label>
+              </div>
+              <div class="actions one compact-actions">
+                <button type="button" id="btnApplyTimeFilter">确认时间范围</button>
               </div>
             </div>
-          </section>
+          </div>
         </section>
 
         <section id="tab-inspection" class="tab-screen hidden">
-          <section class="page-block hero-block">
+          <section class="page-block feature-head">
             <div>
-              <h2>巡检</h2>
-              <p class="hint">聚焦现场巡检任务，扫码与 NFC 使用同一套提交模式。</p>
+              <h2>现场巡检</h2>
+              <p class="hint">只保留扫码、NFC 和最近记录，现场操作路径保持简单。</p>
             </div>
+          </section>
+          <section class="page-block inspection-summary">
+            <div class="summary-grid">
+              <div class="summary-card">
+                <strong id="inspectionPendingCount">-</strong>
+                <span>待巡检</span>
+              </div>
+              <div class="summary-card">
+                <strong id="inspectionDoneCount">-</strong>
+                <span>今日完成</span>
+              </div>
+              <div class="summary-card warn">
+                <strong id="inspectionAbnormalCount">-</strong>
+                <span>异常</span>
+              </div>
+            </div>
+            <div id="inspectionSummaryHint" class="hint">切换到巡检页后自动统计今日巡检。</div>
           </section>
           <section class="page-block">
             <div class="entry-grid single-column">
@@ -159,24 +169,29 @@
           </section>
         </section>
 
-        <section id="tab-selfcheck" class="tab-screen hidden">
-          <section class="page-block hero-block">
+        <section id="tab-block" class="tab-screen hidden">
+          <section class="page-block feature-head">
             <div>
-              <h2>自检</h2>
-              <p class="hint">查看系统状态、告警信息与 AI 自检报告。</p>
+              <h2>恶意 IP 封禁</h2>
+              <p class="hint">先查询威胁情报，再直接封禁高危 IP。</p>
             </div>
           </section>
           <section class="page-block">
-            <div class="entry-grid single-column">
-              <button class="entry-card large" data-open-page="page-selfcheck-run">
-                <span class="entry-title">系统自检</span>
-                <span class="entry-desc">查看状态、告警与 AI 自检报告</span>
-              </button>
-              <button class="entry-card large" data-open-page="page-selfcheck-errors">
-                <span class="entry-title">错误日志分析</span>
-                <span class="entry-desc">提取错误日志并结合 AI 生成建议</span>
-              </button>
+            <label class="full">IP 列表
+              <textarea id="threatIpInput" rows="6" placeholder="每行一个 IP，也可以用逗号或空格分隔"></textarea>
+            </label>
+            <div class="actions">
+              <button id="btnQueryThreatIps">查询风险</button>
+              <button id="btnBlockHighRiskIps" class="secondary">封禁全部高危 IP</button>
             </div>
+            <div id="threatStatus" class="hint">输入 IP 后点击查询风险。</div>
+          </section>
+          <section class="page-block result-card">
+            <div class="section-head compact">
+              <h2>查询结果</h2>
+              <span class="section-meta" id="threatSummary">暂无结果</span>
+            </div>
+            <div id="threatResultList" class="threat-result-list"></div>
           </section>
         </section>
 
@@ -271,8 +286,18 @@
             <label class="full">机房名称
               <input id="inspectionPointName" placeholder="扫码后自动识别，不可修改" readonly />
             </label>
+            <div class="field-label">结果</div>
+            <div class="choice-row" id="inspectionResultChoice">
+              <label class="choice-pill">
+                <input type="radio" name="inspectionResult" value="normal" checked />
+                <span>正常</span>
+              </label>
+              <label class="choice-pill danger">
+                <input type="radio" name="inspectionResult" value="abnormal" />
+                <span>异常</span>
+              </label>
+            </div>
             <div id="inspectionCheckItems" class="checklist-panel"></div>
-            <div id="inspectionMonitoringItem" class="checklist-panel"></div>
             <label class="full">备注<input id="insNote" placeholder="可选" /></label>
             <div class="actions one">
               <button id="btnStartQrScan">调用相机扫码</button>
@@ -292,9 +317,17 @@
             <h2>NFC 巡检</h2>
           </div>
           <div class="detail-body">
-            <label>结果
-              <select id="nfcResult"><option value="normal">正常</option><option value="abnormal">异常</option></select>
-            </label>
+            <div class="field-label">结果</div>
+            <div class="choice-row" id="nfcResultChoice">
+              <label class="choice-pill">
+                <input type="radio" name="nfcResult" value="normal" checked />
+                <span>正常</span>
+              </label>
+              <label class="choice-pill danger">
+                <input type="radio" name="nfcResult" value="abnormal" />
+                <span>异常</span>
+              </label>
+            </div>
             <label class="full">备注<input id="nfcNote" placeholder="可选" /></label>
             <div class="actions">
               <button id="btnStartNfcScan">开始 NFC 碰一碰</button>
@@ -312,11 +345,11 @@
             <h2>最近巡检记录</h2>
           </div>
           <div class="detail-body">
-            <div class="activity-list">
-              <div class="activity-item"><strong>机房 A-01</strong><span>09:20 · 正常 · 已提交</span></div>
-              <div class="activity-item"><strong>机房 B-03</strong><span>昨天 16:40 · 异常 · 已补充备注</span></div>
-              <div class="activity-item"><strong>航信链路点位</strong><span>昨天 10:12 · 正常</span></div>
+            <div class="actions one">
+              <button id="btnRefreshInspectionRecords" class="secondary">刷新最近记录</button>
             </div>
+            <div id="inspectionRecordsHint" class="hint">打开页面后自动加载最近巡检记录。</div>
+            <div id="inspectionRecordsList" class="activity-list"></div>
           </div>
         </section>
 
@@ -396,90 +429,6 @@
             <section class="log-result-card analysis">
               <h3>AI 自检报告</h3>
               <pre id="selfcheckAiReport"></pre>
-            </section>
-          </div>
-        </section>
-
-        <section id="page-selfcheck-errors" class="detail-screen hidden">
-          <div class="detail-topbar">
-            <button class="ghost small" data-close-page>返回</button>
-            <h2>错误日志分析</h2>
-          </div>
-          <div class="detail-body tool-layout log-analysis-layout">
-            <section class="card-inline log-filter-card compact">
-              <div class="grid two compact-grid">
-                <label>系统
-                  <select id="errorSystem">
-                    <option value="" selected disabled>请选择系统</option>
-                  </select>
-                </label>
-                <label>日志
-                  <select id="errorFileName">
-                    <option value="" selected disabled>请选择日志</option>
-                  </select>
-                </label>
-              </div>
-              <label>时间范围
-                <button type="button" id="btnOpenTimeFilter" class="ghost filter-trigger">选择时间范围</button>
-              </label>
-              <label>日志级别
-                <select id="errorLogLevel"><option value="" selected disabled>请选择级别</option><option value="info">info</option><option value="warning">warning</option><option value="error">error</option></select>
-              </label>
-              <div id="errorTimeSummary" class="filter-summary">最近 1 小时</div>
-              <div class="actions compact-actions">
-                <button id="btnLoadErrors">提取日志</button>
-                <button id="btnAnalyzeErrors">AI 分析</button>
-              </div>
-            </section>
-            <div id="errorTimeModal" class="sheet-modal hidden">
-              <div class="sheet-backdrop" data-close-time-modal></div>
-              <div class="sheet-panel">
-                <div class="sheet-head">
-                  <h3>时间范围</h3>
-                  <button type="button" class="ghost small" data-close-time-modal>关闭</button>
-                </div>
-                <div class="quick-range-row">
-                  <span class="range-label">快捷时间</span>
-                  <div class="quick-range-group">
-                    <button type="button" class="quick-range-btn active" data-range="1h">1h</button>
-                    <button type="button" class="quick-range-btn" data-range="3h">3h</button>
-                    <button type="button" class="quick-range-btn" data-range="6h">6h</button>
-                    <button type="button" class="quick-range-btn" data-range="all">全量</button>
-                  </div>
-                </div>
-                <div class="grid two compact-grid">
-                  <label>开始时间
-                    <input id="errorStartAt" type="datetime-local" />
-                  </label>
-                  <label>结束时间
-                    <input id="errorEndAt" type="datetime-local" />
-                  </label>
-                </div>
-                <div class="actions one compact-actions">
-                  <button type="button" id="btnApplyTimeFilter">确认时间范围</button>
-                </div>
-              </div>
-            </div>
-            <div id="errorAiStatus" class="hint">点击“AI 分析”后，将结合当前日志生成结论与建议。</div>
-            <section class="card-inline log-result-card analysis unified-result-card">
-              <div class="result-tab-bar">
-                <button type="button" class="result-tab-btn active" data-result-tab="logs">日志内容</button>
-                <button type="button" class="result-tab-btn" data-result-tab="analysis">AI 分析</button>
-              </div>
-              <div id="resultLogsPanel" class="result-tab-panel active">
-                <div class="section-head compact">
-                  <h3>日志内容</h3>
-                  <span class="section-meta">提取后展示</span>
-                </div>
-                <pre id="errorLogsView"></pre>
-              </div>
-              <div id="resultAnalysisPanel" class="result-tab-panel hidden">
-                <div class="section-head compact">
-                  <h3>AI 分析结果</h3>
-                  <span class="section-meta">分析后展示</span>
-                </div>
-                <pre id="errorAiView"></pre>
-              </div>
             </section>
           </div>
         </section>
@@ -702,14 +651,14 @@
       </main>
 
       <nav class="bottom-tabs">
-        <button class="bottom-tab active" data-tab="tab-workbench">
-          <span>工作台</span>
+        <button class="bottom-tab active" data-tab="tab-logs">
+          <span>日志</span>
         </button>
         <button class="bottom-tab" data-tab="tab-inspection">
           <span>巡检</span>
         </button>
-        <button class="bottom-tab" data-tab="tab-selfcheck">
-          <span>自检</span>
+        <button class="bottom-tab" data-tab="tab-block">
+          <span>封禁</span>
         </button>
         <button class="bottom-tab" data-tab="tab-me">
           <span>我的</span>
