@@ -207,6 +207,33 @@ window.AegisAdmin = window.AegisAdmin || {};
     message.append(label, body);
     host.appendChild(message);
     host.scrollTop = host.scrollHeight;
+    return body;
+  }
+
+  async function readNdjsonStream(path, options, onEvent) {
+    const response = await fetch(`${ns.api.base()}${path}`, options);
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || data.detail || `HTTP ${response.status}`);
+    }
+    if (!response.body) throw new Error('浏览器不支持读取流式响应。');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+        if (event.type === 'error') throw new Error(event.message || '流式请求失败');
+        onEvent(event);
+      }
+      if (done) break;
+    }
+    if (buffer.trim()) onEvent(JSON.parse(buffer));
   }
 
   function setAiEngineChatPending(pending) {
@@ -238,7 +265,10 @@ window.AegisAdmin = window.AegisAdmin || {};
 
     try {
       const key = document.getElementById('aiEngineApiKey')?.value.trim() || '';
-      const data = await ns.api.request('/api/v1/admin/ai-engine-config/test-chat', {
+      let data = null;
+      let reply = '';
+      const replyBody = appendAiEngineChatMessage('assistant', '');
+      await readNdjsonStream('/api/v1/admin/ai-engine-config/test-chat/stream', {
         method: 'POST',
         headers: ns.api.headers(),
         body: JSON.stringify({
@@ -255,12 +285,21 @@ window.AegisAdmin = window.AegisAdmin || {};
           log_analyze_path: document.getElementById('aiEngineLogAnalyzePath')?.value.trim() || null,
           enabled: document.getElementById('aiEngineEnabled')?.checked !== false,
         }),
+      }, (event) => {
+        if (event.type === 'delta') {
+          reply += event.text || '';
+          if (replyBody) replyBody.textContent = reply;
+          if (status) status.textContent = 'AI 正在流式回复...';
+        } else if (event.type === 'done') {
+          data = event.data || {};
+        }
       });
+      if (!data) throw new Error('AI 流式响应未正常结束。');
       aiEngineConversationId = data.conversation_id || aiEngineConversationId;
-      const reply = data.reply || data.summary || '引擎未返回文本内容。';
+      reply = data.reply || reply || data.summary || '引擎未返回文本内容。';
       aiEngineChatHistory.push({ role: 'user', content: message }, { role: 'assistant', content: reply });
       aiEngineChatHistory = aiEngineChatHistory.slice(-12);
-      appendAiEngineChatMessage('assistant', reply);
+      if (replyBody) replyBody.textContent = reply;
       if (status) {
         const details = [
           `页面引擎：${data.tested_engine_type || '未知'}`,

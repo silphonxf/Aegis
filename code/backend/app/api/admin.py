@@ -42,7 +42,7 @@ from app.schemas.admin import (
 )
 from app.schemas.ai import ChatRequest
 from app.services.ai_engine_config import get_runtime_ai_config, serialize_ai_engine_config, upsert_ai_engine_config
-from app.services.ai_provider import run_chat
+from app.services.ai_provider import run_chat, stream_chat
 from app.schemas.emergency_config import (
     EmergencyDbActionSaveRequest,
     EmergencyProcessActionSaveRequest,
@@ -61,7 +61,7 @@ from app.services.emergency_config import (
     upsert_server_action,
     upsert_ssh_host,
 )
-from app.services.threatbook import ThreatbookError, batch_query_ip_reputation
+from app.services.threatbook import ThreatbookError, batch_query_indicators, batch_query_ip_reputation
 from app.services.firewall import FirewallClientError, FirewallConfigError, FirewallError, block_ip_with_firewall
 from app.services.firewall_config import serialize_firewall_config, upsert_firewall_config
 from app.schemas.system import SystemCreate, SystemUpdate
@@ -285,6 +285,47 @@ def test_ai_engine_chat(
         },
     )
     return result
+
+
+@router.post("/ai-engine-config/test-chat/stream")
+def test_ai_engine_chat_stream(
+    payload: AIEngineChatTestRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    runtime_config = payload.dict(exclude={"message", "conversation_id", "history"})
+    if payload.api_key is None:
+        runtime_config["api_key"] = get_runtime_ai_config().get("api_key", "")
+
+    def generate():
+        final = None
+        try:
+            for event in stream_chat(
+                ChatRequest(message=payload.message, conversation_id=payload.conversation_id),
+                history=payload.history[-12:],
+                runtime_config=runtime_config,
+            ):
+                if event.get("type") == "done":
+                    final = event.get("data") or {}
+                    final["tested_engine_type"] = payload.engine_type
+                    event["data"] = final
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+            if final is not None:
+                log_action(db, "test_ai_engine_chat_stream", "ai_engine_config", current_user, {
+                    "engine_type": payload.engine_type,
+                    "base_url": payload.base_url,
+                    "model": payload.model,
+                    "mode": final.get("mode"),
+                    "elapsed_ms": final.get("elapsed_ms"),
+                })
+        except Exception as exc:
+            yield json.dumps({"type": "error", "message": str(exc)[:300]}, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/systems")
@@ -1384,6 +1425,26 @@ def query_ip_reputation_quick(
             "block_candidates": result["summary"]["block_candidates"],
         },
     )
+    return result
+
+
+@router.post("/threat-intel/analyze")
+def analyze_threat_indicators(
+    payload: ThreatIntelQuickInputRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    try:
+        result = batch_query_indicators([payload.raw_input], lang=payload.lang)
+    except ThreatbookError as exc:
+        raise HTTPException(status_code=400, detail={"code": "THREATBOOK_QUERY_FAILED", "message": str(exc)})
+    log_action(db, "analyze_threat_indicators", "threat_intel", current_user, {
+        "count": result["summary"]["total"],
+        "ip_count": result["summary"]["ip_count"],
+        "domain_count": result["summary"]["domain_count"],
+        "malicious": result["summary"]["malicious"],
+        "block_candidates": result["summary"]["block_candidates"],
+    })
     return result
 
 

@@ -1,8 +1,10 @@
 from datetime import datetime
 import hashlib
+import json
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -78,6 +80,29 @@ def assistant_chat(payload: AssistantChatRequest, _: User = Depends(get_current_
     result = executor.chat(payload.conversation_id, payload.message, attachments)
     _save_assistant_turn(db, result.conversation_id, payload.message, result.reply)
     return result
+
+
+@router.post("/chat/stream")
+def assistant_chat_stream(payload: AssistantChatRequest, _: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    attachments = _load_assistant_attachments(db, payload.attachments)
+
+    def generate():
+        yield json.dumps({"type": "status", "message": "正在识别意图并调用相关能力..."}, ensure_ascii=False) + "\n"
+        try:
+            result = executor.chat(payload.conversation_id, payload.message, attachments)
+            reply = result.reply or ""
+            if reply:
+                yield json.dumps({"type": "delta", "text": reply}, ensure_ascii=False) + "\n"
+            _save_assistant_turn(db, result.conversation_id, payload.message, reply)
+            yield json.dumps({"type": "done", "data": result.dict()}, ensure_ascii=False, default=str) + "\n"
+        except Exception as exc:
+            yield json.dumps({"type": "error", "message": str(exc)[:300]}, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/confirm", response_model=AssistantChatResponse)

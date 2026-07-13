@@ -225,16 +225,22 @@ function normalizeThreatItem(item) {
   const risk = item.risk_level || item.severity || item.level || (item.should_block ? 'high' : item.is_malicious ? 'medium' : 'low');
   return {
     ...item,
-    ip: item.ip || item.target || '',
+    resource: item.resource || item.ip || item.domain || item.target || '',
+    resource_type: item.resource_type || (item.domain ? 'domain' : 'ip'),
+    ip: item.ip || '',
     risk_level: risk,
     is_malicious: Boolean(item.is_malicious || item.malicious),
-    should_block: Boolean(item.should_block || risk === 'high' || risk === 'critical'),
+    should_block: item.resource_type !== 'domain' && Boolean(item.should_block || risk === 'high' || risk === 'critical'),
   };
 }
 
 function riskLabel(level) {
   const value = String(level || '').toLowerCase();
   if (value === 'critical') return '严重';
+  if (value === 'high_risk') return '高危';
+  if (value === 'medium_risk') return '中危';
+  if (value === 'suspicious') return '可疑';
+  if (value === 'safe') return '安全';
   if (value === 'high') return '高危';
   if (value === 'medium') return '中危';
   if (value === 'low') return '低危';
@@ -247,25 +253,26 @@ function renderThreatResults() {
   if (!host) return;
   const items = state.threatResults || [];
   const candidates = items.filter((item) => item.should_block);
-  if (summary) summary.textContent = items.length ? `${items.length} 个 IP，${candidates.length} 个建议封禁` : '暂无结果';
+  if (summary) summary.textContent = items.length ? `${items.length} 个目标，${candidates.length} 个 IP 建议封禁` : '暂无结果';
   if (!items.length) {
     host.innerHTML = '<div class="empty-state">查询后显示风险结果。</div>';
     return;
   }
   host.innerHTML = items.map((item) => {
-    const tags = Array.isArray(item.tags) ? item.tags.join(' / ') : (item.tags || item.categories || item.judgments || '');
+    const tags = (item.malicious_types || []).join(' / ') || (Array.isArray(item.tags) ? item.tags.join(' / ') : (item.tags || item.categories || item.judgments || ''));
     const status = item.block_status || '';
     const risk = String(item.risk_level || '').toLowerCase();
     return `
       <article class="threat-card ${item.should_block ? 'danger' : ''}">
         <div class="threat-card-main">
-          <strong>${escapeHtml(item.ip)}</strong>
+          <strong>${escapeHtml(item.resource)}</strong>
           <span class="risk-pill ${escapeHtml(risk)}">${escapeHtml(riskLabel(item.risk_level))}</span>
         </div>
-        <div class="threat-meta">${escapeHtml(item.summary || item.reason || tags || (item.is_malicious ? '疑似恶意 IP' : '未发现高危结论'))}</div>
+        <div class="threat-meta">类型：${item.resource_type === 'domain' ? '域名' : 'IP'} · 分类：${escapeHtml(item.ip_type || item.domain_type || '-')} · 国家：${escapeHtml(item.country || '-')}</div>
+        <div class="threat-meta">${escapeHtml(tags || item.summary || (item.is_malicious ? '命中恶意情报' : '未发现高危结论'))}</div>
         <div class="threat-actions">
           <span>${escapeHtml(status || (item.should_block ? '建议封禁' : '建议观察'))}</span>
-          <button class="small ${item.should_block ? 'warn-action' : 'secondary'}" data-block-ip="${escapeHtml(item.ip)}">封禁该 IP</button>
+          ${item.resource_type === 'ip' ? `<button class="small ${item.should_block ? 'warn-action' : 'secondary'}" data-block-ip="${escapeHtml(item.ip)}">封禁该 IP</button>` : ''}
         </div>
       </article>
     `;
@@ -540,6 +547,47 @@ async function api(path, options = {}) {
     throw normalized;
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function streamApi(path, options = {}, onEvent = () => {}) {
+  const method = options.method || 'POST';
+  const url = `${getBase()}${path}`;
+  const started = Date.now();
+  let resp;
+  try {
+    resp = await fetch(url, options);
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      throw normalizeApiError(null, resp, data, url);
+    }
+    if (!resp.body) throw new Error('浏览器不支持读取流式响应。');
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+        if (event.type === 'error') throw new Error(event.message || 'AI 流式响应失败');
+        await onEvent(event);
+      }
+      if (done) break;
+    }
+    if (buffer.trim()) {
+      const event = JSON.parse(buffer);
+      if (event.type === 'error') throw new Error(event.message || 'AI 流式响应失败');
+      await onEvent(event);
+    }
+    rememberLog({ at: new Date().toISOString(), method, url, status: resp.status, ok: true, response: '[stream]', duration_ms: Date.now() - started });
+  } catch (error) {
+    const normalized = error instanceof Error ? error : normalizeApiError(error, resp, null, url);
+    rememberLog({ at: new Date().toISOString(), method, url, status: resp?.status || 0, ok: false, network_error: normalized.message, duration_ms: Date.now() - started });
+    throw normalized;
   }
 }
 
@@ -1135,12 +1183,26 @@ async function sendAiQuestion(reusePayload = null) {
       uploadedFiles,
     };
     $('aiQaResult').textContent = 'AI 助手正在调用移动端能力，请稍等...';
-    const result = await api('/api/v1/assistant/chat', {
+    let result = null;
+    let streamedReply = '';
+    const pendingMessage = state.aiMessages.find((item) => item.pending);
+    await streamApi('/api/v1/assistant/chat/stream', {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(payload),
-      timeoutMs: 150000,
+    }, (event) => {
+      if (event.type === 'status') {
+        $('aiQaResult').textContent = event.message || 'AI 正在处理...';
+      } else if (event.type === 'delta') {
+        streamedReply += event.text || '';
+        if (pendingMessage) pendingMessage.text = streamedReply;
+        renderAiMessages();
+        $('aiQaResult').textContent = 'AI 正在流式回复...';
+      } else if (event.type === 'done') {
+        result = event.data || {};
+      }
     });
+    if (!result) throw new Error('AI 流式响应未正常结束。');
     const reply = formatAiReply(result);
     state.aiMessages = state.aiMessages.filter((item) => !item.pending);
     const hasUserBubble = state.aiMessages.some((item) => item.role === 'user' && item.text === (question || '请帮我分析这些附件。'));
@@ -2836,7 +2898,19 @@ onClick('btnAnalyzeErrors', async () => {
       ? state.extractedErrors.map((e) => e.line || `${e.at} ${e.method || ''} ${e.url || ''} status=${e.status || 0} err=${e.network_error || ''}`).join('\n').slice(0, 20000)
       : '暂无系统日志，建议先执行“提取日志”。';
     const payload = { title: '系统日志分析', detail, severity: $('errorLogLevel').value === 'error' ? 'high' : $('errorLogLevel').value === 'warning' ? 'medium' : 'low' };
-    const result = await api('/api/v1/ai/diagnose', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
+    let result = null;
+    let streamedText = '';
+    await streamApi('/api/v1/ai/diagnose/stream', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) }, (event) => {
+      if (event.type === 'delta') {
+        streamedText += event.text || '';
+        show('errorAiView', streamedText);
+        switchResultTab('analysis');
+        $('errorAiStatus').textContent = 'AI 正在流式分析...';
+      } else if (event.type === 'done') {
+        result = event.data || {};
+      }
+    });
+    if (!result) throw new Error('AI 流式分析未正常结束。');
     $('errorAiStatus').textContent = 'AI 分析完成。';
     show('errorAiView', formatErrorAiResult(result));
     switchResultTab('analysis');
@@ -2850,24 +2924,24 @@ onClick('btnAnalyzeErrors', async () => {
 });
 
 onClick('btnQueryThreatIps', async () => {
-  const ips = extractIpsFromText($('threatIpInput')?.value || '');
-  if (!ips.length) {
-    if ($('threatStatus')) $('threatStatus').textContent = '请先输入至少一个 IPv4 地址。';
+  const rawInput = $('threatIpInput')?.value.trim() || '';
+  if (!rawInput) {
+    if ($('threatStatus')) $('threatStatus').textContent = '请先输入至少一个 IP 或域名。';
     return;
   }
-  if ($('threatStatus')) $('threatStatus').textContent = `正在查询 ${ips.length} 个 IP 的风险...`;
+  if ($('threatStatus')) $('threatStatus').textContent = '正在识别并查询 IP / 域名风险...';
   setButtonLoading('btnQueryThreatIps', true, '查询中...');
   try {
-    const data = await api('/api/v1/admin/threat-intel/ip-reputation', {
+    const data = await api('/api/v1/admin/threat-intel/analyze', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ ips, lang: 'zh', realtime_verdict: true }),
+      body: JSON.stringify({ raw_input: rawInput, lang: 'zh', realtime_verdict: true }),
       timeoutMs: 150000,
     });
     state.threatResults = (data.items || []).map(normalizeThreatItem);
     renderThreatResults();
     const high = state.threatResults.filter((item) => item.should_block).length;
-    if ($('threatStatus')) $('threatStatus').textContent = `查询完成：${state.threatResults.length} 个 IP，${high} 个建议封禁。`;
+    if ($('threatStatus')) $('threatStatus').textContent = `查询完成：${data.summary?.ip_count || 0} 个 IP，${data.summary?.domain_count || 0} 个域名，${high} 个 IP 建议封禁。`;
   } catch (e) {
     state.threatResults = [];
     renderThreatResults();

@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from app.core.config import settings
 from app.schemas.ai import ChatRequest
@@ -236,6 +236,99 @@ def run_chat(
         "elapsed_ms": int((time.perf_counter() - started) * 1000),
         "fallback_reason": fallback_reason or "openclaw_not_enabled",
     }
+
+
+def stream_chat(
+    payload: ChatRequest,
+    history: Optional[List[Dict[str, str]]] = None,
+    summary: Optional[str] = None,
+    runtime_config: Optional[Dict[str, Any]] = None,
+) -> Iterator[Dict[str, Any]]:
+    """Stream chat deltas when supported and always finish with a result event."""
+    config = runtime_config or get_runtime_ai_config()
+    provider = str(config.get("engine_type") or settings.AI_PROVIDER).lower()
+    if provider in {"internal_gateway", "pi_gateway"} and internal_ai_gateway_client._is_pi_gateway(config):
+        started = time.perf_counter()
+        text_parts: List[str] = []
+        try:
+            for text in internal_ai_gateway_client.stream_pi_messages(
+                payload.message,
+                system="你是 Aegis 运维助手，请用中文给出清晰、可执行的回复。",
+                history=history or [],
+                config=config,
+            ):
+                text_parts.append(text)
+                yield {"type": "delta", "text": text}
+            reply = "".join(text_parts).strip()
+            if not reply:
+                raise InternalAIGatewayClientError("Pi Gateway 流式返回为空")
+            yield {
+                "type": "done",
+                "data": {
+                    "conversation_id": payload.conversation_id or "pi-gateway-chat",
+                    "mode": provider,
+                    "summary": "本次对话由 Pi Gateway 流式返回。",
+                    "reply": reply,
+                    "severity": "medium",
+                    "suggestions": [],
+                    "attachment_notes": [],
+                    "elapsed_ms": int((time.perf_counter() - started) * 1000),
+                    "fallback_reason": None,
+                },
+            }
+            return
+        except InternalAIGatewayClientError:
+            if text_parts:
+                raise
+
+    result = run_chat(payload, history=history, summary=summary, runtime_config=config)
+    reply = str(result.get("reply") or result.get("summary") or "")
+    if reply:
+        yield {"type": "delta", "text": reply}
+    yield {"type": "done", "data": result}
+
+
+def stream_diagnose(title: str, detail: str, severity: str) -> Iterator[Dict[str, Any]]:
+    """Stream diagnosis text; the done event contains the normalized diagnosis."""
+    config = get_runtime_ai_config()
+    provider = str(config.get("engine_type") or settings.AI_PROVIDER).lower()
+    if provider in {"internal_gateway", "pi_gateway"} and internal_ai_gateway_client._is_pi_gateway(config):
+        prompt = (
+            "你是 Aegis 的运维诊断助手。请用中文输出诊断结论和可执行建议。\n\n"
+            f"标题：{title}\n当前严重级别：{severity}\n详情：\n{detail}"
+        )
+        started = time.perf_counter()
+        parts: List[str] = []
+        try:
+            for text in internal_ai_gateway_client.stream_pi_messages(
+                prompt,
+                system="你负责运维故障诊断，先给结论，再给分点建议。",
+                config=config,
+            ):
+                parts.append(text)
+                yield {"type": "delta", "text": text}
+            summary = "".join(parts).strip()
+            if not summary:
+                raise InternalAIGatewayClientError("Pi Gateway 流式返回为空")
+            result = {
+                "mode": provider,
+                "severity": severity,
+                "summary": summary,
+                "suggestions": [],
+                "elapsed_ms": int((time.perf_counter() - started) * 1000),
+                "fallback_reason": None,
+            }
+            yield {"type": "done", "data": result}
+            return
+        except InternalAIGatewayClientError:
+            if parts:
+                raise
+
+    result = run_diagnose(title, detail, severity)
+    text = str(result.get("summary") or "")
+    if text:
+        yield {"type": "delta", "text": text}
+    yield {"type": "done", "data": result}
 
 
 def run_offline_analyze(payload: OfflineAnalyzeRequest) -> Dict[str, Any]:

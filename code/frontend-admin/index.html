@@ -97,7 +97,7 @@
           <div class="submenu-list">
             <button class="submenu-btn" data-view="view-net-ping">Ping 工具</button>
             <button class="submenu-btn" data-view="view-net-capture">抓包分析</button>
-            <button class="submenu-btn" data-view="view-tool-threatbook">IP 恶意研判</button>
+            <button class="submenu-btn" data-view="view-tool-threatbook">IP / 域名恶意研判</button>
           </div>
         </div>
 
@@ -1075,18 +1075,18 @@
         </section>
       </section>
 
-      <section id="view-tool-threatbook" class="view-panel" data-view-title="IP 恶意研判" data-view-desc="输入单个或批量 IP，查询微步情报并预留一键封禁入口。">
+      <section id="view-tool-threatbook" class="view-panel" data-view-title="IP / 域名恶意研判" data-view-desc="混合输入 IP 和域名，自动查询对应微步情报。">
         <section class="card">
           <div class="section-head">
             <div>
-              <h2>IP 恶意研判</h2>
-              <p class="muted">保留 IP 输入、批量查询和一键封禁预留接口，减少研判页操作噪音。</p>
+              <h2>IP / 域名恶意研判</h2>
+              <p class="muted">一个入口同时分析 IP 和域名；自动识别目标类型，只有恶意 IP 会进入封禁候选。</p>
             </div>
           </div>
           <div class="form-section">
-            <h3>IP 查询</h3>
-            <label>IP 输入（支持单个或批量，逗号、空格、换行分隔）
-              <textarea id="threatbookRawInput" rows="8" style="width:100%;padding:10px;" placeholder="例如：&#10;66.240.205.34&#10;8.8.8.8"></textarea>
+            <h3>统一查询</h3>
+            <label>IP / 域名输入（支持混合批量，逗号、空格、换行分隔）
+              <textarea id="threatbookRawInput" rows="8" style="width:100%;padding:10px;" placeholder="例如：&#10;66.240.205.34&#10;example.com"></textarea>
             </label>
             <div class="action-row compact">
               <button id="btnThreatbookQuery">批量查询</button>
@@ -1095,7 +1095,7 @@
           </div>
           <div class="summary-strip">
             <div class="summary-card"><span>查询总数</span><strong id="threatbookTotal">0</strong></div>
-            <div class="summary-card"><span>恶意 IP</span><strong id="threatbookMalicious">0</strong></div>
+            <div class="summary-card"><span>恶意目标</span><strong id="threatbookMalicious">0</strong></div>
             <div class="summary-card"><span>封禁候选</span><strong id="threatbookBlockCandidates">0</strong></div>
           </div>
           <div class="form-section">
@@ -1104,10 +1104,10 @@
               <table>
                 <thead>
                   <tr>
-                    <th>IP</th><th>风险等级</th><th>是否恶意</th><th>建议动作</th><th>摘要</th>
+                    <th>目标</th><th>类型</th><th>IP类型/域名分类</th><th>国家</th><th>恶意类型</th><th>风险等级</th><th>是否恶意</th>
                   </tr>
                 </thead>
-                <tbody id="threatbookResultTbody"><tr><td colspan="5">暂无结果</td></tr></tbody>
+                <tbody id="threatbookResultTbody"><tr><td colspan="7">暂无结果</td></tr></tbody>
               </table>
             </div>
           </div>

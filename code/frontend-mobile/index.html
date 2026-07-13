@@ -172,19 +172,19 @@
         <section id="tab-block" class="tab-screen hidden">
           <section class="page-block feature-head">
             <div>
-              <h2>恶意 IP 封禁</h2>
-              <p class="hint">先查询威胁情报，再直接封禁高危 IP。</p>
+              <h2>IP / 域名恶意研判</h2>
+              <p class="hint">混合查询 IP 和域名威胁情报，高危 IP 可继续封禁。</p>
             </div>
           </section>
           <section class="page-block">
-            <label class="full">IP 列表
-              <textarea id="threatIpInput" rows="6" placeholder="每行一个 IP，也可以用逗号或空格分隔"></textarea>
+            <label class="full">IP / 域名列表
+              <textarea id="threatIpInput" rows="6" placeholder="每行一个 IP 或域名，也可以用逗号或空格分隔"></textarea>
             </label>
             <div class="actions">
               <button id="btnQueryThreatIps">查询风险</button>
               <button id="btnBlockHighRiskIps" class="secondary">封禁全部高危 IP</button>
             </div>
-            <div id="threatStatus" class="hint">输入 IP 后点击查询风险。</div>
+            <div id="threatStatus" class="hint">输入 IP 或域名后点击查询风险。</div>
           </section>
           <section class="page-block result-card">
             <div class="section-head compact">

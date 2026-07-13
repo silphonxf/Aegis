@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
@@ -16,7 +17,7 @@ from app.models.offline_analysis import OfflineAnalysisResult, OfflineAnalysisTa
 from app.models.user import User
 from app.schemas.ai import ChatRequest, ChatResponse, ChatV2Request, DiagnoseRequest
 from app.schemas.offline_ai import OfflineAnalyzeRequest
-from app.services.ai_provider import run_chat, run_diagnose, run_offline_analyze
+from app.services.ai_provider import run_chat, run_diagnose, run_offline_analyze, stream_diagnose
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -269,6 +270,46 @@ def diagnose(
         "elapsed_ms": result.get("elapsed_ms", 0),
         "fallback_reason": result.get("fallback_reason"),
     }
+
+
+@router.post("/diagnose/stream")
+def diagnose_stream(
+    payload: DiagnoseRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    def generate():
+        final = None
+        try:
+            for event in stream_diagnose(payload.title, payload.detail, payload.severity):
+                if event.get("type") == "done":
+                    final = event.get("data") or {}
+                    row = AIDiagnosis(
+                        title=payload.title,
+                        severity=final.get("severity", payload.severity),
+                        detail=payload.detail,
+                        suggestions=json.dumps(final.get("suggestions", []), ensure_ascii=False),
+                    )
+                    db.add(row)
+                    db.commit()
+                    db.refresh(row)
+                    final["id"] = row.id
+                    final["title"] = payload.title
+                    event["data"] = final
+                    log_action(db, "ai_diagnose_stream", "ai", current_user, {
+                        "diagnosis_id": row.id,
+                        "mode": final.get("mode"),
+                        "elapsed_ms": final.get("elapsed_ms"),
+                    })
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+        except Exception as exc:
+            yield json.dumps({"type": "error", "message": str(exc)[:300]}, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/diagnoses")

@@ -1,7 +1,7 @@
 import json
 import urllib.error
 import urllib.request
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from app.core.config import settings
 
@@ -52,6 +52,79 @@ class InternalAIGatewayClient:
             raise InternalAIGatewayClientError(f"internal_gateway 连接失败: {e}") from e
         except json.JSONDecodeError as e:
             raise InternalAIGatewayClientError(f"internal_gateway 返回非 JSON: {e}") from e
+
+    def stream_pi_messages(
+        self,
+        message: str,
+        system: Optional[str] = None,
+        history: Optional[List[Dict[str, str]]] = None,
+        config: Optional[Dict[str, Any]] = None,
+    ) -> Iterator[str]:
+        """Yield text deltas from a Pi/Anthropic-compatible messages endpoint."""
+        messages: List[Dict[str, str]] = []
+        for item in (history or [])[-12:]:
+            content = str(item.get("content") or "").strip()
+            if content:
+                messages.append({"role": item.get("role") or "user", "content": content})
+        messages.append({"role": "user", "content": message.strip() or "请帮我分析当前问题。"})
+        payload: Dict[str, Any] = {
+            "model": (config or {}).get("model") or settings.INTERNAL_AI_GATEWAY_MODEL,
+            "max_tokens": 1200,
+            "stream": True,
+            "messages": messages,
+        }
+        if system and system.strip():
+            payload["system"] = system.strip()
+
+        base_url = str((config or {}).get("base_url") or settings.INTERNAL_AI_GATEWAY_BASE_URL or "").rstrip("/")
+        timeout = int((config or {}).get("timeout_seconds") or settings.INTERNAL_AI_GATEWAY_TIMEOUT_SECONDS)
+        if not base_url:
+            raise InternalAIGatewayClientError("internal_gateway 未配置 INTERNAL_AI_GATEWAY_BASE_URL")
+        path = (config or {}).get("chat_path") or settings.INTERNAL_AI_GATEWAY_CHAT_PATH
+        req = urllib.request.Request(
+            f"{base_url}{path}",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={**self._headers(config), "Accept": "text/event-stream"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                for raw_line in resp:
+                    line = raw_line.decode("utf-8", errors="ignore").strip()
+                    if not line or line.startswith(":"):
+                        continue
+                    if line.startswith("data:"):
+                        line = line[5:].strip()
+                    if line == "[DONE]":
+                        break
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if event.get("type") == "error":
+                        error = event.get("error") if isinstance(event.get("error"), dict) else {}
+                        raise InternalAIGatewayClientError(str(error.get("message") or "Pi Gateway 返回错误"))
+                    delta = event.get("delta")
+                    text = ""
+                    if isinstance(delta, dict):
+                        text = str(delta.get("text") or delta.get("content") or "")
+                    elif isinstance(delta, str):
+                        text = delta
+                    if not text:
+                        choices = event.get("choices")
+                        if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+                            choice_delta = choices[0].get("delta") or {}
+                            if isinstance(choice_delta, dict):
+                                text = str(choice_delta.get("content") or choice_delta.get("text") or "")
+                    if not text and event.get("type") in {"content_block_delta", "text_delta"}:
+                        text = str(event.get("text") or "")
+                    if text:
+                        yield text
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="ignore") if e.fp else str(e)
+            raise InternalAIGatewayClientError(f"internal_gateway HTTP {e.code}: {detail[:300]}") from e
+        except urllib.error.URLError as e:
+            raise InternalAIGatewayClientError(f"internal_gateway 连接失败: {e}") from e
 
     def chat(
         self,

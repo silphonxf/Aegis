@@ -25,14 +25,16 @@ window.AegisAdmin = window.AegisAdmin || {};
     if (!tbody) return;
     const rows = displayedItems.map((item) => `
       <tr>
-        <td>${escapeHtml(item.ip)}</td>
+        <td>${escapeHtml(item.resource || item.ip || item.domain)}</td>
+        <td>${item.resource_type === 'domain' ? '域名' : 'IP'}</td>
+        <td>${escapeHtml(item.ip_type || item.domain_type || '-')}</td>
+        <td>${escapeHtml(item.country || '-')}</td>
+        <td>${escapeHtml((item.malicious_types || []).join('、') || '-')}</td>
         <td><span class="status-chip ${riskClass(item.risk_level)}">${escapeHtml(item.risk_level)}</span></td>
         <td>${item.is_malicious ? '是' : '否'}</td>
-        <td>${escapeHtml(item.decision || '-')}</td>
-        <td>${escapeHtml(item.summary || '-')}</td>
       </tr>
     `).join('');
-    tbody.innerHTML = rows || '<tr><td colspan="5">暂无结果</td></tr>';
+    tbody.innerHTML = rows || '<tr><td colspan="7">暂无结果</td></tr>';
   }
 
   function getAllItems() {
@@ -60,8 +62,9 @@ window.AegisAdmin = window.AegisAdmin || {};
     if (!resultEl) return;
     resultEl.textContent = [
       `查询总数：${data.summary?.total ?? 0}`,
-      `恶意 IP：${data.summary?.malicious ?? 0}`,
-      `高危 IP：${data.summary?.high_risk ?? 0}`,
+      `IP：${data.summary?.ip_count ?? 0}，域名：${data.summary?.domain_count ?? 0}`,
+      `恶意目标：${data.summary?.malicious ?? 0}`,
+      `高危目标：${data.summary?.high_risk ?? 0}`,
       `封禁候选：${blockCandidates}`,
       extra,
     ].filter(Boolean).join('\n');
@@ -155,7 +158,7 @@ window.AegisAdmin = window.AegisAdmin || {};
     const rawInput = document.getElementById('threatbookRawInput')?.value || '';
     const lang = document.getElementById('threatbookLang')?.value || 'zh';
     const realtimeVerdict = (document.getElementById('threatbookRealtimeVerdict')?.value || 'true') === 'true';
-    const data = await ns.api.request('/api/v1/admin/threat-intel/ip-reputation/quick', {
+    const data = await ns.api.request('/api/v1/admin/threat-intel/analyze', {
       method: 'POST',
       headers: ns.api.headers(),
       body: JSON.stringify({ raw_input: rawInput, lang, realtime_verdict: realtimeVerdict }),
@@ -196,7 +199,7 @@ window.AegisAdmin = window.AegisAdmin || {};
 
   function fillDemo() {
     const input = document.getElementById('threatbookRawInput');
-    if (input) input.value = '66.240.205.34\n8.8.8.8\n1.1.1.1';
+    if (input) input.value = '66.240.205.34\n8.8.8.8\nexample.com\nbibme.org';
   }
 
   ns.threatbook = {

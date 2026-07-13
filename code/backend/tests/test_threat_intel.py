@@ -54,6 +54,63 @@ def test_threat_intel_quick_query_rule_jinan_confirm(client, admin_headers, monk
     assert body["items"][1]["decision"] == "block"
 
 
+def test_threatbook_unified_ip_and_domain_analysis(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    def fake_get(url, params, timeout):
+        calls.append((url, params["resource"]))
+        if url.endswith("/ip/query"):
+            return FakeResponse({
+                "response_code": 0,
+                "verbose_msg": "OK",
+                "data": {
+                    "8.8.8.8": {
+                        "basic": {"carrier": "Google", "location": {"country": "美国", "city": ""}},
+                        "scene": "云服务商",
+                        "judgments": ["Scanner"],
+                        "intelligences": {},
+                        "asn": {"rank": 2},
+                    }
+                },
+            })
+        return FakeResponse({
+            "response_code": 0,
+            "verbose_msg": "OK",
+            "data": {
+                "evil.example": {
+                    "judgments": ["Phishing"],
+                    "intelligences": {},
+                    "categories": [{"first_cats": ["恶意网站"], "second_cats": "钓鱼"}],
+                    "cur_ips": [{"ip": "1.2.3.4", "location": {"country": "德国"}}],
+                }
+            },
+        })
+
+    monkeypatch.setattr(settings, "THREATBOOK_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.threatbook.requests.get", fake_get)
+    result = threatbook.batch_query_indicators(["8.8.8.8\nevil.example"], lang="zh")
+
+    assert calls[0][0] == "https://api.threatbook.cn/v3/ip/query"
+    assert calls[1][0] == "https://api.threatbook.cn/v3/domain/query"
+    assert result["items"][0]["ip_type"] == "云服务商"
+    assert result["items"][0]["country"] == "美国"
+    assert result["items"][0]["malicious_types"] == ["Scanner"]
+    assert result["items"][1]["domain_type"] == "恶意网站、钓鱼"
+    assert result["items"][1]["country"] == "德国"
+    assert result["items"][1]["malicious_types"] == ["Phishing"]
+    assert result["items"][1]["should_block"] is False
+
+
 def test_threat_intel_excel_import(client, admin_headers, monkeypatch):
     def fake_batch_query_ip_reputation(raw_items, lang="zh", realtime_verdict=True):
         assert "10.0.0.1" in raw_items

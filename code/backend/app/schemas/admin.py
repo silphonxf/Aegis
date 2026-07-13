@@ -132,7 +132,7 @@ class ThreatIntelQuickInputRequest(BaseModel):
     def normalize_raw_input(cls, value: str) -> str:
         cleaned = value.strip()
         if not cleaned:
-            raise ValueError("请输入至少一个 IP")
+            raise ValueError("请输入至少一个 IP 或域名")
         return cleaned
 
 
