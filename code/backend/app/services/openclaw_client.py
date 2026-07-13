@@ -19,21 +19,24 @@ class OpenClawClient:
     def is_configured(self) -> bool:
         return bool(self.base_url)
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+        api_key = (config or {}).get("api_key") or self.api_key
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         return headers
 
-    def post_json(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        if not self.is_configured():
+    def post_json(self, path: str, payload: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        base_url = ((config or {}).get("base_url") or self.base_url).rstrip("/")
+        timeout = int((config or {}).get("timeout_seconds") or self.timeout)
+        if not base_url:
             raise OpenClawClientError("OpenClaw provider 未配置 OPENCLAW_BASE_URL")
 
-        url = f"{self.base_url}{path}"
+        url = f"{base_url}{path}"
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        req = urllib.request.Request(url, data=data, headers=self._headers(), method="POST")
+        req = urllib.request.Request(url, data=data, headers=self._headers(config), method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
                 body = resp.read().decode("utf-8", errors="ignore")
                 return json.loads(body)
         except urllib.error.HTTPError as e:
@@ -44,13 +47,16 @@ class OpenClawClient:
         except json.JSONDecodeError as e:
             raise OpenClawClientError(f"OpenClaw 返回非 JSON: {e}") from e
 
-    def chat(self, *, message: str, conversation_id: Optional[str] = None, attachments: Optional[List[Dict[str, Any]]] = None, history: Optional[List[Dict[str, str]]] = None, summary: Optional[str] = None) -> Dict[str, Any]:
+    def chat(self, *, message: str, conversation_id: Optional[str] = None, attachments: Optional[List[Dict[str, Any]]] = None, history: Optional[List[Dict[str, str]]] = None, summary: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        model = (config or {}).get("model") or settings.OPENCLAW_MODEL
+        path = (config or {}).get("chat_path") or settings.OPENCLAW_RESPONSES_PATH
         response = self.post_json(
-            settings.OPENCLAW_RESPONSES_PATH,
+            path,
             {
-                "model": settings.OPENCLAW_MODEL,
+                "model": model,
                 "input": self._build_chat_input(message=message, attachments=attachments or [], history=history or [], summary=summary),
             },
+            config,
         )
         text = self._extract_response_text(response)
         return {
@@ -60,7 +66,9 @@ class OpenClawClient:
             "raw_response": response,
         }
 
-    def diagnose(self, *, title: str, detail: str, severity: str) -> Dict[str, Any]:
+    def diagnose(self, *, title: str, detail: str, severity: str, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        model = (config or {}).get("model") or settings.OPENCLAW_MODEL
+        path = (config or {}).get("diagnose_path") or (config or {}).get("chat_path") or settings.OPENCLAW_RESPONSES_PATH
         prompt = (
             "你是 Aegis 的运维诊断助手。请基于给定故障信息，返回 JSON，字段必须包含："
             "summary(string), severity(low|medium|high), suggestions(string数组)。"
@@ -70,11 +78,12 @@ class OpenClawClient:
             f"详情：\n{detail}"
         )
         response = self.post_json(
-            settings.OPENCLAW_RESPONSES_PATH,
+            path,
             {
-                "model": settings.OPENCLAW_MODEL,
+                "model": model,
                 "input": prompt,
             },
+            config,
         )
         text = self._extract_response_text(response)
         parsed = self._extract_json_object(text)
@@ -85,7 +94,9 @@ class OpenClawClient:
             "raw_response": response,
         }
 
-    def log_analyze(self, *, title: str, detail: str, severity: str, source_type: str = "manual", source_ref: Optional[str] = None) -> Dict[str, Any]:
+    def log_analyze(self, *, title: str, detail: str, severity: str, source_type: str = "manual", source_ref: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        model = (config or {}).get("model") or settings.OPENCLAW_MODEL
+        path = (config or {}).get("log_analyze_path") or (config or {}).get("chat_path") or settings.OPENCLAW_RESPONSES_PATH
         prompt = (
             "你是 Aegis 的离线日志分析助手。请基于输入日志返回 JSON，字段必须包含："
             "summary(string), severity(low|medium|high), matched_rules(array), suggestions(string数组), excerpt(string)。"
@@ -98,11 +109,12 @@ class OpenClawClient:
             f"日志详情：\n{detail}"
         )
         response = self.post_json(
-            settings.OPENCLAW_RESPONSES_PATH,
+            path,
             {
-                "model": settings.OPENCLAW_MODEL,
+                "model": model,
                 "input": prompt,
             },
+            config,
         )
         text = self._extract_response_text(response)
         parsed = self._extract_json_object(text)

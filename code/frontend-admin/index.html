@@ -70,6 +70,7 @@
           <div class="submenu-list">
             <button class="submenu-btn" data-view="view-systems">系统</button>
             <button class="submenu-btn" data-view="view-db-selfchecks">数据库自检</button>
+            <button class="submenu-btn" data-view="view-rooms">机房</button>
             <button class="submenu-btn" data-view="view-inspection-points">巡检点</button>
             <button class="submenu-btn" data-view="view-inspection-records">巡检记录</button>
             <button class="submenu-btn" data-view="view-users">用户</button>
@@ -109,6 +110,7 @@
             <button class="submenu-btn" data-view="view-tool-rules">规则与审计</button>
             <button class="submenu-btn" data-view="view-tool-ai">AI诊断</button>
             <button class="submenu-btn" data-view="view-ai-external-keys">AI 对外接口 Key</button>
+            <button class="submenu-btn" data-view="view-ai-engine-config">AI 引擎配置</button>
           </div>
         </div>
       </nav>
@@ -370,6 +372,39 @@
               <tbody id="dbSelfcheckTbody"><tr><td colspan="10">暂无数据库自检配置</td></tr></tbody>
             </table>
           </div>
+        </section>
+      </section>
+
+      <section id="view-rooms" class="view-panel" data-view-title="机房配置" data-view-desc="维护机房二维码、NFC、检查项和每日巡检次数。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>机房</h2>
+              <p class="muted">配置移动端扫码 / NFC 识别的机房，以及工作日和节假日每日巡检次数。</p>
+            </div>
+          </div>
+          <div class="search-toolbar wide-toolbar">
+            <input id="roomFilterKeyword" class="search-input" placeholder="搜索机房编号 / 名称 / 二维码 / NFC" />
+            <select id="roomFilterActive">
+              <option value="">启用机房</option>
+              <option value="all">全部机房</option>
+            </select>
+            <button id="btnListRooms" class="toolbar-btn">搜索</button>
+            <button id="btnOpenCreateRoomModal" class="toolbar-btn secondary">新增机房</button>
+          </div>
+          <div id="roomListSummary" class="result-line"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>序号</th><th>编号</th><th>名称</th><th>二维码</th><th>NFC</th><th>工作日次数</th><th>节假日次数</th><th>检查项</th><th>状态</th><th>操作</th></tr>
+              </thead>
+              <tbody id="roomListTbody"><tr><td colspan="10">暂无机房数据</td></tr></tbody>
+            </table>
+          </div>
+          <details class="details-block">
+            <summary>查看机房接口原始返回</summary>
+            <pre id="roomListResult"></pre>
+          </details>
         </section>
       </section>
 
@@ -837,6 +872,47 @@
         </section>
       </section>
 
+      <section id="view-ai-engine-config" class="view-panel" data-view-title="AI 引擎配置" data-view-desc="选择 Aegis 诊断、日志分析和助手对话使用的 AI 引擎。">
+        <section class="card narrow-card">
+          <div class="section-head">
+            <div>
+              <h2>AI 引擎配置</h2>
+              <p class="muted">支持本地离线、本地 OpenClaw 和服务器 pi-agent；Key 留空时保留当前已保存值。</p>
+            </div>
+            <div class="action-row compact">
+              <button id="btnLoadAiEngineConfig">读取配置</button>
+            </div>
+          </div>
+          <div class="form-section">
+            <h3>引擎类型</h3>
+            <div class="grid3">
+              <label>引擎<select id="aiEngineType">
+                <option value="offline">本地离线引擎</option>
+                <option value="openclaw">本地 OpenClaw 引擎</option>
+                <option value="pi_gateway">服务器 pi-agent 引擎</option>
+              </select></label>
+              <label>模型<input id="aiEngineModel" placeholder="例如 qwen-plus" /></label>
+              <label>超时秒数<input id="aiEngineTimeout" type="number" min="1" max="600" value="120" /></label>
+            </div>
+            <div class="grid2">
+              <label>服务地址<input id="aiEngineBaseUrl" placeholder="例如 http://10.26.234.58:18888" /></label>
+              <label>API Key<input id="aiEngineApiKey" type="password" autocomplete="new-password" placeholder="留空则保留原 Key" /></label>
+            </div>
+            <div class="grid3">
+              <label>对话路径<input id="aiEngineChatPath" placeholder="/v1/messages" /></label>
+              <label>诊断路径<input id="aiEngineDiagnosePath" placeholder="/v1/messages" /></label>
+              <label>日志分析路径<input id="aiEngineLogAnalyzePath" placeholder="/v1/messages" /></label>
+            </div>
+            <label><input id="aiEngineEnabled" type="checkbox" checked /> 启用数据库配置</label>
+            <div class="action-row compact">
+              <button id="btnFillPiGatewayConfig" type="button">填入 pi-agent 默认值</button>
+              <button id="btnSaveAiEngineConfig" type="button">保存配置</button>
+            </div>
+            <pre id="aiEngineConfigResult"></pre>
+          </div>
+        </section>
+      </section>
+
       <section id="view-tool-template" class="view-panel" data-view-title="机房巡检配置与记录（承接页）" data-view-desc="当前先承接移动端巡检/自检相关配置与审阅能力，后续再拆成独立机房巡检页。">
         <section class="card">
           <div class="section-head">
@@ -1246,10 +1322,56 @@
       <button id="btnDeletePoint" class="danger hidden" type="button">删除巡检点</button>
     </div>
   </div>
+  <div id="createRoomModal" class="modal hidden" hidden aria-hidden="true">
+    <div class="modal-card">
+      <h3 id="roomModalTitle">新增机房</h3>
+      <label>机房编号
+        <input id="modalRoomCode" placeholder="可留空自动生成" />
+      </label>
+      <label>机房名称
+        <input id="modalRoomName" placeholder="请输入机房名称" />
+      </label>
+      <label>二维码值
+        <input id="modalRoomQrContent" placeholder="用于移动端扫码识别" />
+      </label>
+      <label>NFC 值
+        <input id="modalRoomNfcTag" placeholder="可选，NFC 标签内容" />
+      </label>
+      <div class="grid2">
+        <label>工作日每日巡检次数
+          <input id="modalRoomWeekdayCount" type="number" min="0" max="24" value="1" />
+        </label>
+        <label>节假日每日巡检次数
+          <input id="modalRoomHolidayCount" type="number" min="0" max="24" value="1" />
+        </label>
+      </div>
+      <label>检查项
+        <textarea id="modalRoomCheckItems" rows="4" placeholder="每行一个检查项，例如：门禁正常"></textarea>
+      </label>
+      <label>位置说明
+        <input id="modalRoomLocationDetail" placeholder="例如 A 栋 3 层核心机房" />
+      </label>
+      <label>备注
+        <input id="modalRoomRemark" placeholder="可选" />
+      </label>
+      <label>启用状态
+        <select id="modalRoomActive">
+          <option value="true">启用</option>
+          <option value="false">停用</option>
+        </select>
+      </label>
+      <div class="grid2">
+        <button id="btnSubmitRoom">确认新增</button>
+        <button id="btnCloseCreateRoomModal" type="button">取消</button>
+      </div>
+      <button id="btnDeleteRoom" class="danger hidden" type="button">停用机房</button>
+    </div>
+  </div>
   <script defer src="./js/api.js"></script>
   <script defer src="./js/auth.js"></script>
   <script defer src="./js/dashboard.js"></script>
   <script defer src="./js/toolbox.js"></script>
+  <script defer src="./js/rooms.js"></script>
   <script defer src="./js/inspection-points.js"></script>
   <script defer src="./js/inspection-records.js"></script>
   <script defer src="./js/users.js"></script>

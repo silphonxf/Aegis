@@ -1,4 +1,5 @@
 from .ai_diagnosis import AIDiagnosis
+from .ai_engine_config import AIEngineConfig
 from .ai_external_key import AIExternalApiKey
 from .asset import Asset
 from .audit import AuditLog
@@ -36,6 +37,7 @@ __all__ = [
     "Asset",
     "ToolTask",
     "AIDiagnosis",
+    "AIEngineConfig",
     "AIExternalApiKey",
     "FirewallBlockConfig",
 ]

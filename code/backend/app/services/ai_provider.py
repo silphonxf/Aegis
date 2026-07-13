@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from app.core.config import settings
 from app.schemas.ai import ChatRequest
 from app.schemas.offline_ai import OfflineAnalyzeRequest
+from app.services.ai_engine_config import get_runtime_ai_config
 from app.services.internal_ai_gateway_client import InternalAIGatewayClientError, internal_ai_gateway_client
 from app.services.offline_llm import OfflineLLMError, diagnose_with_ollama, offline_analyze_with_ollama
 from app.services.openclaw_client import OpenClawClientError, openclaw_client
@@ -127,25 +128,26 @@ def _call_provider(handler, fallback_reason: Optional[str], mode: str) -> Dict[s
 
 
 def run_diagnose(title: str, detail: str, severity: str) -> Dict[str, Any]:
-    provider = settings.AI_PROVIDER.lower()
+    runtime_config = get_runtime_ai_config()
+    provider = runtime_config.get("engine_type", settings.AI_PROVIDER).lower()
     started = time.perf_counter()
 
     try:
         if provider == "openclaw":
             return _call_provider(
-                lambda: openclaw_client.diagnose(title=title, detail=detail, severity=severity),
+                lambda: openclaw_client.diagnose(title=title, detail=detail, severity=severity, config=runtime_config),
                 None,
                 "openclaw",
             )
 
-        if provider == "internal_gateway":
+        if provider in {"internal_gateway", "pi_gateway"}:
             return _call_provider(
-                lambda: internal_ai_gateway_client.diagnose(title=title, detail=detail, severity=severity),
+                lambda: internal_ai_gateway_client.diagnose(title=title, detail=detail, severity=severity, config=runtime_config),
                 None,
-                "internal_gateway",
+                provider,
             )
 
-        if provider == "ollama" and settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
+        if provider in {"ollama", "offline"} and settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
             out_severity, suggestions, summary = diagnose_with_ollama(title, detail, severity)
             return {
                 "mode": "offline_ollama",
@@ -167,7 +169,8 @@ def run_diagnose(title: str, detail: str, severity: str) -> Dict[str, Any]:
 
 
 def run_chat(payload: ChatRequest, history: Optional[List[Dict[str, str]]] = None, summary: Optional[str] = None) -> Dict[str, Any]:
-    provider = settings.AI_PROVIDER.lower()
+    runtime_config = get_runtime_ai_config()
+    provider = runtime_config.get("engine_type", settings.AI_PROVIDER).lower()
     started = time.perf_counter()
 
     if provider == "openclaw":
@@ -179,6 +182,7 @@ def run_chat(payload: ChatRequest, history: Optional[List[Dict[str, str]]] = Non
                     attachments=[item.dict() for item in payload.attachments],
                     history=history or [],
                     summary=None,
+                    config=runtime_config,
                 ),
                 None,
                 "openclaw",
@@ -187,7 +191,7 @@ def run_chat(payload: ChatRequest, history: Optional[List[Dict[str, str]]] = Non
             fallback_reason = str(e)[:200]
         else:
             fallback_reason = None
-    elif provider == "internal_gateway":
+    elif provider in {"internal_gateway", "pi_gateway"}:
         try:
             return _call_provider(
                 lambda: internal_ai_gateway_client.chat(
@@ -196,9 +200,10 @@ def run_chat(payload: ChatRequest, history: Optional[List[Dict[str, str]]] = Non
                     attachments=[item.dict() for item in payload.attachments],
                     history=history or [],
                     summary=summary,
+                    config=runtime_config,
                 ),
                 None,
-                "internal_gateway",
+                provider,
             )
         except InternalAIGatewayClientError as e:
             fallback_reason = str(e)[:200]
@@ -229,7 +234,8 @@ def run_chat(payload: ChatRequest, history: Optional[List[Dict[str, str]]] = Non
 
 
 def run_offline_analyze(payload: OfflineAnalyzeRequest) -> Dict[str, Any]:
-    provider = settings.AI_PROVIDER.lower()
+    runtime_config = get_runtime_ai_config()
+    provider = runtime_config.get("engine_type", settings.AI_PROVIDER).lower()
     started = time.perf_counter()
 
     try:
@@ -241,12 +247,13 @@ def run_offline_analyze(payload: OfflineAnalyzeRequest) -> Dict[str, Any]:
                     severity=payload.severity,
                     source_type=payload.source_type,
                     source_ref=payload.source_ref,
+                    config=runtime_config,
                 ),
                 None,
                 "openclaw",
             )
 
-        if provider == "internal_gateway":
+        if provider in {"internal_gateway", "pi_gateway"}:
             return _call_provider(
                 lambda: internal_ai_gateway_client.log_analyze(
                     title=payload.title,
@@ -254,12 +261,13 @@ def run_offline_analyze(payload: OfflineAnalyzeRequest) -> Dict[str, Any]:
                     severity=payload.severity,
                     source_type=payload.source_type,
                     source_ref=payload.source_ref,
+                    config=runtime_config,
                 ),
                 None,
-                "internal_gateway",
+                provider,
             )
 
-        if provider == "ollama" and settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
+        if provider in {"ollama", "offline"} and settings.OFFLINE_AI_ENABLED and settings.OFFLINE_AI_PROVIDER.lower() == "ollama":
             severity, summary, suggestions, matched_rules = offline_analyze_with_ollama(
                 payload.title, payload.detail, payload.severity
             )

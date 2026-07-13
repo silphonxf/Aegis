@@ -31,15 +31,6 @@ def _parse_check_items(value: Optional[str]) -> List[str]:
     return [line.strip() for line in value.splitlines() if line.strip()]
 
 
-def _monitoring_confirmation(room_id: Optional[int]) -> Dict[str, Any]:
-    return {
-        "has_alarm": False,
-        "label": "监控无异常",
-        "value": "monitoring_no_alarm",
-        "options": [{"value": "monitoring_no_alarm", "label": "监控无异常"}],
-    }
-
-
 def _serialize_resolved_point(point: InspectionPoint, db: Session) -> Dict[str, Any]:
     room = db.query(Room).filter(Room.id == point.room_id).first() if point.room_id else None
     system = db.query(System).filter(System.id == point.system_id).first() if point.system_id else None
@@ -53,9 +44,10 @@ def _serialize_resolved_point(point: InspectionPoint, db: Session) -> Dict[str, 
         "location": point.location,
         "room_id": point.room_id,
         "room_name": room.room_name if room else "",
+        "weekday_inspection_count": getattr(room, "weekday_inspection_count", 1) if room else 1,
+        "holiday_inspection_count": getattr(room, "holiday_inspection_count", 1) if room else 1,
         "location_detail": point.location_detail,
         "check_items": _parse_check_items(getattr(room, "check_items", None)) if room else [],
-        "monitoring_confirmation": _monitoring_confirmation(point.room_id),
     }
 
 
@@ -121,14 +113,6 @@ def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User 
 
     logger.info("解析巡检点成功: point_id=%s system_id=%s", point.id, point.system_id)
     return _serialize_resolved_point(point, db)
-
-
-@router.get("/rooms/{room_id}/monitoring-confirmation")
-def room_monitoring_confirmation(room_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    room = db.query(Room).filter(Room.id == room_id, Room.is_active.is_(True)).first()
-    if not room:
-        raise HTTPException(status_code=404, detail="机房不存在")
-    return _monitoring_confirmation(room_id)
 
 
 @router.post("/records")
