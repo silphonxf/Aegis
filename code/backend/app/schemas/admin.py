@@ -25,6 +25,12 @@ class AIEngineConfigRequest(BaseModel):
     enabled: bool = True
 
 
+class AIEngineChatTestRequest(AIEngineConfigRequest):
+    message: str = Field(min_length=1, max_length=4000)
+    conversation_id: Optional[str] = Field(default=None, max_length=64)
+    history: List[Dict[str, str]] = Field(default_factory=list, max_items=12)
+
+
 class CreateAssetRequest(BaseModel):
     asset_code: str = Field(min_length=2, max_length=64)
     name: str = Field(min_length=1, max_length=128)

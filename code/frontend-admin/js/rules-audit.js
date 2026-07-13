@@ -3,6 +3,7 @@ window.AegisAdmin = window.AegisAdmin || {};
 (function (ns) {
   let aiEngineConversationId = null;
   let aiEngineChatPending = false;
+  let aiEngineChatHistory = [];
 
   function buildAuditQuery() {
     const params = new URLSearchParams({ page: '1', size: '20' });
@@ -236,19 +237,36 @@ window.AegisAdmin = window.AegisAdmin || {};
     if (status) status.textContent = '正在调用已保存的 AI 引擎配置...';
 
     try {
-      const data = await ns.api.request('/api/v1/ai/chat', {
+      const key = document.getElementById('aiEngineApiKey')?.value.trim() || '';
+      const data = await ns.api.request('/api/v1/admin/ai-engine-config/test-chat', {
         method: 'POST',
         headers: ns.api.headers(),
         body: JSON.stringify({
           message,
           conversation_id: aiEngineConversationId,
-          attachments: [],
+          history: aiEngineChatHistory.slice(-12),
+          engine_type: document.getElementById('aiEngineType')?.value || 'offline',
+          base_url: document.getElementById('aiEngineBaseUrl')?.value.trim() || null,
+          api_key: key || null,
+          model: document.getElementById('aiEngineModel')?.value.trim() || null,
+          timeout_seconds: Number(document.getElementById('aiEngineTimeout')?.value || 120),
+          chat_path: document.getElementById('aiEngineChatPath')?.value.trim() || null,
+          diagnose_path: document.getElementById('aiEngineDiagnosePath')?.value.trim() || null,
+          log_analyze_path: document.getElementById('aiEngineLogAnalyzePath')?.value.trim() || null,
+          enabled: document.getElementById('aiEngineEnabled')?.checked !== false,
         }),
       });
       aiEngineConversationId = data.conversation_id || aiEngineConversationId;
-      appendAiEngineChatMessage('assistant', data.reply || data.summary || '引擎未返回文本内容。');
+      const reply = data.reply || data.summary || '引擎未返回文本内容。';
+      aiEngineChatHistory.push({ role: 'user', content: message }, { role: 'assistant', content: reply });
+      aiEngineChatHistory = aiEngineChatHistory.slice(-12);
+      appendAiEngineChatMessage('assistant', reply);
       if (status) {
-        const details = [`模式：${data.mode || '未知'}`, `耗时：${data.elapsed_ms ?? '-'} ms`];
+        const details = [
+          `页面引擎：${data.tested_engine_type || '未知'}`,
+          `实际模式：${data.mode || '未知'}`,
+          `耗时：${data.elapsed_ms ?? '-'} ms`,
+        ];
         if (data.fallback_reason) details.push(`降级原因：${data.fallback_reason}`);
         status.textContent = details.join('  |  ');
         status.classList.toggle('warning', Boolean(data.fallback_reason));
@@ -267,6 +285,7 @@ window.AegisAdmin = window.AegisAdmin || {};
 
   function clearAiEngineChat() {
     aiEngineConversationId = null;
+    aiEngineChatHistory = [];
     const host = document.getElementById('aiEngineChatMessages');
     const status = document.getElementById('aiEngineChatStatus');
     if (host) host.innerHTML = '<div class="ai-chat-empty">输入问题以测试 AI 引擎响应。</div>';

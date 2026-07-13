@@ -168,8 +168,13 @@ def run_diagnose(title: str, detail: str, severity: str) -> Dict[str, Any]:
     return fallback
 
 
-def run_chat(payload: ChatRequest, history: Optional[List[Dict[str, str]]] = None, summary: Optional[str] = None) -> Dict[str, Any]:
-    runtime_config = get_runtime_ai_config()
+def run_chat(
+    payload: ChatRequest,
+    history: Optional[List[Dict[str, str]]] = None,
+    summary: Optional[str] = None,
+    runtime_config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    runtime_config = runtime_config or get_runtime_ai_config()
     provider = runtime_config.get("engine_type", settings.AI_PROVIDER).lower()
     started = time.perf_counter()
 

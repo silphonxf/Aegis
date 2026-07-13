@@ -24,6 +24,7 @@ from app.models.shared_data import Room
 from app.models.system import System, SystemLogConfig, SystemUserBinding
 from app.models.user import Role, User
 from app.schemas.admin import (
+    AIEngineChatTestRequest,
     AIEngineConfigRequest,
     BatchCreateAssetsRequest,
     CreateAIExternalApiKeyRequest,
@@ -39,7 +40,9 @@ from app.schemas.admin import (
     UpdateInspectionPointRequest,
     UpdateRoomRequest,
 )
-from app.services.ai_engine_config import serialize_ai_engine_config, upsert_ai_engine_config
+from app.schemas.ai import ChatRequest
+from app.services.ai_engine_config import get_runtime_ai_config, serialize_ai_engine_config, upsert_ai_engine_config
+from app.services.ai_provider import run_chat
 from app.schemas.emergency_config import (
     EmergencyDbActionSaveRequest,
     EmergencyProcessActionSaveRequest,
@@ -244,6 +247,41 @@ def save_ai_engine_config(
             "base_url": result["base_url"],
             "model": result["model"],
             "has_api_key": result["has_api_key"],
+        },
+    )
+    return result
+
+
+@router.post("/ai-engine-config/test-chat")
+def test_ai_engine_chat(
+    payload: AIEngineChatTestRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    runtime_config = payload.dict(
+        exclude={"message", "conversation_id", "history"},
+    )
+    if payload.api_key is None:
+        runtime_config["api_key"] = get_runtime_ai_config().get("api_key", "")
+
+    result = run_chat(
+        ChatRequest(message=payload.message, conversation_id=payload.conversation_id),
+        history=payload.history[-12:],
+        runtime_config=runtime_config,
+    )
+    result["tested_engine_type"] = payload.engine_type
+    log_action(
+        db,
+        "test_ai_engine_chat",
+        "ai_engine_config",
+        current_user,
+        {
+            "engine_type": payload.engine_type,
+            "base_url": payload.base_url,
+            "model": payload.model,
+            "mode": result.get("mode"),
+            "elapsed_ms": result.get("elapsed_ms"),
+            "fallback_reason": result.get("fallback_reason"),
         },
     )
     return result
