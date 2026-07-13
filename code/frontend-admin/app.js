@@ -242,6 +242,14 @@ bindClick('btnCreateAiExternalKey', () => ns.rulesAudit.createAiExternalKey().ca
 bindClick('btnLoadAiEngineConfig', () => ns.rulesAudit.loadAiEngineConfig().catch((e) => { $('aiEngineConfigResult').textContent = formatError('AI 引擎配置读取', e); }));
 bindClick('btnSaveAiEngineConfig', () => ns.rulesAudit.saveAiEngineConfig().catch((e) => { $('aiEngineConfigResult').textContent = formatError('AI 引擎配置保存', e); }));
 bindClick('btnFillPiGatewayConfig', () => ns.rulesAudit.fillPiGatewayConfig?.());
+bindClick('btnSendAiEngineChat', () => ns.rulesAudit.sendAiEngineChat());
+bindClick('btnClearAiEngineChat', () => ns.rulesAudit.clearAiEngineChat());
+document.getElementById('aiEngineChatInput')?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    ns.rulesAudit.sendAiEngineChat();
+  }
+});
 bindClick('btnCreateTemplate', () => ns.templates.createTemplate().catch((e) => { $('templateCreateResult').textContent = formatError('创建模板', e); }));
 bindClick('btnListTemplates', () => ns.templates.listTemplates().catch((e) => { $('templateListResult').textContent = formatError('模板列表', e); }));
 bindClick('btnCreateSnapshot', () => ns.templates.createSnapshot().catch((e) => { $('snapshotResult').textContent = formatError('状态快照', e); }));

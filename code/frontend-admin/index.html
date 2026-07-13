@@ -910,6 +910,23 @@
             </div>
             <pre id="aiEngineConfigResult"></pre>
           </div>
+          <div class="form-section ai-engine-tester">
+            <div class="section-head">
+              <div>
+                <h3>对话测试</h3>
+                <p class="muted">使用当前已保存的引擎配置发起真实问答，并显示调用模式、耗时和降级原因。</p>
+              </div>
+              <button id="btnClearAiEngineChat" class="secondary-btn ai-chat-clear" type="button">清空会话</button>
+            </div>
+            <div id="aiEngineChatMessages" class="ai-chat-messages" aria-live="polite">
+              <div class="ai-chat-empty">输入问题以测试 AI 引擎响应。</div>
+            </div>
+            <div class="ai-chat-composer">
+              <textarea id="aiEngineChatInput" rows="3" maxlength="4000" placeholder="输入测试问题，Enter 发送，Shift + Enter 换行"></textarea>
+              <button id="btnSendAiEngineChat" type="button">发送</button>
+            </div>
+            <div id="aiEngineChatStatus" class="ai-chat-status muted">尚未发起测试</div>
+          </div>
         </section>
       </section>
 

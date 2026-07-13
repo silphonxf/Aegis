@@ -1,6 +1,9 @@
 window.AegisAdmin = window.AegisAdmin || {};
 
 (function (ns) {
+  let aiEngineConversationId = null;
+  let aiEngineChatPending = false;
+
   function buildAuditQuery() {
     const params = new URLSearchParams({ page: '1', size: '20' });
     const mappings = [
@@ -190,6 +193,90 @@ window.AegisAdmin = window.AegisAdmin || {};
     return data;
   }
 
+  function appendAiEngineChatMessage(role, content) {
+    const host = document.getElementById('aiEngineChatMessages');
+    if (!host) return;
+    host.querySelector('.ai-chat-empty')?.remove();
+    const message = document.createElement('div');
+    message.className = `ai-chat-message ${role}`;
+    const label = document.createElement('strong');
+    label.textContent = role === 'user' ? '你' : 'AI';
+    const body = document.createElement('div');
+    body.textContent = content;
+    message.append(label, body);
+    host.appendChild(message);
+    host.scrollTop = host.scrollHeight;
+  }
+
+  function setAiEngineChatPending(pending) {
+    aiEngineChatPending = pending;
+    const button = document.getElementById('btnSendAiEngineChat');
+    const input = document.getElementById('aiEngineChatInput');
+    if (button) {
+      button.disabled = pending;
+      button.textContent = pending ? '请求中...' : '发送';
+    }
+    if (input) input.disabled = pending;
+  }
+
+  async function sendAiEngineChat() {
+    if (aiEngineChatPending) return;
+    const input = document.getElementById('aiEngineChatInput');
+    const status = document.getElementById('aiEngineChatStatus');
+    const message = input?.value.trim() || '';
+    if (!message) {
+      if (status) status.textContent = '请输入测试问题。';
+      input?.focus();
+      return;
+    }
+
+    appendAiEngineChatMessage('user', message);
+    input.value = '';
+    setAiEngineChatPending(true);
+    if (status) status.textContent = '正在调用已保存的 AI 引擎配置...';
+
+    try {
+      const data = await ns.api.request('/api/v1/ai/chat', {
+        method: 'POST',
+        headers: ns.api.headers(),
+        body: JSON.stringify({
+          message,
+          conversation_id: aiEngineConversationId,
+          attachments: [],
+        }),
+      });
+      aiEngineConversationId = data.conversation_id || aiEngineConversationId;
+      appendAiEngineChatMessage('assistant', data.reply || data.summary || '引擎未返回文本内容。');
+      if (status) {
+        const details = [`模式：${data.mode || '未知'}`, `耗时：${data.elapsed_ms ?? '-'} ms`];
+        if (data.fallback_reason) details.push(`降级原因：${data.fallback_reason}`);
+        status.textContent = details.join('  |  ');
+        status.classList.toggle('warning', Boolean(data.fallback_reason));
+      }
+    } catch (error) {
+      appendAiEngineChatMessage('error', `请求失败：${error.message}`);
+      if (status) {
+        status.textContent = `测试失败：${error.message}`;
+        status.classList.add('warning');
+      }
+    } finally {
+      setAiEngineChatPending(false);
+      input?.focus();
+    }
+  }
+
+  function clearAiEngineChat() {
+    aiEngineConversationId = null;
+    const host = document.getElementById('aiEngineChatMessages');
+    const status = document.getElementById('aiEngineChatStatus');
+    if (host) host.innerHTML = '<div class="ai-chat-empty">输入问题以测试 AI 引擎响应。</div>';
+    if (status) {
+      status.textContent = '已清空会话';
+      status.classList.remove('warning');
+    }
+    document.getElementById('aiEngineChatInput')?.focus();
+  }
+
   document.getElementById('aiExternalKeyTbody')?.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-ai-key-action]');
     if (!btn) return;
@@ -210,5 +297,7 @@ window.AegisAdmin = window.AegisAdmin || {};
     loadAiEngineConfig,
     saveAiEngineConfig,
     fillPiGatewayConfig,
+    sendAiEngineChat,
+    clearAiEngineChat,
   };
 })(window.AegisAdmin);
