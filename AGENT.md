@@ -62,6 +62,7 @@ Local:
 https://127.0.0.1:8000  Backend API
 https://127.0.0.1:5173  Mobile frontend
 https://127.0.0.1:5174  Admin frontend
+https://127.0.0.1:18791 Malicious IP block console
 ```
 
 LAN/Tailscale reference:
@@ -70,6 +71,7 @@ LAN/Tailscale reference:
 https://100.102.111.74:8000
 https://100.102.111.74:5173
 https://100.102.111.74:5174
+https://100.102.111.74:18791
 ```
 
 Default local admin:

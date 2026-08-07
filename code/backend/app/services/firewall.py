@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
 from ipaddress import IPv4Address, ip_address
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
@@ -11,6 +12,17 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.services.firewall_config import FirewallRuntimeConfig, get_runtime_firewall_config
+
+
+_TARGET_LOCKS: Dict[str, threading.Lock] = {}
+_TARGET_LOCKS_GUARD = threading.Lock()
+
+
+def _target_lock(key: str) -> threading.Lock:
+    with _TARGET_LOCKS_GUARD:
+        if key not in _TARGET_LOCKS:
+            _TARGET_LOCKS[key] = threading.Lock()
+        return _TARGET_LOCKS[key]
 
 
 class FirewallError(Exception):
@@ -29,7 +41,10 @@ def validate_block_ip(value: str) -> str:
     candidate = value.strip()
     if not candidate:
         raise FirewallError("IP 不能为空")
-    parsed = ip_address(candidate)
+    try:
+        parsed = ip_address(candidate)
+    except ValueError as exc:
+        raise FirewallError(f"非法 IP：{candidate}") from exc
     if not isinstance(parsed, IPv4Address):
         raise FirewallError("当前山石地址簿封禁仅支持 IPv4")
     return str(parsed)
@@ -40,6 +55,9 @@ class HillstoneRestClient:
 
     def __init__(self, config: Optional[FirewallRuntimeConfig] = None) -> None:
         runtime = config or get_runtime_firewall_config(None)
+        self.target_code = runtime.target_code
+        self.target_name = runtime.target_name
+        self.is_test_target = runtime.is_test_target
         self.enabled = runtime.enabled
         self.scheme = runtime.scheme.strip() or "https"
         self.host = runtime.host.strip()
@@ -97,6 +115,13 @@ class HillstoneRestClient:
             return default
 
     def _normalize_ip_entries(self, existing: Optional[Dict[str, Any]], ip: str) -> List[Dict[str, Any]]:
+        return self._normalize_ip_entries_many(existing, [ip])
+
+    def _normalize_ip_entries_many(
+        self,
+        existing: Optional[Dict[str, Any]],
+        ips: List[str],
+    ) -> List[Dict[str, Any]]:
         entries: List[Dict[str, Any]] = []
         seen: set[str] = set()
 
@@ -143,11 +168,21 @@ class HillstoneRestClient:
                 }
             )
 
-        if ip not in seen:
-            entries.append({"ip_addr": ip, "netmask": 32, "flag": 0})
+        for ip in ips:
+            if ip not in seen:
+                seen.add(ip)
+                entries.append({"ip_addr": ip, "netmask": 32, "flag": 0})
         return entries
 
     def build_addrbook_payload(self, ip: str, reason: Optional[str], existing: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return self.build_addrbook_payload_many([ip], reason, existing)
+
+    def build_addrbook_payload_many(
+        self,
+        ips: List[str],
+        reason: Optional[str],
+        existing: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         current = existing or {}
         return {
             "is_ipv6": self._addrbook_int(current.get("is_ipv6"), 0),
@@ -155,12 +190,96 @@ class HillstoneRestClient:
             "name": str(current.get("name") or self.address_book_name),
             "description": str(current.get("description") or ""),
             "entry": list(current.get("entry") or []),
-            "ip": self._normalize_ip_entries(current, ip),
+            "ip": self._normalize_ip_entries_many(current, ips),
             "range": list(current.get("range") or []),
             "host": list(current.get("host") or []),
             "wildcard": list(current.get("wildcard") or []),
             "country": list(current.get("country") or []),
         }
+
+    def block_ips(self, ips: List[str], reason: Optional[str], dry_run: bool) -> Dict[str, Any]:
+        normalized_ips = list(dict.fromkeys(validate_block_ip(ip) for ip in ips))
+        if not normalized_ips:
+            raise FirewallError("至少需要一个待封禁 IP")
+        if dry_run:
+            return {
+                "status": "dry_run",
+                "dry_run": True,
+                "vendor": "hillstone",
+                "target_code": self.target_code,
+                "target_name": self.target_name,
+                "is_test_target": self.is_test_target,
+                "ips": normalized_ips,
+                "firewall_host": self.host,
+                "address_set": self.address_book_name,
+                "request": {
+                    "method": "LOGIN + GET + PUT + GET_VERIFY",
+                    "url": self.addrbook_url(),
+                    "body": self.build_addrbook_payload_many(normalized_ips, reason),
+                },
+                "message": "演练模式，未连接山石；真实执行将单次登录、单次合并更新并回读核验。",
+            }
+
+        self._require_config()
+        lock_key = f"{self.host}:{self.port}:{self.address_book_name}"
+        with _target_lock(lock_key):
+            cookie = self._login()
+            existing = self._fetch_addrbook(cookie)
+            if not existing:
+                raise FirewallClientError(f"山石地址簿不存在：{self.address_book_name}")
+            before_entries = self._normalize_ip_entries_many(existing, [])
+            before = {item["ip_addr"] for item in before_entries}
+            added = [ip for ip in normalized_ips if ip not in before]
+            response_body: Dict[str, Any] = {"success": True, "noop": True}
+            http_status = 200
+            if added:
+                request_kwargs = self._request_kwargs(cookie)
+                request_kwargs["data"] = json.dumps(
+                    self.build_addrbook_payload_many(normalized_ips, reason, existing),
+                    ensure_ascii=False,
+                )
+                response = requests.put(self.addrbook_url(), **request_kwargs)
+                http_status = response.status_code
+                try:
+                    response.raise_for_status()
+                except requests.RequestException as exc:
+                    raise FirewallClientError(
+                        f"调用山石地址簿批量封禁失败：{exc}; response={response.text[:300]}"
+                    ) from exc
+                try:
+                    response_body = response.json()
+                except ValueError:
+                    response_body = {"raw": response.text[:500]}
+                if isinstance(response_body, dict) and response_body.get("success") is False:
+                    raise FirewallClientError(f"山石地址簿批量封禁失败：{response_body}")
+
+            verified_book = self._fetch_addrbook(cookie)
+            verified = {
+                item["ip_addr"]
+                for item in self._normalize_ip_entries_many(verified_book, [])
+            }
+            missing = [ip for ip in normalized_ips if ip not in verified]
+            if missing:
+                raise FirewallClientError(f"山石地址簿回读核验失败，缺少：{', '.join(missing)}")
+            return {
+                "status": "blocked",
+                "dry_run": False,
+                "vendor": "hillstone",
+                "target_code": self.target_code,
+                "target_name": self.target_name,
+                "is_test_target": self.is_test_target,
+                "ips": normalized_ips,
+                "existing_ips": [ip for ip in normalized_ips if ip in before],
+                "added_ips": added,
+                "verified_ips": normalized_ips,
+                "before_count": len(before),
+                "after_count": len(verified),
+                "firewall_host": self.host,
+                "address_set": self.address_book_name,
+                "http_status": http_status,
+                "response": response_body,
+                "message": "已永久加入山石地址簿并完成回读核验。",
+            }
 
     def dry_run_plan(self, ip: str, reason: Optional[str]) -> Dict[str, Any]:
         normalized_ip = validate_block_ip(ip)
@@ -296,3 +415,17 @@ class HillstoneRestClient:
 
 def block_ip_with_firewall(ip: str, reason: Optional[str] = None, dry_run: bool = True, db: Optional[Session] = None) -> Dict[str, Any]:
     return HillstoneRestClient(get_runtime_firewall_config(db)).block_ip(ip=ip, reason=reason, dry_run=dry_run)
+
+
+def block_ips_with_firewall(
+    ips: List[str],
+    reason: Optional[str] = None,
+    dry_run: bool = True,
+    db: Optional[Session] = None,
+    target_code: Optional[str] = None,
+) -> Dict[str, Any]:
+    return HillstoneRestClient(get_runtime_firewall_config(db, target_code)).block_ips(
+        ips=ips,
+        reason=reason,
+        dry_run=dry_run,
+    )

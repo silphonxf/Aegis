@@ -31,6 +31,18 @@ def _parse_check_items(value: Optional[str]) -> List[str]:
     return [line.strip() for line in value.splitlines() if line.strip()]
 
 
+def _monitoring_confirmation(room_id: int) -> Dict[str, Any]:
+    # The current inspection workflow records an explicit human confirmation.
+    # Until an alarm source is bound to a room, present the neutral no-alarm
+    # choice expected by the mobile client rather than omitting the field.
+    return {
+        "room_id": room_id,
+        "value": "monitoring_no_alarm",
+        "label": "监控无异常",
+        "has_alarm": False,
+    }
+
+
 def _serialize_resolved_point(point: InspectionPoint, db: Session) -> Dict[str, Any]:
     room = db.query(Room).filter(Room.id == point.room_id).first() if point.room_id else None
     system = db.query(System).filter(System.id == point.system_id).first() if point.system_id else None
@@ -48,6 +60,7 @@ def _serialize_resolved_point(point: InspectionPoint, db: Session) -> Dict[str, 
         "holiday_inspection_count": getattr(room, "holiday_inspection_count", 1) if room else 1,
         "location_detail": point.location_detail,
         "check_items": _parse_check_items(getattr(room, "check_items", None)) if room else [],
+        "monitoring_confirmation": _monitoring_confirmation(room.id) if room else None,
     }
 
 
@@ -113,6 +126,18 @@ def resolve_point_by_qr(qr_content: str, db: Session = Depends(get_db), _: User 
 
     logger.info("解析巡检点成功: point_id=%s system_id=%s", point.id, point.system_id)
     return _serialize_resolved_point(point, db)
+
+
+@router.get("/rooms/{room_id}/monitoring-confirmation")
+def get_room_monitoring_confirmation(
+    room_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    room = db.query(Room).filter(Room.id == room_id, Room.is_active.is_(True)).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="未找到对应机房")
+    return _monitoring_confirmation(room.id)
 
 
 @router.post("/records")

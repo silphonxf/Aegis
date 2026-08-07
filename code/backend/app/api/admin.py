@@ -6,9 +6,9 @@ import hashlib
 import json
 import secrets
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,7 @@ from app.schemas.admin import (
     CreateRoomRequest,
     CreateUserRequest,
     FirewallBlockConfigRequest,
+    ThreatIntelBatchBlockRequest,
     ThreatIntelBlockRequest,
     ThreatIntelQueryRequest,
     ThreatIntelQuickInputRequest,
@@ -62,8 +63,15 @@ from app.services.emergency_config import (
     upsert_ssh_host,
 )
 from app.services.threatbook import ThreatbookError, batch_query_indicators, batch_query_ip_reputation
-from app.services.firewall import FirewallClientError, FirewallConfigError, FirewallError, block_ip_with_firewall
-from app.services.firewall_config import serialize_firewall_config, upsert_firewall_config
+from app.services.firewall import (
+    FirewallClientError,
+    FirewallConfigError,
+    FirewallError,
+    block_ip_with_firewall,
+    block_ips_with_firewall,
+    validate_block_ip,
+)
+from app.services.firewall_config import list_firewall_configs, serialize_firewall_config, upsert_firewall_config
 from app.schemas.system import SystemCreate, SystemUpdate
 from app.services.audit import log_action
 from app.services.cache import delete_prefix, get_json, set_json
@@ -73,6 +81,8 @@ logger = get_logger("admin")
 
 
 IP_HEADER_CANDIDATES = {"ip", "ip地址", "ip_address", "地址", "目标ip", "ipv4", "ipv6"}
+IP_REASON_HEADER_CANDIDATES = {"封禁原因", "原因", "reason", "block_reason"}
+IP_REMARK_HEADER_CANDIDATES = {"备注", "说明", "remark", "note"}
 SYSTEM_LIST_CACHE_PREFIX = "aegis:cache:admin:systems:"
 
 
@@ -117,6 +127,38 @@ def _extract_ips_from_excel(content: bytes) -> List[str]:
             if ip_col < len(row) and row[ip_col] is not None:
                 ips.append(str(row[ip_col]).strip())
     return ips
+
+
+def _extract_ip_block_rows(content: bytes) -> List[Dict[str, Any]]:
+    try:
+        workbook = load_workbook(filename=BytesIO(content), data_only=True)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail={"code": "INVALID_EXCEL", "message": f"Excel 解析失败：{exc}"})
+
+    items: List[Dict[str, Any]] = []
+    for sheet in workbook.worksheets:
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            continue
+        header = [str(cell).strip().lower() if cell is not None else "" for cell in rows[0]]
+        ip_col = next((idx for idx, name in enumerate(header) if name in IP_HEADER_CANDIDATES), 0)
+        reason_col = next((idx for idx, name in enumerate(header) if name in IP_REASON_HEADER_CANDIDATES), None)
+        remark_col = next((idx for idx, name in enumerate(header) if name in IP_REMARK_HEADER_CANDIDATES), None)
+        for row_number, row in enumerate(rows[1:], start=2):
+            if ip_col >= len(row) or row[ip_col] is None or not str(row[ip_col]).strip():
+                continue
+            reason = row[reason_col] if reason_col is not None and reason_col < len(row) else None
+            remark = row[remark_col] if remark_col is not None and remark_col < len(row) else None
+            items.append(
+                {
+                    "sheet": sheet.title,
+                    "row": row_number,
+                    "ip": str(row[ip_col]).strip(),
+                    "reason": str(reason).strip() if reason is not None and str(reason).strip() else None,
+                    "remark": str(remark).strip() if remark is not None and str(remark).strip() else None,
+                }
+            )
+    return items
 
 
 @router.get("/users")
@@ -1483,6 +1525,137 @@ async def query_ip_reputation_excel(
     return result
 
 
+@router.get("/threat-intel/ip-block-template")
+def download_ip_block_template(
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "待封禁IP"
+    sheet.append(["IP地址", "封禁原因", "备注"])
+    sheet.append(["", "", ""])
+    sheet.freeze_panes = "A2"
+    sheet.column_dimensions["A"].width = 22
+    sheet.column_dimensions["B"].width = 36
+    sheet.column_dimensions["C"].width = 36
+
+    instructions = workbook.create_sheet("填写说明")
+    instructions.append(["字段", "说明"])
+    instructions.append(["IP地址", "必填；当前山石地址簿封禁仅支持 IPv4；最多导入 100 个 IP"])
+    instructions.append(["封禁原因", "选填；用于 Aegis 操作审计，不会写入山石地址簿"])
+    instructions.append(["备注", "选填；仅用于导入结果展示"])
+    instructions.column_dimensions["A"].width = 18
+    instructions.column_dimensions["B"].width = 72
+
+    content = BytesIO()
+    workbook.save(content)
+    content.seek(0)
+    return StreamingResponse(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="aegis-ip-block-template.xlsx"'},
+    )
+
+
+@router.post("/threat-intel/ip-block-import")
+async def import_ip_block_excel(
+    file: UploadFile = File(...),
+    verify_with_threatbook: bool = Form(True),
+    realtime_verdict: bool = Form(True),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    filename = file.filename or ""
+    if not filename.lower().endswith((".xlsx", ".xlsm", ".xltx", ".xltm")):
+        raise HTTPException(status_code=400, detail={"code": "INVALID_FILE_TYPE", "message": "仅支持上传 .xlsx 类 Excel 文件"})
+
+    raw_rows = _extract_ip_block_rows(await file.read())
+    valid_rows: List[Dict[str, Any]] = []
+    invalid_rows: List[Dict[str, Any]] = []
+    seen: Set[str] = set()
+    for row in raw_rows:
+        try:
+            normalized_ip = validate_block_ip(row["ip"])
+        except FirewallError as exc:
+            invalid_rows.append({**row, "error": str(exc)})
+            continue
+        if normalized_ip in seen:
+            continue
+        seen.add(normalized_ip)
+        valid_rows.append({**row, "ip": normalized_ip})
+
+    if not valid_rows:
+        raise HTTPException(status_code=400, detail={"code": "NO_VALID_IP", "message": "Excel 中没有可用的 IPv4 地址"})
+    if len(valid_rows) > 100:
+        raise HTTPException(status_code=400, detail={"code": "TOO_MANY_IPS", "message": "单次最多导入 100 个 IPv4 地址"})
+
+    reputation_by_ip: Dict[str, Dict[str, Any]] = {}
+    if verify_with_threatbook:
+        try:
+            reputation = batch_query_ip_reputation(
+                [row["ip"] for row in valid_rows],
+                lang="zh",
+                realtime_verdict=realtime_verdict,
+            )
+        except ThreatbookError as exc:
+            raise HTTPException(status_code=400, detail={"code": "THREATBOOK_QUERY_FAILED", "message": str(exc)}) from exc
+        reputation_by_ip = {item["ip"]: item for item in reputation.get("items") or []}
+
+    items = []
+    for row in valid_rows:
+        reputation_item = dict(reputation_by_ip.get(row["ip"]) or {})
+        reputation_item.update(
+            {
+                "ip": row["ip"],
+                "resource": row["ip"],
+                "verified": verify_with_threatbook,
+                "import_reason": row["reason"],
+                "remark": row["remark"],
+                "sheet": row["sheet"],
+                "row": row["row"],
+            }
+        )
+        if not verify_with_threatbook:
+            reputation_item.update(
+                {
+                    "is_malicious": None,
+                    "risk_level": "unverified",
+                    "should_block": False,
+                    "needs_manual_confirmation": False,
+                    "decision": "manual_review",
+                    "summary": "未使用微步 IP 信誉验证，请人工确认后封禁。",
+                }
+            )
+        items.append(reputation_item)
+
+    result = {
+        "filename": filename,
+        "verified": verify_with_threatbook,
+        "realtime_verdict": realtime_verdict if verify_with_threatbook else None,
+        "summary": {
+            "valid": len(items),
+            "invalid": len(invalid_rows),
+            "malicious": sum(1 for item in items if item.get("is_malicious") is True),
+            "block_candidates": [item["ip"] for item in items if item.get("should_block")],
+        },
+        "items": items,
+        "invalid_rows": invalid_rows,
+    }
+    log_action(
+        db,
+        "import_ip_block_excel",
+        "threat_intel",
+        current_user,
+        {
+            "filename": filename,
+            "verified": verify_with_threatbook,
+            "valid_count": len(items),
+            "invalid_count": len(invalid_rows),
+        },
+    )
+    return result
+
+
 @router.get("/emergency-config")
 def get_emergency_config(
     db: Session = Depends(get_db),
@@ -1615,12 +1788,57 @@ def block_high_risk_ip(
     return result
 
 
+@router.post("/threat-intel/block-ips")
+def block_high_risk_ips(
+    payload: ThreatIntelBatchBlockRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    audit_base = {
+        "ips": payload.ips,
+        "reason": payload.reason,
+        "source": payload.source,
+        "dry_run": payload.dry_run,
+        "target_code": payload.target_code,
+    }
+    try:
+        result = block_ips_with_firewall(
+            ips=payload.ips,
+            reason=payload.reason,
+            dry_run=payload.dry_run,
+            db=db,
+            target_code=payload.target_code,
+        )
+    except FirewallConfigError as exc:
+        log_action(db, "block_ips_request_failed", "threat_intel", current_user, {**audit_base, "error": str(exc)})
+        raise HTTPException(status_code=503, detail={"code": "FIREWALL_CONFIG_MISSING", "message": str(exc)}) from exc
+    except FirewallClientError as exc:
+        log_action(db, "block_ips_request_failed", "threat_intel", current_user, {**audit_base, "error": str(exc)})
+        raise HTTPException(status_code=502, detail={"code": "FIREWALL_REQUEST_FAILED", "message": str(exc)}) from exc
+    except FirewallError as exc:
+        log_action(db, "block_ips_request_failed", "threat_intel", current_user, {**audit_base, "error": str(exc)})
+        raise HTTPException(status_code=400, detail={"code": "FIREWALL_BLOCK_INVALID", "message": str(exc)}) from exc
+
+    result.update({"reason": payload.reason, "source": payload.source})
+    log_action(db, "block_ips_request", "threat_intel", current_user, result)
+    return result
+
+
 @router.get("/threat-intel/firewall-config")
 def get_threat_intel_firewall_config(
+    target_code: Optional[str] = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "super_admin")),
 ):
-    return serialize_firewall_config(db)
+    return serialize_firewall_config(db, target_code)
+
+
+@router.get("/threat-intel/firewall-configs")
+def list_threat_intel_firewall_configs(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "super_admin")),
+):
+    return list_firewall_configs(db)
 
 
 @router.put("/threat-intel/firewall-config")

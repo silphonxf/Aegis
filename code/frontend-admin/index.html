@@ -1136,6 +1136,41 @@
             </div>
             <pre id="threatbookResult">尚未查询</pre>
           </div>
+          <div class="form-section">
+            <div class="section-head">
+              <div>
+                <h3>飞书安全响应权限</h3>
+                <p class="muted">用户先给机器人发送任意消息，Aegis 会登记 open_id；再由超级管理员在此绑定 Aegis 管理员并授权。Aegis 飞书机器人和远端 OpenClaw 共用此白名单，封禁权限不会按姓名自动授予。</p>
+              </div>
+              <button id="btnLoadFeishuBindings" class="toolbar-btn secondary" type="button">刷新身份列表</button>
+            </div>
+            <div class="grid2">
+              <label>飞书 open_id
+                <input id="feishuBindingOpenId" placeholder="例如 ou_xxx；可从下表点击填入" />
+              </label>
+              <label>显示名称
+                <input id="feishuBindingDisplayName" placeholder="例如 张晓帆" />
+              </label>
+              <label>Aegis 用户 ID
+                <input id="feishuBindingAegisUserId" type="number" min="1" placeholder="必须是 admin / super_admin 才能获得封禁权限" />
+              </label>
+              <label>启用状态
+                <select id="feishuBindingEnabled"><option value="true">启用</option><option value="false">停用</option></select>
+              </label>
+            </div>
+            <div class="action-row compact">
+              <label class="inline-check"><input type="checkbox" id="feishuBindingCanQuery" checked> IP 查询权限</label>
+              <label class="inline-check"><input type="checkbox" id="feishuBindingCanBlock"> 永久封禁权限</label>
+              <button id="btnSaveFeishuBinding" type="button">保存飞书权限</button>
+            </div>
+            <p class="muted" id="feishuBindingSummary">尚未读取飞书身份。</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>名称</th><th>open_id</th><th>Aegis 用户 ID</th><th>查询</th><th>封禁</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody id="feishuBindingTbody"><tr><td colspan="7">暂无数据</td></tr></tbody>
+              </table>
+            </div>
+          </div>
         </section>
       </section>
 
@@ -1243,6 +1278,22 @@
   <div id="firewallConfigModal" class="modal hidden" hidden aria-hidden="true">
     <div class="modal-card">
       <h3>防火墙封禁配置</h3>
+      <div class="grid2">
+        <label>设备代码
+          <input id="modalFirewallTargetCode" value="test-primary" />
+        </label>
+        <label>设备名称
+          <input id="modalFirewallTargetName" value="山石测试设备" />
+        </label>
+      </div>
+      <div class="grid2">
+        <label>默认目标
+          <select id="modalFirewallIsDefault"><option value="true">是</option><option value="false">否</option></select>
+        </label>
+        <label>测试设备
+          <select id="modalFirewallIsTestTarget"><option value="true">是</option><option value="false">否</option></select>
+        </label>
+      </div>
       <label>启用状态
         <select id="modalFirewallEnabled">
           <option value="true">启用</option>

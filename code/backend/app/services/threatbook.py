@@ -9,7 +9,7 @@ import requests
 
 from app.core.config import settings
 
-THREATBOOK_IP_QUERY_URL = "https://api.threatbook.cn/v3/ip/query"
+THREATBOOK_IP_QUERY_URL = "https://api.threatbook.cn/v3/scene/ip_reputation"
 THREATBOOK_DOMAIN_QUERY_URL = "https://api.threatbook.cn/v3/domain/query"
 DEFAULT_MALICIOUS_JUDGMENTS = {
     "Spam",
@@ -19,7 +19,7 @@ DEFAULT_MALICIOUS_JUDGMENTS = {
     "Botnet",
     "Brute Force",
 }
-SAFE_JUDGMENTS = {"Whitelist", "CDN", "DNS", "Gateway", "ICP", "Search Engine", "Cloud Provider"}
+SAFE_JUDGMENTS = {"Whitelist", "Info", "CDN", "DNS", "Gateway", "ICP", "Search Engine", "Cloud Provider"}
 
 
 class ThreatbookError(Exception):
@@ -93,13 +93,21 @@ def normalize_indicators(raw_items: List[str]) -> List[Dict[str, str]]:
     return items
 
 
-def _fetch_resource(url: str, resource: str, lang: str) -> Dict[str, Any]:
+def _fetch_resource(
+    url: str,
+    resource: str,
+    lang: str,
+    realtime_verdict: Optional[bool] = None,
+) -> Dict[str, Any]:
     if not settings.THREATBOOK_API_KEY:
         raise ThreatbookError("未配置微步 API Key")
     try:
+        params: Dict[str, Any] = {"apikey": settings.THREATBOOK_API_KEY, "resource": resource, "lang": lang}
+        if realtime_verdict is not None:
+            params["realtime_verdict"] = "true" if realtime_verdict else "false"
         response = requests.get(
             url,
-            params={"apikey": settings.THREATBOOK_API_KEY, "resource": resource, "lang": lang},
+            params=params,
             timeout=settings.THREATBOOK_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
@@ -121,9 +129,13 @@ def fetch_ip_reputation(ips: List[str], lang: str = "zh", realtime_verdict: bool
     if len(ips) > 100:
         raise ThreatbookError("单次最多查询 100 个 IP")
 
-    if len(ips) != 1:
-        raise ThreatbookError("IP 分析接口每次仅支持查询一个 IP")
-    return _fetch_resource(THREATBOOK_IP_QUERY_URL, ips[0], lang)
+    normalized_ips = [validate_ip(ip) for ip in ips]
+    return _fetch_resource(
+        THREATBOOK_IP_QUERY_URL,
+        ",".join(normalized_ips),
+        lang,
+        realtime_verdict=realtime_verdict,
+    )
 
 
 def _as_bool(value: Any) -> bool:
@@ -155,7 +167,13 @@ def summarize_ip_record(ip: str, record: Dict[str, Any]) -> Dict[str, Any]:
     location = basic.get("location") or {}
     judgments = [str(item) for item in (record.get("judgments") or [])]
     intel_types = _extract_intel_types(record)
-    malicious_hits = list(dict.fromkeys([item for item in judgments + intel_types if item not in SAFE_JUDGMENTS]))
+    malicious_hits = list(
+        dict.fromkeys(
+            item
+            for item in judgments + intel_types
+            if item in DEFAULT_MALICIOUS_JUDGMENTS
+        )
+    )
     tags_classes = record.get("tags_classes") or []
     tag_names = []
     for item in tags_classes:
@@ -345,11 +363,9 @@ def batch_query_indicators(raw_items: List[str], lang: str = "zh") -> Dict[str, 
 
 def batch_query_ip_reputation(raw_items: List[str], lang: str = "zh", realtime_verdict: bool = True) -> Dict[str, Any]:
     ips = normalize_ip_list(raw_items)
-    items: List[Dict[str, Any]] = []
-    for ip in ips:
-        data = fetch_ip_reputation([ip], lang=lang, realtime_verdict=realtime_verdict)
-        records = _extract_ip_records(data)
-        items.append(summarize_ip_record(ip, records.get(ip) or {}))
+    data = fetch_ip_reputation(ips, lang=lang, realtime_verdict=realtime_verdict)
+    records = _extract_ip_records(data)
+    items = [summarize_ip_record(ip, records.get(ip) or {}) for ip in ips]
     return {
         "query": {"ips": ips, "count": len(ips), "lang": lang, "realtime_verdict": realtime_verdict},
         "summary": {

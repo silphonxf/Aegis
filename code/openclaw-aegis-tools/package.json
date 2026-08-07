@@ -1,0 +1,28 @@
+{
+  "name": "openclaw-aegis-tools",
+  "version": "1.1.2",
+  "description": "Trusted Feishu IP security-response cards and tools for an Aegis remote gateway",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild index.ts --bundle --platform=node --format=esm --external:openclaw/* --external:@sinclair/typebox --external:undici --outfile=dist/index.js",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "0.34.48",
+    "undici": "8.10.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "files": [
+    "index.ts",
+    "dist/index.js",
+    "openclaw.plugin.json",
+    "README.md"
+  ]
+}

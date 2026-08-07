@@ -90,10 +90,14 @@ window.AegisAdmin = window.AegisAdmin || {};
       return;
     }
     const authState = data.has_username && data.has_password ? '账号密码已配置' : '账号密码未完整配置';
-    el.textContent = `${data.enabled ? '已启用' : '已停用'} / ${data.firewall_ip || '-'} / ${data.address_book_name || '-'} / ${authState}`;
+    el.textContent = `${data.enabled ? '已启用' : '已停用'} / ${data.target_name || data.target_code || '默认设备'} / ${data.firewall_ip || '-'} / ${data.address_book_name || '-'} / ${authState}`;
   }
 
   function fillFirewallConfigModal(data) {
+    setValue('modalFirewallTargetCode', data.target_code || 'test-primary');
+    setValue('modalFirewallTargetName', data.target_name || '山石测试设备');
+    setValue('modalFirewallIsDefault', data.is_default === false ? 'false' : 'true');
+    setValue('modalFirewallIsTestTarget', data.is_test_target === false ? 'false' : 'true');
     setValue('modalFirewallEnabled', data.enabled === false ? 'false' : 'true');
     setValue('modalFirewallScheme', data.scheme || 'https');
     setValue('modalFirewallPort', data.port || 443);
@@ -130,6 +134,10 @@ window.AegisAdmin = window.AegisAdmin || {};
     const username = document.getElementById('modalFirewallUsername')?.value ?? '';
     const password = document.getElementById('modalFirewallPassword')?.value ?? '';
     const payload = {
+      target_code: document.getElementById('modalFirewallTargetCode')?.value.trim() || 'test-primary',
+      target_name: document.getElementById('modalFirewallTargetName')?.value.trim() || '山石测试设备',
+      is_default: (document.getElementById('modalFirewallIsDefault')?.value || 'true') === 'true',
+      is_test_target: (document.getElementById('modalFirewallIsTestTarget')?.value || 'true') === 'true',
       enabled: (document.getElementById('modalFirewallEnabled')?.value || 'true') === 'true',
       scheme: document.getElementById('modalFirewallScheme')?.value || 'https',
       firewall_ip: document.getElementById('modalFirewallIp')?.value.trim() || '',
@@ -202,6 +210,64 @@ window.AegisAdmin = window.AegisAdmin || {};
     if (input) input.value = '66.240.205.34\n8.8.8.8\nexample.com\nbibme.org';
   }
 
+  function fillBindingForm(item) {
+    setValue('feishuBindingOpenId', item.open_id);
+    setValue('feishuBindingDisplayName', item.display_name || '');
+    setValue('feishuBindingAegisUserId', item.aegis_user_id || '');
+    setValue('feishuBindingEnabled', item.enabled ? 'true' : 'false');
+    const queryEl = document.getElementById('feishuBindingCanQuery');
+    const blockEl = document.getElementById('feishuBindingCanBlock');
+    if (queryEl) queryEl.checked = Boolean(item.can_query);
+    if (blockEl) blockEl.checked = Boolean(item.can_block);
+  }
+
+  async function loadFeishuBindings() {
+    const data = await ns.api.request('/api/v1/admin/security-response/feishu-bindings', {
+      headers: ns.api.headers(),
+    });
+    const items = data.items || [];
+    const tbody = document.getElementById('feishuBindingTbody');
+    if (tbody) {
+      tbody.innerHTML = items.map((item) => `
+        <tr>
+          <td>${escapeHtml(item.display_name || '-')}</td>
+          <td><code>${escapeHtml(item.open_id)}</code></td>
+          <td>${escapeHtml(item.aegis_user_id || '-')}</td>
+          <td>${item.can_query ? '是' : '否'}</td>
+          <td>${item.can_block ? '是' : '否'}</td>
+          <td>${item.enabled ? '启用' : '停用'}</td>
+          <td><button class="toolbar-btn secondary" type="button" data-feishu-open-id="${escapeHtml(item.open_id)}">编辑</button></td>
+        </tr>
+      `).join('') || '<tr><td colspan="7">暂无数据；请先给机器人发一条消息。</td></tr>';
+      tbody.querySelectorAll('[data-feishu-open-id]').forEach((button) => {
+        button.onclick = () => fillBindingForm(items.find((item) => item.open_id === button.dataset.feishuOpenId));
+      });
+    }
+    const summary = document.getElementById('feishuBindingSummary');
+    if (summary) summary.textContent = `已登记 ${items.length} 个飞书身份；拥有封禁权限 ${items.filter((item) => item.enabled && item.can_block).length} 个。`;
+    return data;
+  }
+
+  async function saveFeishuBinding() {
+    const openId = document.getElementById('feishuBindingOpenId')?.value.trim() || '';
+    const aegisUserIdRaw = document.getElementById('feishuBindingAegisUserId')?.value || '';
+    if (!openId) throw new Error('请填写飞书 open_id');
+    const payload = {
+      open_id: openId,
+      display_name: document.getElementById('feishuBindingDisplayName')?.value.trim() || null,
+      aegis_user_id: aegisUserIdRaw ? Number(aegisUserIdRaw) : null,
+      can_query: document.getElementById('feishuBindingCanQuery')?.checked ?? false,
+      can_block: document.getElementById('feishuBindingCanBlock')?.checked ?? false,
+      enabled: (document.getElementById('feishuBindingEnabled')?.value || 'true') === 'true',
+    };
+    await ns.api.request('/api/v1/admin/security-response/feishu-bindings', {
+      method: 'PUT',
+      headers: ns.api.headers(),
+      body: JSON.stringify(payload),
+    });
+    return loadFeishuBindings();
+  }
+
   ns.threatbook = {
     queryThreatbook,
     blockIp,
@@ -210,6 +276,8 @@ window.AegisAdmin = window.AegisAdmin || {};
     loadFirewallConfig,
     openFirewallConfigModal,
     saveFirewallConfig,
+    loadFeishuBindings,
+    saveFeishuBinding,
     renderTable,
     getAutoBlockItems,
   };

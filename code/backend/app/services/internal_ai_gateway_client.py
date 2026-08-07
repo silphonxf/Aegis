@@ -19,7 +19,11 @@ class InternalAIGatewayClient:
         return str(provider).lower() in {"pi_gateway", "pi-gateway"}
 
     def _headers(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
-        provider = str((config or {}).get("engine_type") or settings.INTERNAL_AI_GATEWAY_PROVIDER)
+        provider = str(
+            (config or {}).get("provider")
+            or (config or {}).get("engine_type")
+            or settings.INTERNAL_AI_GATEWAY_PROVIDER
+        )
         headers = {
             "Content-Type": "application/json",
             "X-Aegis-AI-Provider": provider,
@@ -142,7 +146,7 @@ class InternalAIGatewayClient:
         response = self.post_json(
             (config or {}).get("chat_path") or settings.INTERNAL_AI_GATEWAY_CHAT_PATH,
             {
-                "provider": (config or {}).get("engine_type") or settings.INTERNAL_AI_GATEWAY_PROVIDER,
+                "provider": (config or {}).get("provider") or (config or {}).get("engine_type") or settings.INTERNAL_AI_GATEWAY_PROVIDER,
                 "model": (config or {}).get("model") or settings.INTERNAL_AI_GATEWAY_MODEL,
                 "conversation_id": conversation_id,
                 "message": message,
@@ -183,7 +187,7 @@ class InternalAIGatewayClient:
         response = self.post_json(
             (config or {}).get("diagnose_path") or settings.INTERNAL_AI_GATEWAY_DIAGNOSE_PATH,
             {
-                "provider": (config or {}).get("engine_type") or settings.INTERNAL_AI_GATEWAY_PROVIDER,
+                "provider": (config or {}).get("provider") or (config or {}).get("engine_type") or settings.INTERNAL_AI_GATEWAY_PROVIDER,
                 "model": (config or {}).get("model") or settings.INTERNAL_AI_GATEWAY_MODEL,
                 "title": title,
                 "detail": detail,
@@ -232,7 +236,7 @@ class InternalAIGatewayClient:
         response = self.post_json(
             (config or {}).get("log_analyze_path") or settings.INTERNAL_AI_GATEWAY_LOG_ANALYZE_PATH,
             {
-                "provider": (config or {}).get("engine_type") or settings.INTERNAL_AI_GATEWAY_PROVIDER,
+                "provider": (config or {}).get("provider") or (config or {}).get("engine_type") or settings.INTERNAL_AI_GATEWAY_PROVIDER,
                 "model": (config or {}).get("model") or settings.INTERNAL_AI_GATEWAY_MODEL,
                 "title": title,
                 "detail": detail,

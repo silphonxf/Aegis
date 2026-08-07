@@ -144,7 +144,32 @@ class ThreatIntelBlockRequest(BaseModel):
     dry_run: bool = True
 
 
+class ThreatIntelBatchBlockRequest(BaseModel):
+    ips: List[str] = Field(default_factory=list, min_items=1, max_items=100)
+    reason: Optional[str] = Field(default=None, max_length=500)
+    source: str = Field(default="ip-block-console", max_length=64)
+    dry_run: bool = True
+    target_code: Optional[str] = Field(default=None, max_length=64)
+
+    @validator("ips")
+    def normalize_ips(cls, values: List[str]) -> List[str]:
+        normalized = []
+        seen = set()
+        for value in values:
+            cleaned = str(value).strip()
+            if cleaned and cleaned not in seen:
+                seen.add(cleaned)
+                normalized.append(cleaned)
+        if not normalized:
+            raise ValueError("至少需要一个待封禁 IP")
+        return normalized
+
+
 class FirewallBlockConfigRequest(BaseModel):
+    target_code: str = Field(default="test-primary", min_length=1, max_length=64)
+    target_name: str = Field(default="山石测试设备", min_length=1, max_length=128)
+    is_default: bool = True
+    is_test_target: bool = True
     enabled: bool = True
     scheme: str = Field(default="https", pattern="^https?$")
     firewall_ip: str = Field(min_length=1, max_length=128)
@@ -156,7 +181,7 @@ class FirewallBlockConfigRequest(BaseModel):
     timeout_seconds: int = Field(default=15, ge=1, le=120)
     addrbook_path: str = Field(default="/api/addrbook", min_length=1, max_length=128)
 
-    @validator("firewall_ip", "address_book_name", "addrbook_path")
+    @validator("target_code", "target_name", "firewall_ip", "address_book_name", "addrbook_path")
     def normalize_required_text(cls, value: str) -> str:
         cleaned = value.strip()
         if not cleaned:

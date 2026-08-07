@@ -50,6 +50,15 @@ class Settings(BaseSettings):
     OPENCLAW_DIAGNOSE_PATH: str = "/aegis/ai/diagnose"
     OPENCLAW_LOG_ANALYZE_PATH: str = "/aegis/ai/log-analyze"
 
+    # Remote OpenClaw tool gateway. The OpenClaw plugin forwards the trusted
+    # Feishu sender identity from its runtime context; the LLM never supplies
+    # that identity as a tool argument.
+    OPENCLAW_TOOL_GATEWAY_ENABLED: bool = False
+    OPENCLAW_TOOL_GATEWAY_TOKEN: Optional[str] = None
+    OPENCLAW_TOOL_ALLOWED_CLIENT_CIDRS: str = ""
+    OPENCLAW_TOOL_FIREWALL_TARGET_CODE: str = "test-primary"
+    OPENCLAW_TOOL_ALLOW_PERMANENT_BLOCK: bool = False
+
     # Internal AI gateway. Use AI_PROVIDER=internal_gateway to route all AI
     # requests through a server-side gateway that can adapt to pi-agent or
     # other provider-specific APIs.
@@ -72,6 +81,13 @@ class Settings(BaseSettings):
     # ThreatBook
     THREATBOOK_API_KEY: Optional[str] = None
     THREATBOOK_TIMEOUT_SECONDS: int = 30
+
+    # Feishu bot. The bridge uses an outbound WebSocket long connection, so
+    # Aegis does not need a public callback URL.
+    FEISHU_APP_ID: Optional[str] = None
+    FEISHU_APP_SECRET: Optional[str] = None
+    FEISHU_FIREWALL_TARGET_CODE: str = "test-primary"
+    FEISHU_ALLOW_NON_TEST_FIREWALL_TARGETS: bool = False
 
     # Redis cache. Used for DB-backed configuration and selector/reference data.
     REDIS_CACHE_ENABLED: bool = True

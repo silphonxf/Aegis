@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>Aegis 恶意 IP 封禁台</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+
+  <main id="loginView" class="login-shell">
+    <section class="login-card">
+      <div class="brand-mark" aria-hidden="true"><span></span></div>
+      <p class="eyebrow">AEGIS SECURITY OPERATIONS</p>
+      <h1>恶意 IP 封禁台</h1>
+      <p class="login-copy">威胁信誉核验、批量导入与山石地址簿封禁集中处置。</p>
+      <form id="loginForm" class="stack-form">
+        <label>管理员账号<input id="username" autocomplete="username" value="admin" required /></label>
+        <label>密码<input id="password" type="password" autocomplete="current-password" required /></label>
+        <button class="primary wide" type="submit">进入控制台</button>
+      </form>
+      <p id="loginMessage" class="form-message" role="alert"></p>
+    </section>
+  </main>
+
+  <div id="appView" class="app-shell hidden" hidden>
+    <header class="topbar">
+      <div class="brand-inline">
+        <div class="brand-mark small" aria-hidden="true"><span></span></div>
+        <div><p class="eyebrow">AEGIS / NETWORK DEFENSE</p><h1>恶意 IP 封禁台</h1></div>
+      </div>
+      <div class="topbar-actions">
+        <span id="apiState" class="status-pill"><i></i>正在连接</span>
+        <span id="userBadge" class="user-badge">—</span>
+        <button id="logoutButton" class="ghost small-btn" type="button">退出</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="hero-grid">
+        <div>
+          <p class="eyebrow accent">HILLSTONE RESPONSE WORKBENCH</p>
+          <h2>先研判，后处置。<br /><span>让每次封禁都有依据。</span></h2>
+          <p class="hero-copy">支持微步 IP 信誉核验，也可跳过情报验证直接进入人工确认。真实执行会合并更新山石地址簿并回读核验。</p>
+        </div>
+        <aside class="firewall-card">
+          <div class="card-head"><span>当前封禁目标</span><button id="refreshConfig" class="icon-button" title="刷新" type="button">↻</button></div>
+          <strong id="firewallName">读取中…</strong>
+          <dl>
+            <div><dt>设备</dt><dd id="firewallHost">—</dd></div>
+            <div><dt>地址簿</dt><dd id="firewallBook">—</dd></div>
+            <div><dt>状态</dt><dd id="firewallState">—</dd></div>
+          </dl>
+        </aside>
+      </section>
+
+      <section class="control-strip">
+        <label class="switch-control">
+          <input id="verifyThreatbook" type="checkbox" checked />
+          <span class="switch"></span>
+          <span><b>微步信誉验证</b><small>使用入站 IP 信誉接口</small></span>
+        </label>
+        <label class="compact-field">情报范围
+          <select id="realtimeVerdict">
+            <option value="true">仅当前有效情报</option>
+            <option value="false">包含历史过期情报</option>
+          </select>
+        </label>
+        <label class="switch-control warning-control">
+          <input id="dryRun" type="checkbox" checked />
+          <span class="switch"></span>
+          <span><b>演练模式</b><small id="dryRunHint">不会写入防火墙</small></span>
+        </label>
+      </section>
+
+      <nav class="tabs" aria-label="封禁方式">
+        <button class="tab active" data-tab="single" type="button"><span>01</span>单 IP 处置</button>
+        <button class="tab" data-tab="batch" type="button"><span>02</span>Excel 批量处置</button>
+      </nav>
+
+      <section id="singlePanel" class="panel tab-panel">
+        <div class="panel-heading">
+          <div><p class="section-kicker">SINGLE TARGET</p><h3>单 IP 检测与封禁</h3></div>
+          <span class="step-note">检测结果不会自动执行封禁</span>
+        </div>
+        <div class="single-form-grid">
+          <label class="field prominent">目标 IPv4
+            <input id="singleIp" inputmode="decimal" placeholder="例如 203.0.113.10" />
+          </label>
+          <label class="field">封禁原因
+            <input id="singleReason" placeholder="例如：确认存在恶意扫描行为" />
+          </label>
+          <button id="checkSingle" class="primary action-button" type="button">检测 IP 信誉</button>
+        </div>
+
+        <div id="singleEmpty" class="empty-state">
+          <div class="radar-icon"><span></span></div>
+          <strong>等待目标 IP</strong>
+          <p>输入 IPv4 后执行检测，信誉信息将在这里展开。</p>
+        </div>
+
+        <div id="singleResult" class="result-area hidden" hidden>
+          <div class="verdict-row">
+            <div><span class="label">研判结论</span><strong id="singleVerdict">—</strong><p id="singleSummary">—</p></div>
+            <button id="blockSingle" class="danger action-button" type="button">执行封禁</button>
+          </div>
+          <div class="intel-grid">
+            <article><span>国家 / 地区</span><strong id="singleLocation">—</strong></article>
+            <article><span>危险类型</span><strong id="singleJudgments">—</strong></article>
+            <article><span>严重级别</span><strong id="singleSeverity">—</strong></article>
+            <article><span>可信度</span><strong id="singleConfidence">—</strong></article>
+            <article><span>ASN / 风险值</span><strong id="singleAsn">—</strong></article>
+            <article><span>应用场景</span><strong id="singleScene">—</strong></article>
+          </div>
+        </div>
+      </section>
+
+      <section id="batchPanel" class="panel tab-panel hidden" hidden>
+        <div class="panel-heading">
+          <div><p class="section-kicker">BATCH TARGETS</p><h3>Excel 批量导入与封禁</h3></div>
+          <button id="downloadTemplate" class="secondary" type="button">下载 Excel 模板</button>
+        </div>
+        <div id="dropZone" class="drop-zone" tabindex="0" role="button">
+          <input id="excelFile" type="file" accept=".xlsx,.xlsm,.xltx,.xltm" hidden />
+          <div class="upload-icon">⇧</div>
+          <strong>拖入 Excel 文件，或点击选择</strong>
+          <p>识别“IP地址 / 封禁原因 / 备注”列，单次最多 100 个 IPv4</p>
+          <span id="selectedFile">尚未选择文件</span>
+        </div>
+        <div class="batch-actions">
+          <button id="importExcel" class="primary" type="button" disabled>解析并检测</button>
+          <button id="selectCandidates" class="secondary" type="button" disabled>只选恶意候选</button>
+          <button id="selectAll" class="ghost" type="button" disabled>全选有效 IP</button>
+          <button id="blockBatch" class="danger push-right" type="button" disabled>封禁已选 IP</button>
+        </div>
+
+        <div class="summary-cards">
+          <article><span>有效 IP</span><strong id="validCount">0</strong></article>
+          <article><span>恶意 IP</span><strong id="maliciousCount">0</strong></article>
+          <article><span>已选择</span><strong id="selectedCount">0</strong></article>
+          <article class="muted-stat"><span>无效行</span><strong id="invalidCount">0</strong></article>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="check-cell"></th><th>IP 地址</th><th>结论</th><th>国家 / 地区</th><th>危险类型</th><th>严重级别</th><th>可信度</th><th>导入原因</th></tr></thead>
+            <tbody id="batchTable"><tr><td colspan="8" class="table-empty">导入 Excel 后显示结果</td></tr></tbody>
+          </table>
+        </div>
+        <div id="invalidRows" class="invalid-box hidden" hidden></div>
+      </section>
+
+      <section id="operationPanel" class="operation-panel hidden" hidden>
+        <div class="operation-head"><div><p class="section-kicker">EXECUTION RESULT</p><h3>操作结果</h3></div><button id="closeOperation" class="icon-button" type="button">×</button></div>
+        <pre id="operationResult"></pre>
+      </section>
+    </main>
+  </div>
+
+  <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+</body>
+</html>

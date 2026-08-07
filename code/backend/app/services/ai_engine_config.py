@@ -3,8 +3,8 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
+import app.db.session as db_session_module
 from app.core.config import settings
-from app.db.session import SessionLocal
 from app.models.ai_engine_config import AIEngineConfig
 from app.services.secret_crypto import decrypt_secret, encrypt_secret
 
@@ -31,6 +31,7 @@ def _defaults() -> Dict[str, Any]:
         engine_type = "pi_gateway" if settings.INTERNAL_AI_GATEWAY_PROVIDER.lower() in {"pi_gateway", "pi-gateway"} else "internal_gateway"
         return {
             "engine_type": engine_type,
+            "provider": settings.INTERNAL_AI_GATEWAY_PROVIDER,
             "base_url": settings.INTERNAL_AI_GATEWAY_BASE_URL or "",
             "api_key": settings.INTERNAL_AI_GATEWAY_API_KEY or "",
             "model": settings.INTERNAL_AI_GATEWAY_MODEL,
@@ -80,13 +81,14 @@ def serialize_ai_engine_config(db: Session) -> Dict[str, Any]:
 
 
 def get_runtime_ai_config() -> Dict[str, Any]:
-    db = SessionLocal()
+    db = db_session_module.SessionLocal()
     try:
         row = _first_config(db)
         if not row or not row.enabled:
             return _defaults()
         return {
             "engine_type": row.engine_type,
+            "provider": settings.INTERNAL_AI_GATEWAY_PROVIDER if row.engine_type == "internal_gateway" else row.engine_type,
             "base_url": row.base_url or "",
             "api_key": decrypt_secret(row.api_key_encrypted) or "",
             "model": row.model or "",

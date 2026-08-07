@@ -112,6 +112,7 @@ function switchView(viewId, groupId) {
   if (viewId === 'view-emergency-custom') ns.emergencyConfig?.listCustomActions?.();
   if (viewId === 'view-ai-external-keys') ns.rulesAudit?.listAiExternalKeys?.();
   if (viewId === 'view-ai-engine-config') ns.rulesAudit?.loadAiEngineConfig?.();
+  if (viewId === 'view-tool-threatbook') ns.threatbook?.loadFeishuBindings?.().catch(() => {});
 }
 
 function openGroup(groupId) {
@@ -291,6 +292,14 @@ bindClick('btnSaveThreatbookFirewallConfig', () => ns.threatbook.saveFirewallCon
   if (el) el.textContent = formatError('保存防火墙配置', e);
 }));
 bindClick('btnCloseThreatbookFirewallConfig', () => ns.modals.closeModal('firewallConfigModal'));
+bindClick('btnLoadFeishuBindings', () => ns.threatbook.loadFeishuBindings().catch((e) => {
+  const el = $('feishuBindingSummary');
+  if (el) el.textContent = formatError('读取飞书身份', e);
+}));
+bindClick('btnSaveFeishuBinding', () => ns.threatbook.saveFeishuBinding().catch((e) => {
+  const el = $('feishuBindingSummary');
+  if (el) el.textContent = formatError('保存飞书权限', e);
+}));
 
 bindClick('btnToggleAutoRefresh', () => {
   ns.state.autoRefreshEnabled = !ns.state.autoRefreshEnabled;

@@ -10,6 +10,7 @@ from app.models.firewall import FirewallBlockConfig
 from app.models.inspection import InspectionPoint, InspectionRecord
 from app.models.offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from app.models.rule import StatusRule
+from app.models.security_response import FeishuEventReceipt, FeishuUserBinding, IpBlockBatch, IpBlockItem
 from app.models.selfcheck import ChecklistTemplate, SelfcheckRecord, SelfcheckReport
 from app.models.system import System, SystemStatusSnapshot
 from app.models.tool_task import ToolTask
@@ -38,4 +39,8 @@ __all__ = [
     "AIChatMessage",
     "AIChatSummary",
     "AIConversation",
+    "FeishuUserBinding",
+    "FeishuEventReceipt",
+    "IpBlockBatch",
+    "IpBlockItem",
 ]

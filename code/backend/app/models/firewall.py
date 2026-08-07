@@ -11,6 +11,10 @@ class FirewallBlockConfig(Base):
     __tablename__ = "firewall_block_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    target_code: Mapped[str] = mapped_column(String(64), default="test-primary", nullable=False, unique=True)
+    target_name: Mapped[str] = mapped_column(String(128), default="山石测试设备", nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_test_target: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     scheme: Mapped[str] = mapped_column(String(16), default="https", nullable=False)
     firewall_ip: Mapped[str] = mapped_column(String(128), nullable=False)

@@ -8,6 +8,7 @@ alembic==1.13.2
 python-multipart==0.0.9
 openpyxl==3.1.5
 requests==2.32.3
+lark-oapi==1.7.1
 PyMySQL==1.1.1
 cryptography==42.0.8
 redis==5.0.8

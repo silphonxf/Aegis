@@ -69,7 +69,7 @@ def test_threatbook_unified_ip_and_domain_analysis(monkeypatch):
 
     def fake_get(url, params, timeout):
         calls.append((url, params["resource"]))
-        if url.endswith("/ip/query"):
+        if url.endswith("/scene/ip_reputation"):
             return FakeResponse({
                 "response_code": 0,
                 "verbose_msg": "OK",
@@ -100,7 +100,7 @@ def test_threatbook_unified_ip_and_domain_analysis(monkeypatch):
     monkeypatch.setattr("app.services.threatbook.requests.get", fake_get)
     result = threatbook.batch_query_indicators(["8.8.8.8\nevil.example"], lang="zh")
 
-    assert calls[0][0] == "https://api.threatbook.cn/v3/ip/query"
+    assert calls[0][0] == "https://api.threatbook.cn/v3/scene/ip_reputation"
     assert calls[1][0] == "https://api.threatbook.cn/v3/domain/query"
     assert result["items"][0]["ip_type"] == "云服务商"
     assert result["items"][0]["country"] == "美国"
@@ -294,6 +294,68 @@ def test_hillstone_addrbook_payload_converts_legacy_member(monkeypatch):
     }
 
 
+def test_hillstone_batch_block_updates_once_and_verifies(monkeypatch):
+    calls = []
+    get_count = 0
+
+    class FakeResponse:
+        status_code = 200
+        text = '{"success": true}'
+
+        def __init__(self, body):
+            self._body = body
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._body
+
+    def addrbook(ips):
+        return {
+            "success": True,
+            "result": [
+                {
+                    "name": "aegis-blocked-ip",
+                    "ip": [{"ip_addr": ip, "netmask": 32, "flag": 0} for ip in ips],
+                }
+            ],
+        }
+
+    def fake_post(url, **kwargs):
+        calls.append(("POST", url, kwargs))
+        return FakeResponse({"success": True, "result": [{"token": "tok"}]})
+
+    def fake_get(url, **kwargs):
+        nonlocal get_count
+        get_count += 1
+        calls.append(("GET", url, kwargs))
+        return FakeResponse(addrbook(["1.1.1.1"] if get_count == 1 else ["1.1.1.1", "2.2.2.2", "3.3.3.3"]))
+
+    def fake_put(url, **kwargs):
+        calls.append(("PUT", url, kwargs))
+        return FakeResponse({"success": True})
+
+    monkeypatch.setattr(settings, "HILLSTONE_USERNAME", "admin")
+    monkeypatch.setattr(settings, "HILLSTONE_PASSWORD", "secret")
+    monkeypatch.setattr("app.services.firewall.requests.post", fake_post)
+    monkeypatch.setattr("app.services.firewall.requests.get", fake_get)
+    monkeypatch.setattr("app.services.firewall.requests.put", fake_put)
+
+    result = HillstoneRestClient().block_ips(
+        ["1.1.1.1", "2.2.2.2", "3.3.3.3", "2.2.2.2"],
+        reason="batch test",
+        dry_run=False,
+    )
+
+    assert [method for method, _, _ in calls] == ["POST", "GET", "PUT", "GET"]
+    assert result["existing_ips"] == ["1.1.1.1"]
+    assert result["added_ips"] == ["2.2.2.2", "3.3.3.3"]
+    assert result["verified_ips"] == ["1.1.1.1", "2.2.2.2", "3.3.3.3"]
+    put_body = json.loads(calls[2][2]["data"])
+    assert [item["ip_addr"] for item in put_body["ip"]] == ["1.1.1.1", "2.2.2.2", "3.3.3.3"]
+
+
 def test_threat_intel_firewall_config_encrypts_credentials(client, admin_headers):
     resp = client.put(
         "/api/v1/admin/threat-intel/firewall-config",
@@ -462,3 +524,103 @@ def test_threatbook_ip_key_response_and_scanner_judgment_are_malicious(monkeypat
     assert result["summary"]["malicious"] == 1
     assert result["summary"]["high_risk"] == 1
     assert result["summary"]["block_candidates"] == ["66.240.205.34"]
+
+
+def test_threatbook_ip_reputation_batches_resources_and_realtime_verdict(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "response_code": 0,
+                "verbose_msg": "Ok",
+                "data": {
+                    "1.1.1.1": {"is_malicious": False, "judgments": ["Info"]},
+                    "2.2.2.2": {"is_malicious": True, "judgments": ["Scanner"]},
+                },
+            }
+
+    def fake_get(url, params, timeout):
+        calls.append((url, params, timeout))
+        return FakeResponse()
+
+    monkeypatch.setattr(settings, "THREATBOOK_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.threatbook.requests.get", fake_get)
+
+    result = threatbook.batch_query_ip_reputation(
+        ["1.1.1.1", "2.2.2.2"],
+        realtime_verdict=False,
+    )
+
+    assert len(calls) == 1
+    assert calls[0][0] == "https://api.threatbook.cn/v3/scene/ip_reputation"
+    assert calls[0][1]["resource"] == "1.1.1.1,2.2.2.2"
+    assert calls[0][1]["realtime_verdict"] == "false"
+    assert result["items"][0]["is_malicious"] is False
+    assert result["items"][1]["malicious_judgments"] == ["Scanner"]
+
+
+def test_ip_block_template_and_excel_import_without_threatbook(client, admin_headers):
+    template = client.get(
+        "/api/v1/admin/threat-intel/ip-block-template",
+        headers=admin_headers,
+    )
+    assert template.status_code == 200
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["IP地址", "封禁原因", "备注"])
+    sheet.append(["1.1.1.1", "扫描源", "第一条"])
+    sheet.append(["not-an-ip", "无效", "应被跳过"])
+    sheet.append(["2.2.2.2", "暴力破解", None])
+    content = BytesIO()
+    workbook.save(content)
+    content.seek(0)
+
+    response = client.post(
+        "/api/v1/admin/threat-intel/ip-block-import",
+        headers=admin_headers,
+        data={"verify_with_threatbook": "false", "realtime_verdict": "true"},
+        files={"file": ("block-list.xlsx", content.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["summary"] == {"valid": 2, "invalid": 1, "malicious": 0, "block_candidates": []}
+    assert body["items"][0]["ip"] == "1.1.1.1"
+    assert body["items"][0]["import_reason"] == "扫描源"
+    assert body["items"][0]["risk_level"] == "unverified"
+    assert body["invalid_rows"][0]["ip"] == "not-an-ip"
+
+
+def test_threat_intel_batch_block_uses_verified_firewall_flow(client, admin_headers, monkeypatch):
+    calls = []
+
+    def fake_block(ips, reason, dry_run, db, target_code):
+        calls.append((ips, reason, dry_run, target_code))
+        return {
+            "status": "blocked",
+            "dry_run": False,
+            "ips": ips,
+            "added_ips": ips,
+            "existing_ips": [],
+            "verified_ips": ips,
+        }
+
+    monkeypatch.setattr("app.api.admin.block_ips_with_firewall", fake_block)
+    response = client.post(
+        "/api/v1/admin/threat-intel/block-ips",
+        headers=admin_headers,
+        json={
+            "ips": ["1.1.1.1", "2.2.2.2", "1.1.1.1"],
+            "reason": "页面批量封禁",
+            "dry_run": False,
+            "source": "ip-block-console",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert calls == [(["1.1.1.1", "2.2.2.2"], "页面批量封禁", False, None)]
+    assert response.json()["verified_ips"] == ["1.1.1.1", "2.2.2.2"]

@@ -1,0 +1,85 @@
+{
+  "id": "aegis-tools",
+  "name": "Aegis Remote Tools",
+  "description": "Expose Aegis IP analysis and controlled firewall blocking cards to trusted Feishu sessions.",
+  "activation": {
+    "onStartup": true,
+    "onCommands": [
+      "aegis-ip"
+    ]
+  },
+  "contracts": {
+    "tools": [
+      "aegis_ip_capabilities",
+      "aegis_ip_analyze",
+      "aegis_ip_prepare_block",
+      "aegis_ip_confirm_jinan",
+      "aegis_ip_execute_block"
+    ],
+    "trustedToolPolicies": [
+      "aegis-feishu-local-firewall-deny"
+    ]
+  },
+  "commandAliases": [
+    {
+      "name": "aegis-ip",
+      "kind": "runtime-slash"
+    }
+  ],
+  "toolMetadata": {
+    "aegis_ip_capabilities": { "optional": true },
+    "aegis_ip_analyze": { "optional": true },
+    "aegis_ip_prepare_block": { "optional": true },
+    "aegis_ip_confirm_jinan": { "optional": true },
+    "aegis_ip_execute_block": { "optional": true }
+  },
+  "uiHints": {
+    "baseUrl": {
+      "label": "Aegis gateway URL",
+      "placeholder": "https://aegis.example.com:18791"
+    },
+    "token": {
+      "label": "Gateway token",
+      "sensitive": true
+    },
+    "caFile": {
+      "label": "Private CA certificate",
+      "advanced": true
+    },
+    "allowInsecureTls": {
+      "label": "Allow untrusted TLS",
+      "advanced": true
+    },
+    "timeoutMs": {
+      "label": "Request timeout (ms)",
+      "advanced": true
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "minLength": 8
+      },
+      "token": {
+        "type": "string",
+        "minLength": 24
+      },
+      "caFile": {
+        "type": "string"
+      },
+      "allowInsecureTls": {
+        "type": "boolean",
+        "default": false
+      },
+      "timeoutMs": {
+        "type": "number",
+        "minimum": 1000,
+        "maximum": 120000,
+        "default": 30000
+      }
+    }
+  }
+}

@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BACKEND_DIR="$ROOT_DIR/code/backend"
 MOBILE_DIR="$ROOT_DIR/code/frontend-mobile"
 ADMIN_DIR="$ROOT_DIR/code/frontend-admin"
+IP_BLOCK_DIR="$ROOT_DIR/code/frontend-ip-block"
 LOG_DIR="$ROOT_DIR/.logs"
 CERT_DIR="$ROOT_DIR/.certs"
 VENV_DIR="${VENV_DIR:-$ROOT_DIR/.venv}"
@@ -13,6 +14,7 @@ mkdir -p "$LOG_DIR"
 BACKEND_PORT="${AEGIS_BACKEND_PORT:-8000}"
 MOBILE_PORT="${AEGIS_MOBILE_PORT:-5173}"
 ADMIN_PORT="${AEGIS_ADMIN_PORT:-5174}"
+IP_BLOCK_PORT="${AEGIS_IP_BLOCK_PORT:-18791}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 HTTPS_CERT="${AEGIS_HTTPS_CERT:-$CERT_DIR/dev-lan.crt}"
 HTTPS_KEY="${AEGIS_HTTPS_KEY:-$CERT_DIR/dev-lan.key}"
@@ -35,6 +37,7 @@ print_access_urls() {
   echo "- Backend API:     https://127.0.0.1:${BACKEND_PORT}"
   echo "- Admin Frontend:  https://127.0.0.1:${ADMIN_PORT}"
   echo "- Mobile Frontend: https://127.0.0.1:${MOBILE_PORT}"
+  echo "- IP Block Console: https://127.0.0.1:${IP_BLOCK_PORT}"
 
   if [[ -n "$ips" ]]; then
     while IFS= read -r ip; do
@@ -42,6 +45,7 @@ print_access_urls() {
       echo "- Backend API (LAN):     https://$ip:${BACKEND_PORT}"
       echo "- Admin Frontend (LAN):  https://$ip:${ADMIN_PORT}"
       echo "- Mobile Frontend (LAN): https://$ip:${MOBILE_PORT}"
+      echo "- IP Block Console (LAN): https://$ip:${IP_BLOCK_PORT}"
     done <<< "$ips"
   fi
 
@@ -59,6 +63,7 @@ stop_local_processes() {
   pkill -f "python3 -m http.server ${ADMIN_PORT}" || true
   pkill -f "serve_https.py --host 0.0.0.0 --port ${MOBILE_PORT}" || true
   pkill -f "serve_https.py --host 0.0.0.0 --port ${ADMIN_PORT}" || true
+  pkill -f "serve_https.py --host 0.0.0.0 --port ${IP_BLOCK_PORT}" || true
 }
 
 ensure_backend_env() {
@@ -138,15 +143,17 @@ start_local_processes() {
   setsid -f bash -lc "cd '$BACKEND_DIR' && PYTHONPATH=. '$VENV_UVICORN' app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} --ssl-certfile '$HTTPS_CERT' --ssl-keyfile '$HTTPS_KEY' > '$LOG_DIR/backend-https.log' 2>&1"
   setsid -f bash -lc "'$VENV_PYTHON' '$ROOT_DIR/scripts/serve_https.py' --host 0.0.0.0 --port ${MOBILE_PORT} --dir '$MOBILE_DIR' --cert '$HTTPS_CERT' --key '$HTTPS_KEY' > '$LOG_DIR/frontend-mobile.log' 2>&1"
   setsid -f bash -lc "'$VENV_PYTHON' '$ROOT_DIR/scripts/serve_https.py' --host 0.0.0.0 --port ${ADMIN_PORT} --dir '$ADMIN_DIR' --cert '$HTTPS_CERT' --key '$HTTPS_KEY' > '$LOG_DIR/frontend-admin.log' 2>&1"
+  setsid -f bash -lc "'$VENV_PYTHON' '$ROOT_DIR/scripts/serve_https.py' --host 0.0.0.0 --port ${IP_BLOCK_PORT} --dir '$IP_BLOCK_DIR' --cert '$HTTPS_CERT' --key '$HTTPS_KEY' --proxy-prefix /aegis/tools/v1 --proxy-target https://127.0.0.1:${BACKEND_PORT} > '$LOG_DIR/frontend-ip-block.log' 2>&1"
 
   sleep 3
   echo "📋 Local dev process status:"
-  ss -lntp | grep -E ":(${BACKEND_PORT}|${MOBILE_PORT}|${ADMIN_PORT})\\b" || true
+  ss -lntp | grep -E ":(${BACKEND_PORT}|${MOBILE_PORT}|${ADMIN_PORT}|${IP_BLOCK_PORT})\\b" || true
   echo
   curl -k -fsS "https://127.0.0.1:${BACKEND_PORT}/healthz" || true
   echo
   curl -k -I -fsS "https://127.0.0.1:${MOBILE_PORT}" | head -n 1 || true
   curl -k -I -fsS "https://127.0.0.1:${ADMIN_PORT}" | head -n 1 || true
+  curl -k -I -fsS "https://127.0.0.1:${IP_BLOCK_PORT}" | head -n 1 || true
 }
 
 echo "ℹ️ 使用 Codex 整理版本地开发模式（uvicorn + HTTPS static server）。"

@@ -9,6 +9,7 @@ from .inspection import InspectionPoint, InspectionRecord
 from .shared_data import EmergencyHost, Room, Runbook
 from .offline_analysis import OfflineAnalysisResult, OfflineAnalysisTask
 from .rule import StatusRule
+from .security_response import FeishuEventReceipt, FeishuUserBinding, IpBlockBatch, IpBlockItem
 from .selfcheck import ChecklistTemplate, SelfcheckRecord, SelfcheckReport
 from .system import System, SystemLogConfig, SystemStatusSnapshot, SystemUserBinding
 from .tool_task import ToolTask
@@ -40,4 +41,8 @@ __all__ = [
     "AIEngineConfig",
     "AIExternalApiKey",
     "FirewallBlockConfig",
+    "FeishuUserBinding",
+    "FeishuEventReceipt",
+    "IpBlockBatch",
+    "IpBlockItem",
 ]
