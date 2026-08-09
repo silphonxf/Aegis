@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -10,7 +10,13 @@ class OpenClawIpAnalyzeRequest(BaseModel):
 
 
 class OpenClawBatchPrepareRequest(BaseModel):
-    selection: str = Field(default="recommended", pattern="^(recommended|all_malicious)$")
+    selection: str = Field(default="recommended", pattern="^(recommended|all_malicious|selected)$")
+    selected_ips: Optional[List[str]] = Field(default=None, max_items=100)
+
+
+class OpenClawBatchItemSelectionRequest(BaseModel):
+    ip: str = Field(min_length=7, max_length=45)
+    selected: bool
 
 
 class OpenClawBatchConfirmRequest(BaseModel):

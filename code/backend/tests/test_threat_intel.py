@@ -10,6 +10,12 @@ from app.models.firewall import FirewallBlockConfig
 from app.services.firewall import HillstoneRestClient
 
 
+def test_normalize_ip_list_accepts_mixed_separators_and_deduplicates():
+    assert threatbook.normalize_ip_list([
+        "1.1.1.1 2.2.2.2，3.3.3.3; 1.1.1.1\n4.4.4.4",
+    ]) == ["1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4"]
+
+
 def test_threat_intel_quick_query_rule_jinan_confirm(client, admin_headers, monkeypatch):
     def fake_batch_query_ip_reputation(raw_items, lang="zh", realtime_verdict=True):
         return {

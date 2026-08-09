@@ -246,6 +246,7 @@ def prepare_batch(
     selection: str,
     confirmer_user_id: Optional[int],
     confirmer_open_id: Optional[str],
+    selected_ips: Optional[List[str]] = None,
 ) -> IpBlockBatch:
     if confirmer_open_id:
         binding = require_feishu_permission(db, confirmer_open_id, "block")
@@ -254,13 +255,34 @@ def prepare_batch(
     if batch.status != "analyzed":
         raise SecurityResponseStateError(f"当前批次状态 {batch.status}，不能重复选择")
     items = db.query(IpBlockItem).filter(IpBlockItem.batch_id == batch.id).all()
+    if selection not in {"recommended", "all_malicious", "selected"}:
+        raise SecurityResponseStateError("不支持的 IP 选择方式")
+
+    explicit_selection = None
+    if selection == "selected":
+        if selected_ips is None:
+            explicit_selection = {item.ip for item in items if item.selected}
+        else:
+            explicit_selection = {str(ip).strip() for ip in selected_ips if str(ip).strip()}
+        known_ips = {item.ip for item in items}
+        unknown_ips = sorted(explicit_selection - known_ips)
+        if unknown_ips:
+            raise SecurityResponseStateError(f"所选 IP 不属于本次研判清单：{', '.join(unknown_ips)}")
+
     for item in items:
-        item.selected = item.should_block if selection == "recommended" else item.is_malicious
+        if selection == "recommended":
+            item.selected = item.should_block
+        elif selection == "all_malicious":
+            item.selected = item.is_malicious
+        else:
+            item.selected = item.ip in explicit_selection
         if item.selected:
             item.status = "selected"
+        elif item.status == "selected":
+            item.status = "analyzed"
     selected = [item for item in items if item.selected]
     if not selected:
-        raise SecurityResponseStateError("本批次没有符合条件的恶意 IP")
+        raise SecurityResponseStateError("本批次没有已选择的 IP")
     batch.confirmer_open_id = confirmer_open_id
     batch.confirmer_user_id = confirmer_user_id
     batch.status = (
@@ -268,6 +290,37 @@ def prepare_batch(
         if any(item.needs_jinan_confirmation for item in selected)
         else "execution_confirmation_pending"
     )
+    batch.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(batch)
+    return batch
+
+
+def set_batch_item_selection(
+    db: Session,
+    batch_id: str,
+    ip: str,
+    selected: bool,
+    confirmer_user_id: Optional[int],
+    confirmer_open_id: Optional[str],
+) -> IpBlockBatch:
+    if confirmer_open_id:
+        binding = require_feishu_permission(db, confirmer_open_id, "block")
+        confirmer_user_id = binding.aegis_user_id
+    batch = _get_batch(db, batch_id)
+    if batch.status != "analyzed":
+        raise SecurityResponseStateError(f"当前批次状态 {batch.status}，不能修改 IP 选择")
+    item = db.query(IpBlockItem).filter(
+        IpBlockItem.batch_id == batch.id,
+        IpBlockItem.ip == ip.strip(),
+    ).first()
+    if not item:
+        raise SecurityResponseStateError("所选 IP 不属于本次研判清单")
+    item.selected = selected
+    item.status = "selected" if selected else "analyzed"
+    item.updated_at = datetime.utcnow()
+    batch.confirmer_open_id = confirmer_open_id
+    batch.confirmer_user_id = confirmer_user_id
     batch.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(batch)
@@ -407,6 +460,49 @@ def execute_batch(
 
 def serialize_batch(db: Session, batch: IpBlockBatch) -> Dict[str, Any]:
     items = db.query(IpBlockItem).filter(IpBlockItem.batch_id == batch.id).order_by(IpBlockItem.id.asc()).all()
+    try:
+        analysis = json.loads(batch.analysis_json) if batch.analysis_json else {}
+    except (TypeError, ValueError):
+        analysis = {}
+    analysis_by_ip = {
+        str(item.get("ip")): item
+        for item in (analysis.get("items") or [])
+        if isinstance(item, dict) and item.get("ip")
+    }
+
+    def serialize_item(item: IpBlockItem) -> Dict[str, Any]:
+        intel = analysis_by_ip.get(item.ip, {})
+        basic = intel.get("basic") if isinstance(intel.get("basic"), dict) else {}
+        location = basic.get("location") if isinstance(basic.get("location"), dict) else {}
+        asn = intel.get("asn") if isinstance(intel.get("asn"), dict) else {}
+        return {
+            "ip": item.ip,
+            "risk_level": item.risk_level,
+            "risk_score": intel.get("risk_score"),
+            "is_malicious": item.is_malicious,
+            "should_block": item.should_block,
+            "needs_jinan_confirmation": item.needs_jinan_confirmation,
+            "selected": item.selected,
+            "summary": item.summary,
+            "status": item.status,
+            "country": intel.get("country") or location.get("country"),
+            "province": location.get("province"),
+            "city": location.get("city"),
+            "location": location.get("display"),
+            "carrier": basic.get("carrier"),
+            "asn_number": asn.get("number"),
+            "asn_info": asn.get("info"),
+            "asn_rank": asn.get("rank"),
+            "attack_types": intel.get("malicious_types") or intel.get("malicious_judgments") or [],
+            "judgments": intel.get("judgments") or [],
+            "tags": intel.get("tags") or [],
+            "severity": intel.get("severity"),
+            "confidence_level": intel.get("confidence_level"),
+            "scene": intel.get("scene"),
+            "update_time": intel.get("update_time"),
+            "permalink": intel.get("permalink"),
+        }
+
     return {
         "id": batch.id,
         "status": batch.status,
@@ -418,17 +514,5 @@ def serialize_batch(db: Session, batch: IpBlockBatch) -> Dict[str, Any]:
         "expires_at": batch.expires_at.isoformat() if batch.expires_at else None,
         "execution": json.loads(batch.execution_json) if batch.execution_json else None,
         "error_message": batch.error_message,
-        "items": [
-            {
-                "ip": item.ip,
-                "risk_level": item.risk_level,
-                "is_malicious": item.is_malicious,
-                "should_block": item.should_block,
-                "needs_jinan_confirmation": item.needs_jinan_confirmation,
-                "selected": item.selected,
-                "summary": item.summary,
-                "status": item.status,
-            }
-            for item in items
-        ],
+        "items": [serialize_item(item) for item in items],
     }

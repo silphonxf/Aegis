@@ -193,11 +193,15 @@ sha256sum openclaw-aegis-tools-*.tgz
 `prepack` 会自动编译 `dist/index.js`。把版本化 tgz 和 SHA-256 通过受控渠道复制到
 OpenClaw 服务器，不复制 `.env`、OpenClaw 配置、token 或私钥。
 
-当前已联调版本为 `1.1.2`。该版本包含：
+当前源码版本为 `1.3.0`。该版本包含：
 
 - 五个声明式远程工具契约；
 - `/aegis-ip` 飞书卡片命令；
 - IPv4 消息的模型前确定性拦截和卡片响应；
+- 一个或多个 IP 的情报清单，以及逐项选择/取消和已选数量确认；
+- IP 归属地、运营商、ASN、攻击类型、标签、严重度、可信度和风险分展示；
+- 插件通过飞书原生消息 API 发送可点击卡片，兼容当前 OpenClaw 入站流式回复路径；
+- 后端对自定义所选 IP 与原研判批次清单的归属校验；
 - OpenClaw 全局代理开启时，对已配置 Aegis origin 的独立直连；
 - 中文消息到纯 IP 列表的规范化；
 - 卡片发送失败时的文本回退；
@@ -208,13 +212,13 @@ OpenClaw 服务器，不复制 `.env`、OpenClaw 配置、token 或私钥。
 ### 5.1 安装插件
 
 ```bash
-openclaw plugins install ./openclaw-aegis-tools-1.1.2.tgz
+openclaw plugins install ./openclaw-aegis-tools-1.3.0.tgz
 ```
 
 升级已有版本时使用：
 
 ```bash
-openclaw plugins install --force ./openclaw-aegis-tools-1.1.2.tgz
+openclaw plugins install --force ./openclaw-aegis-tools-1.3.0.tgz
 ```
 
 ### 5.2 配置插件
@@ -256,7 +260,7 @@ openclaw plugins install --force ./openclaw-aegis-tools-1.1.2.tgz
 - token 所在配置文件权限应为 `0600`，并纳入服务器密钥备份与轮换流程；
 - 远端部署时 `baseUrl` 不能写 `127.0.0.1`，必须指向 Aegis 网关地址。
 
-插件 `1.1.2` 使用独立 Undici dispatcher 直连配置的精确 Aegis origin，因此不会
+插件 `1.3.0` 使用独立 Undici dispatcher 直连配置的精确 Aegis origin，因此不会
 被 OpenClaw 的全局模型代理错误转发，也不会放宽其他插件的代理策略。
 
 ### 5.3 重启并验证注册
@@ -298,9 +302,10 @@ aegis-tools: registered 5 remote tools, card workflow, and local-firewall guard
 1. 授权测试账号 `enabled=true, can_query=true, can_block=true`。
 2. 在飞书发送：`分析 IP 66.240.205.34`。
 3. 确认出现分析卡片，而不是模型自由回答。
-4. 点击“选择建议封禁”。
-5. 点击“仅演练（不改防火墙）”。
-6. 确认结果卡片显示 dry-run 成功，并在山石地址簿核对没有变化。
+4. 在 IP 情报清单中逐项选择或取消，确认已选数量正确；也可使用“快速选择建议封禁”。
+5. 点击“确认已选”，核对最终待操作 IP 清单。
+6. 点击“仅演练（不改防火墙）”。
+7. 确认结果卡片显示 dry-run 成功，并在山石地址簿核对没有变化。
 
 ### 阶段 C：永久封禁
 

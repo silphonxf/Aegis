@@ -78,44 +78,53 @@
       </section>
 
       <nav class="tabs" aria-label="封禁方式">
-        <button class="tab active" data-tab="single" type="button"><span>01</span>单 IP 处置</button>
+        <button class="tab active" data-tab="single" type="button"><span>01</span>IP 清单研判</button>
         <button class="tab" data-tab="batch" type="button"><span>02</span>Excel 批量处置</button>
       </nav>
 
       <section id="singlePanel" class="panel tab-panel">
         <div class="panel-heading">
-          <div><p class="section-kicker">SINGLE TARGET</p><h3>单 IP 检测与封禁</h3></div>
-          <span class="step-note">检测结果不会自动执行封禁</span>
+          <div><p class="section-kicker">IP INTELLIGENCE LIST</p><h3>一个或多个 IP 检测与选择封禁</h3></div>
+          <span class="step-note">先形成情报清单，再逐项选择</span>
         </div>
         <div class="single-form-grid">
-          <label class="field prominent">目标 IPv4
-            <input id="singleIp" inputmode="decimal" placeholder="例如 203.0.113.10" />
+          <label class="field prominent">目标 IPv4 清单
+            <textarea id="ipListInput" class="ip-list-input" rows="5" placeholder="每行一个，也支持空格或逗号分隔，例如：&#10;203.0.113.10&#10;198.51.100.25"></textarea>
           </label>
           <label class="field">封禁原因
-            <input id="singleReason" placeholder="例如：确认存在恶意扫描行为" />
+            <input id="queryReason" placeholder="例如：根据威胁情报确认存在恶意扫描行为" />
           </label>
-          <button id="checkSingle" class="primary action-button" type="button">检测 IP 信誉</button>
+          <button id="checkIpList" class="primary action-button" type="button">生成 IP 情报清单</button>
         </div>
 
         <div id="singleEmpty" class="empty-state">
           <div class="radar-icon"><span></span></div>
-          <strong>等待目标 IP</strong>
-          <p>输入 IPv4 后执行检测，信誉信息将在这里展开。</p>
+          <strong>等待 IP 清单</strong>
+          <p>输入一个或多个 IPv4 后查询，逐项查看情报并选择需要封禁的 IP。</p>
         </div>
 
         <div id="singleResult" class="result-area hidden" hidden>
-          <div class="verdict-row">
-            <div><span class="label">研判结论</span><strong id="singleVerdict">—</strong><p id="singleSummary">—</p></div>
-            <button id="blockSingle" class="danger action-button" type="button">执行封禁</button>
+          <div class="batch-actions">
+            <button id="selectQueryCandidates" class="secondary" type="button">只选建议封禁</button>
+            <button id="selectQueryAll" class="ghost" type="button">全选清单</button>
+            <button id="clearQuerySelection" class="ghost" type="button">清空选择</button>
+            <button id="blockQueryList" class="danger push-right" type="button">封禁已选 IP</button>
           </div>
-          <div class="intel-grid">
-            <article><span>国家 / 地区</span><strong id="singleLocation">—</strong></article>
-            <article><span>危险类型</span><strong id="singleJudgments">—</strong></article>
-            <article><span>严重级别</span><strong id="singleSeverity">—</strong></article>
-            <article><span>可信度</span><strong id="singleConfidence">—</strong></article>
-            <article><span>ASN / 风险值</span><strong id="singleAsn">—</strong></article>
-            <article><span>应用场景</span><strong id="singleScene">—</strong></article>
+
+          <div class="summary-cards">
+            <article><span>有效 IP</span><strong id="queryValidCount">0</strong></article>
+            <article><span>恶意 IP</span><strong id="queryMaliciousCount">0</strong></article>
+            <article><span>已选择</span><strong id="querySelectedCount">0</strong></article>
+            <article class="muted-stat"><span>无效输入</span><strong id="queryInvalidCount">0</strong></article>
           </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th class="check-cell"></th><th>IP 地址</th><th>情报结论</th><th>国家 / 地区</th><th>危险类型</th><th>严重级别</th><th>可信度</th><th>情报摘要</th></tr></thead>
+              <tbody id="queryTable"><tr><td colspan="8" class="table-empty">查询后显示 IP 情报清单</td></tr></tbody>
+            </table>
+          </div>
+          <div id="queryInvalidInputs" class="invalid-box hidden" hidden></div>
         </div>
       </section>
 
