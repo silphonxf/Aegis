@@ -11,6 +11,7 @@ from app.models.security_response import IpBlockBatch
 from app.schemas.openclaw_tools import (
     OpenClawBatchConfirmRequest,
     OpenClawBatchExecuteRequest,
+    OpenClawBatchItemSelectionRequest,
     OpenClawBatchPrepareRequest,
     OpenClawIpAnalyzeRequest,
 )
@@ -25,6 +26,7 @@ from app.services.security_response import (
     prepare_batch,
     require_feishu_permission,
     serialize_batch,
+    set_batch_item_selection,
 )
 
 
@@ -188,7 +190,36 @@ def openclaw_prepare_batch(
 ):
     _owned_batch(db, batch_id, open_id)
     try:
-        batch = prepare_batch(db, batch_id, payload.selection, None, open_id)
+        batch = prepare_batch(
+            db,
+            batch_id,
+            payload.selection,
+            None,
+            open_id,
+            selected_ips=payload.selected_ips,
+        )
+    except SecurityResponseError as exc:
+        raise _security_error(exc) from exc
+    return serialize_batch(db, batch)
+
+
+@router.post("/ip/batches/{batch_id}/selection")
+def openclaw_select_batch_item(
+    batch_id: str,
+    payload: OpenClawBatchItemSelectionRequest,
+    open_id: str = Depends(require_openclaw_feishu_identity),
+    db: Session = Depends(get_db),
+):
+    _owned_batch(db, batch_id, open_id)
+    try:
+        batch = set_batch_item_selection(
+            db,
+            batch_id,
+            payload.ip,
+            payload.selected,
+            None,
+            open_id,
+        )
     except SecurityResponseError as exc:
         raise _security_error(exc) from exc
     return serialize_batch(db, batch)

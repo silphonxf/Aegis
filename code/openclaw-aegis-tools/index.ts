@@ -22,12 +22,29 @@ type TrustedContext = {
 type BatchItem = {
   ip: string;
   risk_level?: string | null;
+  risk_score?: number | null;
   is_malicious: boolean;
   should_block: boolean;
   needs_jinan_confirmation: boolean;
   selected: boolean;
   summary?: string | null;
   status?: string | null;
+  country?: string | null;
+  province?: string | null;
+  city?: string | null;
+  location?: string | null;
+  carrier?: string | null;
+  asn_number?: number | string | null;
+  asn_info?: string | null;
+  asn_rank?: number | null;
+  attack_types?: string[] | null;
+  judgments?: string[] | null;
+  tags?: string[] | null;
+  severity?: string | null;
+  confidence_level?: string | null;
+  scene?: string | null;
+  update_time?: string | null;
+  permalink?: string | null;
 };
 
 type Batch = {
@@ -64,6 +81,15 @@ const RISK_LABELS: Record<string, string> = {
   medium_risk: "中危",
   suspicious: "可疑",
   safe: "安全",
+};
+
+const ATTACK_TYPE_LABELS: Record<string, string> = {
+  Scanner: "扫描探测",
+  Exploit: "漏洞利用",
+  Zombie: "僵尸主机",
+  Botnet: "僵尸网络",
+  "Brute Force": "暴力破解",
+  Spam: "垃圾邮件/滥发",
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -196,14 +222,48 @@ function commandButton(label: string, command: string, style: "primary" | "secon
   };
 }
 
+function listText(values: string[] | null | undefined, fallback = "未命中"): string {
+  const normalized = (values ?? []).map((value) => value.trim()).filter(Boolean);
+  return normalized.length > 0 ? [...new Set(normalized)].join("、") : fallback;
+}
+
+function attackTypeText(item: BatchItem): string {
+  const values = (item.attack_types ?? []).map((value) => ATTACK_TYPE_LABELS[value] ?? value);
+  return listText(values, "未命中明确攻击类型");
+}
+
+function locationText(item: BatchItem): string {
+  return (
+    item.location ||
+    [item.country, item.province, item.city].map((value) => value?.trim()).filter(Boolean).join(" / ") ||
+    "未知"
+  );
+}
+
+function asnText(item: BatchItem): string {
+  const number = item.asn_number ? `AS${item.asn_number}` : "ASN 未知";
+  return item.asn_info ? `${number} (${item.asn_info})` : number;
+}
+
 function analysisPresentation(batch: Batch): Presentation {
   const malicious = batch.items.filter((item) => item.is_malicious);
   const recommended = batch.items.filter((item) => item.should_block);
+  const selected = batch.items.filter((item) => item.selected);
   const rows = batch.items.slice(0, 20).map((item) => {
     const marker = item.is_malicious ? "🔴" : "🟢";
+    const selectedMarker = item.selected ? "☑️" : "☐";
     const risk = RISK_LABELS[item.risk_level ?? ""] ?? item.risk_level ?? "未知";
     const jinan = item.needs_jinan_confirmation ? " · ⚠️ 济南二次确认" : "";
-    return `${marker} **${item.ip}** · ${risk}${jinan}\n${truncate(item.summary, 140)}`;
+    const score = typeof item.risk_score === "number" ? ` · 风险分 ${item.risk_score}` : "";
+    return (
+      `${selectedMarker} ${marker} **${item.ip}** · ${risk}${score}${jinan}\n` +
+      `📍 归属地：${locationText(item)}\n` +
+      `🏢 运营商：${item.carrier || "未知"} · ${asnText(item)}\n` +
+      `⚔️ 攻击类型：${attackTypeText(item)}\n` +
+      `🏷️ 情报标签：${listText([...(item.judgments ?? []), ...(item.tags ?? [])])}\n` +
+      `🔎 微步结论：${item.is_malicious ? "恶意" : "未判定恶意"} · 严重度 ${item.severity || "未知"} · 可信度 ${item.confidence_level || "未知"}\n` +
+      `📝 依据：${truncate(item.summary, 220)}`
+    );
   });
   const blocks: Array<Record<string, unknown>> = [
     {
@@ -218,22 +278,38 @@ function analysisPresentation(batch: Batch): Presentation {
   if (batch.items.length > 20) {
     blocks.push({ type: "context", text: `另有 ${batch.items.length - 20} 条未在卡片中展开。` });
   }
-  if (malicious.length > 0) {
+  // Feishu cards accept at most 20 actions. Reserve four slots for the batch
+  // actions below and expose per-IP toggles for the first 16 entries.
+  const visibleItems = batch.items.slice(0, 16);
+  for (let index = 0; index < visibleItems.length; index += 3) {
     blocks.push({
       type: "buttons",
-      buttons: [
-        commandButton("选择建议封禁", `/aegis-ip prepare_recommended ${batch.id}`, "primary"),
-        commandButton("选择全部恶意", `/aegis-ip prepare_all_malicious ${batch.id}`, "danger"),
-        commandButton("取消", `/aegis-ip cancel ${batch.id}`, "secondary"),
-      ],
-    });
-  } else {
-    blocks.push({
-      type: "buttons",
-      buttons: [commandButton("关闭", `/aegis-ip cancel ${batch.id}`, "secondary")],
+      buttons: visibleItems.slice(index, index + 3).map((item) =>
+        commandButton(
+          `${item.selected ? "取消" : "选择"} ${item.ip}`,
+          `/aegis-ip ${item.selected ? "unselect_ip" : "select_ip"} ${batch.id} ${item.ip}`,
+          item.selected ? "success" : "secondary",
+        ),
+      ),
     });
   }
-  blocks.push({ type: "context", text: "批次 30 分钟内有效；每次点击都会再次校验飞书账号白名单。" });
+  const actionButtons = [];
+  if (selected.length > 0) {
+    actionButtons.push(commandButton(`确认已选 ${selected.length} 个`, `/aegis-ip prepare_selected ${batch.id}`, "primary"));
+  }
+  if (recommended.length > 0) {
+    actionButtons.push(commandButton("快速选择建议封禁", `/aegis-ip prepare_recommended ${batch.id}`, "primary"));
+  }
+  if (malicious.length > 0) {
+    actionButtons.push(commandButton("快速选择全部恶意", `/aegis-ip prepare_all_malicious ${batch.id}`, "danger"));
+  }
+  actionButtons.push(commandButton("取消", `/aegis-ip cancel ${batch.id}`, "secondary"));
+  blocks.push({ type: "buttons", buttons: actionButtons });
+  blocks.push({
+    type: "context",
+    text:
+      "逐项选择后点击“确认已选”；“未命中明确攻击类型”表示本次微步返回没有攻击分类，不能据此虚构攻击行为。批次 30 分钟内有效，每次点击都会再次校验飞书账号白名单。",
+  });
   return { title: "Aegis IP 威胁研判", tone: "info", blocks };
 }
 
@@ -326,8 +402,108 @@ function cancelledPresentation(): Presentation {
   };
 }
 
-function cardReply(presentation: Presentation, text: string) {
-  return { text, presentation };
+function presentationFallbackText(presentation: Presentation): string {
+  const lines = [`**${presentation.title}**`];
+  for (const block of presentation.blocks) {
+    if (block.type === "divider") {
+      lines.push("---");
+      continue;
+    }
+    if ((block.type === "text" || block.type === "context") && typeof block.text === "string") {
+      lines.push(block.type === "context" ? `> ${block.text}` : block.text);
+      continue;
+    }
+    if (block.type === "buttons" && Array.isArray(block.buttons)) {
+      const commands = block.buttons.flatMap((button) => {
+        if (!button || typeof button !== "object") return [];
+        const record = button as Record<string, unknown>;
+        const action = record.action;
+        if (!action || typeof action !== "object") return [];
+        const command = (action as Record<string, unknown>).command;
+        if (typeof command !== "string") return [];
+        const label = typeof record.label === "string" ? record.label : "操作";
+        return [`- ${label}：\`${command}\``];
+      });
+      if (commands.length > 0) lines.push(commands.join("\n"));
+    }
+  }
+  const text = lines.filter(Boolean).join("\n\n");
+  return text.length <= 3900 ? text : `${text.slice(0, 3880)}\n\n…清单过长，请在 Aegis 控制台查看完整内容。`;
+}
+
+function cardReply(presentation: Presentation) {
+  return { text: presentationFallbackText(presentation), presentation };
+}
+
+function escapeFeishuMarkdown(value: string): string {
+  return value.replace(/[&<>]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[char] ?? char);
+}
+
+function feishuButtonType(style: unknown): "primary" | "danger" | "default" {
+  if (style === "primary" || style === "success") return "primary";
+  if (style === "danger") return "danger";
+  return "default";
+}
+
+function buildNativeFeishuCard(presentation: Presentation): Record<string, unknown> {
+  const elements: Array<Record<string, unknown>> = [];
+  for (const block of presentation.blocks) {
+    if (block.type === "divider") {
+      elements.push({ tag: "hr" });
+      continue;
+    }
+    if ((block.type === "text" || block.type === "context") && typeof block.text === "string") {
+      const content = escapeFeishuMarkdown(block.text);
+      elements.push({
+        tag: "markdown",
+        content: block.type === "context" ? `<font color='grey'>${content}</font>` : content,
+      });
+      continue;
+    }
+    if (block.type !== "buttons" || !Array.isArray(block.buttons)) continue;
+    for (const button of block.buttons) {
+      if (!button || typeof button !== "object") continue;
+      const record = button as Record<string, unknown>;
+      const action = record.action;
+      const command =
+        action && typeof action === "object" && (action as Record<string, unknown>).type === "command"
+          ? (action as Record<string, unknown>).command
+          : undefined;
+      if (typeof record.label !== "string" || typeof command !== "string") continue;
+      elements.push({
+        tag: "button",
+        text: { tag: "plain_text", content: record.label },
+        type: feishuButtonType(record.style),
+        behaviors: [
+          {
+            type: "callback",
+            value: { oc: "ocf1", k: "quick", a: "feishu.payload.button", q: command },
+          },
+        ],
+      });
+    }
+  }
+  const template =
+    presentation.tone === "danger"
+      ? "red"
+      : presentation.tone === "warning"
+        ? "orange"
+        : presentation.tone === "success"
+          ? "green"
+          : "blue";
+  return {
+    schema: "2.0",
+    config: { width_mode: "fill" },
+    header: {
+      title: { tag: "plain_text", content: presentation.title },
+      template,
+    },
+    body: { elements },
+  };
+}
+
+function normalizeFeishuTarget(value: string): string {
+  return value.replace(/^(?:feishu|lark):/i, "").replace(/^(?:chat|user|group|dm|open_id):/i, "").trim();
 }
 
 function commandTrustedContext(ctx: Record<string, unknown>): TrustedContext | null {
@@ -356,6 +532,87 @@ export default definePluginEntry({
       return;
     }
     const resolvedConfig = config as PluginConfig;
+    const feishuTokenCache = new Map<string, { token: string; expiresAt: number }>();
+
+    function resolveFeishuAccount(accountId: string | undefined) {
+      const root = api.config as unknown as Record<string, unknown>;
+      const channels = root.channels as Record<string, unknown> | undefined;
+      const feishu = channels?.feishu as Record<string, unknown> | undefined;
+      const accounts = feishu?.accounts as Record<string, unknown> | undefined;
+      const requested = safeHeader(accountId, 64);
+      const candidates = [
+        ...(requested ? [requested] : []),
+        "main",
+        ...Object.keys(accounts ?? {}).filter((key) => key !== "default"),
+      ];
+      for (const key of [...new Set(candidates)]) {
+        const account = accounts?.[key] as Record<string, unknown> | undefined;
+        const appId = typeof account?.appId === "string" ? account.appId.trim() : "";
+        const appSecret = typeof account?.appSecret === "string" ? account.appSecret.trim() : "";
+        if (!appId || !appSecret || account?.enabled === false) continue;
+        const domain = typeof account.domain === "string" ? account.domain.toLowerCase() : "";
+        return {
+          key,
+          appId,
+          appSecret,
+          apiBase: domain.includes("lark") ? "https://open.larksuite.com" : "https://open.feishu.cn",
+        };
+      }
+      throw new Error("OpenClaw 未配置可用的飞书应用凭据");
+    }
+
+    async function getFeishuTenantToken(accountId: string | undefined) {
+      const account = resolveFeishuAccount(accountId);
+      const cached = feishuTokenCache.get(account.key);
+      if (cached && cached.expiresAt > Date.now() + 60_000) return { account, token: cached.token };
+      const response = await globalThis.fetch(`${account.apiBase}/open-apis/auth/v3/tenant_access_token/internal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ app_id: account.appId, app_secret: account.appSecret }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      const data = (await response.json()) as Record<string, unknown>;
+      const token = typeof data.tenant_access_token === "string" ? data.tenant_access_token : "";
+      if (!response.ok || data.code !== 0 || !token) {
+        throw new Error(`飞书 tenant token 获取失败：${String(data.msg || response.status)}`);
+      }
+      const expiresIn = typeof data.expire === "number" ? data.expire : 7200;
+      feishuTokenCache.set(account.key, { token, expiresAt: Date.now() + expiresIn * 1000 });
+      return { account, token };
+    }
+
+    async function sendFeishuCardDirect(
+      target: string | undefined,
+      accountId: string | undefined,
+      presentation: Presentation,
+    ): Promise<void> {
+      const rawTarget = safeHeader(target, 256);
+      const to = rawTarget ? normalizeFeishuTarget(rawTarget) : "";
+      if (!to) throw new Error("飞书会话目标缺失");
+      const { account, token } = await getFeishuTenantToken(accountId);
+      const receiveIdType = to.startsWith("oc_") ? "chat_id" : "open_id";
+      const response = await globalThis.fetch(
+        `${account.apiBase}/open-apis/im/v1/messages?receive_id_type=${receiveIdType}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            receive_id: to,
+            msg_type: "interactive",
+            content: JSON.stringify(buildNativeFeishuCard(presentation)),
+          }),
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
+      const data = (await response.json()) as Record<string, unknown>;
+      if (!response.ok || data.code !== 0) {
+        throw new Error(`飞书交互卡片发送失败：${String(data.msg || response.status)}`);
+      }
+      api.logger.info(`aegis-tools: native Feishu card sent account=${account.key} target=${to}`);
+    }
 
     api.registerTool(
       (rawContext) => {
@@ -407,22 +664,35 @@ export default definePluginEntry({
         if (!context) return null;
         return {
           name: "aegis_ip_prepare_block",
-          description: "Prepare a remote Aegis block batch. This does not change any firewall.",
+          description:
+            "Prepare a remote Aegis block batch. Use selection=selected with selected_ips only for the exact IPs explicitly chosen by the user. This does not change any firewall.",
           parameters: Type.Object(
             {
               batch_id: Type.String({ minLength: 36, maxLength: 36 }),
-              selection: Type.Optional(Type.Union([Type.Literal("recommended"), Type.Literal("all_malicious")])),
+              selection: Type.Optional(Type.Union([
+                Type.Literal("recommended"),
+                Type.Literal("all_malicious"),
+                Type.Literal("selected"),
+              ])),
+              selected_ips: Type.Optional(Type.Array(Type.String({ minLength: 7, maxLength: 45 }), { maxItems: 100 })),
             },
             { additionalProperties: false },
           ),
-          async execute(_id: string, params: { batch_id: string; selection?: "recommended" | "all_malicious" }) {
+          async execute(
+            _id: string,
+            params: {
+              batch_id: string;
+              selection?: "recommended" | "all_malicious" | "selected";
+              selected_ips?: string[];
+            },
+          ) {
             return toolResult(
               await requestJson(
                 resolvedConfig,
                 context,
                 "POST",
                 `/aegis/tools/v1/ip/batches/${encodeURIComponent(params.batch_id)}/prepare`,
-                { selection: params.selection ?? "recommended" },
+                { selection: params.selection ?? "recommended", selected_ips: params.selected_ips },
               ),
             );
           },
@@ -502,30 +772,71 @@ export default definePluginEntry({
         if (!trusted) {
           return {
             isError: true,
-            ...cardReply(errorPresentation(new Error("需要可信且已授权的飞书账号")), "Aegis 拒绝了本次操作。"),
+            ...cardReply(errorPresentation(new Error("需要可信且已授权的飞书账号"))),
           };
         }
+        const respond = async (presentation: Presentation) => {
+          const target =
+            typeof ctx.to === "string"
+              ? ctx.to
+              : typeof ctx.from === "string"
+                ? ctx.from
+                : trusted.requesterSenderId;
+          try {
+            await sendFeishuCardDirect(
+              target,
+              typeof ctx.accountId === "string" ? ctx.accountId : undefined,
+              presentation,
+            );
+            return { suppressReply: true };
+          } catch (error) {
+            api.logger.warn(
+              `aegis-tools direct command card failed; using text fallback: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return cardReply(presentation);
+          }
+        };
         const args = typeof ctx.args === "string" ? ctx.args.trim().split(/\s+/) : [];
-        const [action, batchId] = args;
+        const [action, batchId, selectedIp] = args;
         if (!action || !batchId || !UUID_PATTERN.test(batchId)) {
           return {
             isError: true,
-            ...cardReply(errorPresentation(new Error("卡片操作参数无效或已过期")), "Aegis 卡片参数无效或已过期。"),
+            ...cardReply(errorPresentation(new Error("卡片操作参数无效或已过期"))),
           };
         }
         try {
-          if (action === "cancel") return cardReply(cancelledPresentation(), "Aegis 操作已取消。");
-          if (action === "prepare_recommended" || action === "prepare_all_malicious") {
+          if (action === "cancel") return await respond(cancelledPresentation());
+          if (action === "select_ip" || action === "unselect_ip") {
+            if (!selectedIp || !validIpv4(selectedIp)) throw new Error("IP 选择参数无效");
+            const batch = asBatch(
+              await requestJson(
+                resolvedConfig,
+                trusted,
+                "POST",
+                `/aegis/tools/v1/ip/batches/${encodeURIComponent(batchId)}/selection`,
+                { ip: selectedIp, selected: action === "select_ip" },
+              ),
+            );
+            return await respond(analysisPresentation(batch));
+          }
+          if (action === "prepare_recommended" || action === "prepare_all_malicious" || action === "prepare_selected") {
             const batch = asBatch(
               await requestJson(
                 resolvedConfig,
                 trusted,
                 "POST",
                 `/aegis/tools/v1/ip/batches/${encodeURIComponent(batchId)}/prepare`,
-                { selection: action === "prepare_recommended" ? "recommended" : "all_malicious" },
+                {
+                  selection:
+                    action === "prepare_recommended"
+                      ? "recommended"
+                      : action === "prepare_all_malicious"
+                        ? "all_malicious"
+                        : "selected",
+                },
               ),
             );
-            return cardReply(confirmationPresentation(batch), "Aegis 已生成远程封禁计划，请在卡片中确认。");
+            return await respond(confirmationPresentation(batch));
           }
           if (action === "confirm_jinan") {
             const batch = asBatch(
@@ -537,7 +848,7 @@ export default definePluginEntry({
                 {},
               ),
             );
-            return cardReply(confirmationPresentation(batch), "济南 IP 二次确认已完成，请在卡片中选择执行方式。");
+            return await respond(confirmationPresentation(batch));
           }
           if (action === "execute_dry_run" || action === "execute_permanent") {
             const permanent = action === "execute_permanent";
@@ -550,15 +861,15 @@ export default definePluginEntry({
                 { dry_run: !permanent, confirmed: permanent },
               ),
             );
-            return cardReply(resultPresentation(batch), "Aegis 远程封禁流程已执行完成。");
+            return await respond(resultPresentation(batch));
           }
           return {
             isError: true,
-            ...cardReply(errorPresentation(new Error("不支持的卡片操作")), "Aegis 不支持该卡片操作。"),
+            ...cardReply(errorPresentation(new Error("不支持的卡片操作"))),
           };
         } catch (error) {
           api.logger.warn(`aegis-tools card action failed: ${error instanceof Error ? error.message : String(error)}`);
-          return { isError: true, ...cardReply(errorPresentation(error), "Aegis 操作失败，请查看卡片详情。") };
+          return { isError: true, ...cardReply(errorPresentation(error)) };
         }
       },
     });
@@ -582,10 +893,24 @@ export default definePluginEntry({
           }),
         );
         api.logger.info(`aegis-tools: analysis card ready batch=${batch.id} items=${batch.items.length}`);
+        const presentation = analysisPresentation(batch);
+        try {
+          await sendFeishuCardDirect(ctx.channelId, undefined, presentation);
+          api.logger.info(`aegis-tools: analysis card delivered directly batch=${batch.id} target=${ctx.channelId}`);
+          return {
+            handled: true,
+            reason: "aegis-ip-card-direct",
+            reply: { text: "NO_REPLY" },
+          };
+        } catch (deliveryError) {
+          api.logger.warn(
+            `aegis-tools direct analysis card failed; using full text fallback: ${deliveryError instanceof Error ? deliveryError.message : String(deliveryError)}`,
+          );
+        }
         return {
           handled: true,
-          reason: "aegis-ip-card",
-          reply: cardReply(analysisPresentation(batch), "Aegis 已完成远程 IP 研判，请在卡片中继续。"),
+          reason: "aegis-ip-card-fallback",
+          reply: cardReply(presentation),
         };
       } catch (error) {
         api.logger.warn(`aegis-tools analysis card failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -594,7 +919,7 @@ export default definePluginEntry({
           reason: "aegis-ip-card-error",
           reply: {
             isError: true,
-            ...cardReply(errorPresentation(error), "Aegis IP 分析失败，请查看卡片详情。"),
+            ...cardReply(errorPresentation(error)),
           },
         };
       }

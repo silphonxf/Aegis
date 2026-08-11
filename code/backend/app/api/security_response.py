@@ -10,6 +10,7 @@ from app.schemas.security_response import (
     SecurityBatchAnalyzeRequest,
     SecurityBatchConfirmRequest,
     SecurityBatchExecuteRequest,
+    SecurityBatchItemSelectionRequest,
     SecurityBatchPrepareRequest,
 )
 from app.services.audit import log_action
@@ -21,6 +22,7 @@ from app.services.security_response import (
     confirm_jinan_batch,
     serialize_batch,
     serialize_binding,
+    set_batch_item_selection,
     upsert_feishu_binding,
 )
 
@@ -97,7 +99,35 @@ def prepare_block_batch(
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ):
     try:
-        batch = prepare_batch(db, batch_id, payload.selection, current_user.id, None)
+        batch = prepare_batch(
+            db,
+            batch_id,
+            payload.selection,
+            current_user.id,
+            None,
+            selected_ips=payload.selected_ips,
+        )
+    except SecurityResponseError as exc:
+        raise _error(exc) from exc
+    return serialize_batch(db, batch)
+
+
+@router.post("/batches/{batch_id}/selection")
+def select_batch_item(
+    batch_id: str,
+    payload: SecurityBatchItemSelectionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+):
+    try:
+        batch = set_batch_item_selection(
+            db,
+            batch_id,
+            payload.ip,
+            payload.selected,
+            current_user.id,
+            None,
+        )
     except SecurityResponseError as exc:
         raise _error(exc) from exc
     return serialize_batch(db, batch)

@@ -28,7 +28,62 @@ def _analysis(ip="2.2.2.2"):
                 "should_block": True,
                 "needs_manual_confirmation": False,
                 "summary": "恶意且非济南",
+                "risk_score": 92,
+                "country": "美国",
+                "malicious_types": ["Scanner", "Exploit"],
+                "judgments": ["Scanner"],
+                "tags": ["端口扫描"],
+                "severity": "高",
+                "confidence_level": "高",
+                "scene": "IDC",
+                "update_time": "2026-08-09 20:00:00",
+                "permalink": f"https://x.threatbook.com/v5/ip/{ip}",
+                "asn": {"number": 10439, "info": "CARINET", "rank": 4},
+                "basic": {
+                    "carrier": "CariNet, Inc.",
+                    "location": {
+                        "country": "美国",
+                        "province": "加利福尼亚州",
+                        "city": "洛杉矶",
+                        "display": "美国 / 加利福尼亚州 / 洛杉矶",
+                    },
+                },
             }
+        ],
+    }
+
+
+def _analysis_many():
+    return {
+        "summary": {"total": 3, "malicious": 2, "block_candidates": ["2.2.2.2", "3.3.3.3"]},
+        "items": [
+            {
+                "resource_type": "ip",
+                "ip": "2.2.2.2",
+                "risk_level": "high_risk",
+                "is_malicious": True,
+                "should_block": True,
+                "needs_manual_confirmation": False,
+                "summary": "恶意扫描来源",
+            },
+            {
+                "resource_type": "ip",
+                "ip": "3.3.3.3",
+                "risk_level": "medium_risk",
+                "is_malicious": True,
+                "should_block": False,
+                "needs_manual_confirmation": False,
+                "summary": "恶意但未自动建议封禁",
+            },
+            {
+                "resource_type": "ip",
+                "ip": "4.4.4.4",
+                "risk_level": "safe",
+                "is_malicious": False,
+                "should_block": False,
+                "needs_manual_confirmation": False,
+                "summary": "未发现恶意情报",
+            },
         ],
     }
 
@@ -146,6 +201,16 @@ def test_gateway_enforces_feishu_whitelist(client, monkeypatch):
         json={"raw_input": "2.2.2.2"},
     )
     assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["location"] == "美国 / 加利福尼亚州 / 洛杉矶"
+    assert item["carrier"] == "CariNet, Inc."
+    assert item["asn_number"] == 10439
+    assert item["asn_info"] == "CARINET"
+    assert item["attack_types"] == ["Scanner", "Exploit"]
+    assert item["judgments"] == ["Scanner"]
+    assert item["tags"] == ["端口扫描"]
+    assert item["severity"] == "高"
+    assert item["confidence_level"] == "高"
     batch_id = response.json()["id"]
     response = client.post(
         f"/aegis/tools/v1/ip/batches/{batch_id}/prepare",
@@ -197,6 +262,65 @@ def test_gateway_dry_run_and_batch_ownership(client, monkeypatch):
         assert batch.requester_open_id == "ou_allowed"
     finally:
         db.close()
+
+
+def test_gateway_allows_exact_ip_list_selection(client, monkeypatch):
+    _configure_gateway(monkeypatch)
+    _grant()
+    monkeypatch.setattr(
+        "app.services.security_response.batch_query_ip_reputation",
+        lambda *args, **kwargs: _analysis_many(),
+    )
+
+    response = client.post(
+        "/aegis/tools/v1/ip/analyze",
+        headers=_headers(),
+        json={"raw_input": "2.2.2.2 3.3.3.3 4.4.4.4"},
+    )
+    assert response.status_code == 200, response.text
+    batch_id = response.json()["id"]
+
+    response = client.post(
+        f"/aegis/tools/v1/ip/batches/{batch_id}/selection",
+        headers=_headers(),
+        json={"ip": "3.3.3.3", "selected": True},
+    )
+    assert response.status_code == 200, response.text
+    selected = [item["ip"] for item in response.json()["items"] if item["selected"]]
+    assert selected == ["3.3.3.3"]
+
+    response = client.post(
+        f"/aegis/tools/v1/ip/batches/{batch_id}/prepare",
+        headers=_headers(),
+        json={"selection": "selected"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "execution_confirmation_pending"
+    selected = [item["ip"] for item in response.json()["items"] if item["selected"]]
+    assert selected == ["3.3.3.3"]
+
+
+def test_gateway_rejects_ip_outside_analysis_list(client, monkeypatch):
+    _configure_gateway(monkeypatch)
+    _grant()
+    monkeypatch.setattr(
+        "app.services.security_response.batch_query_ip_reputation",
+        lambda *args, **kwargs: _analysis_many(),
+    )
+    response = client.post(
+        "/aegis/tools/v1/ip/analyze",
+        headers=_headers(),
+        json={"raw_input": "2.2.2.2 3.3.3.3"},
+    )
+    batch_id = response.json()["id"]
+
+    response = client.post(
+        f"/aegis/tools/v1/ip/batches/{batch_id}/prepare",
+        headers=_headers(),
+        json={"selection": "selected", "selected_ips": ["203.0.113.99"]},
+    )
+    assert response.status_code == 409
+    assert "不属于本次研判清单" in response.json()["message"]
 
 
 def test_gateway_permanent_block_requires_switch_and_confirmation(client, monkeypatch):

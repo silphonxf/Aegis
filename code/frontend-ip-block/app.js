@@ -3,7 +3,9 @@ const TOKEN_KEY = 'aegis_admin_token';
 const state = {
   token: '',
   user: null,
-  singleItem: null,
+  queryItems: [],
+  queryInvalidInputs: [],
+  selectedQueryIps: new Set(),
   batchItems: [],
   invalidRows: [],
   selectedIps: new Set(),
@@ -180,7 +182,7 @@ async function loadFirewallConfig() {
 function updateVerificationControls() {
   const enabled = $('verifyThreatbook').checked;
   $('realtimeVerdict').disabled = !enabled;
-  $('checkSingle').textContent = enabled ? '检测 IP 信誉' : '校验 IP 格式';
+  $('checkIpList').textContent = enabled ? '生成 IP 情报清单' : '生成未验证 IP 清单';
 }
 
 function updateDryRunHint() {
@@ -189,51 +191,104 @@ function updateDryRunHint() {
   $('dryRunHint').className = dryRun ? '' : 'risk-danger';
 }
 
-function renderSingle(item) {
-  state.singleItem = item;
+function parseIpList(rawInput) {
+  const tokens = String(rawInput || '').split(/[\s,，;；]+/).map((value) => value.trim()).filter(Boolean);
+  const uniqueTokens = [...new Set(tokens)];
+  const ips = uniqueTokens.filter(isIpv4);
+  const invalid = uniqueTokens.filter((value) => !isIpv4(value));
+  if (ips.length > 100) throw new Error('单次最多查询 100 个 IPv4');
+  return { ips, invalid };
+}
+
+function updateQueryStats() {
+  $('queryValidCount').textContent = state.queryItems.length;
+  $('queryMaliciousCount').textContent = state.queryItems.filter((item) => item.is_malicious === true).length;
+  $('querySelectedCount').textContent = state.selectedQueryIps.size;
+  $('queryInvalidCount').textContent = state.queryInvalidInputs.length;
+  $('blockQueryList').disabled = !state.selectedQueryIps.size;
+}
+
+function renderQueryList() {
   $('singleEmpty').classList.add('hidden');
   $('singleResult').classList.remove('hidden');
   $('singleResult').removeAttribute('hidden');
-  const itemVerdict = verdict(item);
-  $('singleVerdict').textContent = itemVerdict.text;
-  $('singleVerdict').className = itemVerdict.cls;
-  $('singleSummary').textContent = item.summary || '等待人工确认。';
-  $('singleLocation').textContent = locationText(item);
-  $('singleJudgments').textContent = dangerousTypes(item);
-  $('singleSeverity').textContent = item.severity || item.risk_level || '未知';
-  $('singleConfidence').textContent = item.confidence_level || '未知';
-  $('singleAsn').textContent = item.asn?.number ? `${item.asn.number} / ${item.asn.rank ?? '—'}` : '未知';
-  $('singleScene').textContent = item.scene || item.ip_type || '未知';
-  $('blockSingle').disabled = false;
+  const body = $('queryTable');
+  body.innerHTML = state.queryItems.map((item) => {
+    const itemVerdict = verdict(item);
+    return `<tr>
+      <td class="check-cell"><input type="checkbox" data-query-ip="${escapeHtml(item.ip)}" ${state.selectedQueryIps.has(item.ip) ? 'checked' : ''} /></td>
+      <td><strong>${escapeHtml(item.ip)}</strong></td>
+      <td><span class="verdict-chip ${itemVerdict.chip}">${escapeHtml(itemVerdict.text)}</span></td>
+      <td>${escapeHtml(locationText(item))}</td>
+      <td>${escapeHtml(dangerousTypes(item))}</td>
+      <td>${escapeHtml(item.severity || item.risk_level || '未知')}</td>
+      <td>${escapeHtml(item.confidence_level || '未知')}</td>
+      <td>${escapeHtml(item.summary || '等待人工确认')}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="table-empty">没有可处理的有效 IP</td></tr>';
+  body.querySelectorAll('input[data-query-ip]').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) state.selectedQueryIps.add(checkbox.dataset.queryIp);
+      else state.selectedQueryIps.delete(checkbox.dataset.queryIp);
+      updateQueryStats();
+    });
+  });
+
+  if (state.queryInvalidInputs.length) {
+    $('queryInvalidInputs').innerHTML = `<strong>以下输入不是合法 IPv4，未加入清单：</strong><br />${state.queryInvalidInputs.map(escapeHtml).join('、')}`;
+    $('queryInvalidInputs').classList.remove('hidden');
+    $('queryInvalidInputs').removeAttribute('hidden');
+  } else {
+    $('queryInvalidInputs').classList.add('hidden');
+    $('queryInvalidInputs').setAttribute('hidden', '');
+  }
+  updateQueryStats();
 }
 
-async function checkSingle() {
-  const button = $('checkSingle');
-  const ip = $('singleIp').value.trim();
-  if (!isIpv4(ip)) {
-    toast('请输入合法的 IPv4 地址', 'error');
+async function checkIpList() {
+  const button = $('checkIpList');
+  let parsed;
+  try {
+    parsed = parseIpList($('ipListInput').value);
+  } catch (error) {
+    toast(error.message, 'error');
     return;
   }
-  setBusy(button, true, $('verifyThreatbook').checked ? '正在查询微步…' : '正在校验…');
+  if (!parsed.ips.length) {
+    toast('请输入至少一个合法的 IPv4 地址', 'error');
+    return;
+  }
+  setBusy(button, true, $('verifyThreatbook').checked ? `正在查询 ${parsed.ips.length} 个 IP…` : '正在生成清单…');
   try {
+    state.queryInvalidInputs = parsed.invalid;
     if (!$('verifyThreatbook').checked) {
-      renderSingle({
+      state.queryItems = parsed.ips.map((ip) => ({
         ip,
-        resource: ip,
         verified: false,
         risk_level: 'unverified',
         summary: '已跳过微步验证，请确认来源和封禁依据。',
-      });
+      }));
+      state.selectedQueryIps = new Set(parsed.ips);
+      renderQueryList();
       return;
     }
     const data = await api('/api/v1/admin/threat-intel/ip-reputation', jsonOptions({
-      ips: [ip],
+      ips: parsed.ips,
       lang: 'zh',
       realtime_verdict: $('realtimeVerdict').value === 'true',
     }));
-    const item = data.items?.[0];
-    if (!item) throw new Error('微步未返回该 IP 的信誉信息');
-    renderSingle({ ...item, verified: true });
+    const returnedItems = new Map((data.items || []).map((item) => [item.ip || item.resource, item]));
+    state.queryItems = parsed.ips.map((ip) => {
+      const item = returnedItems.get(ip);
+      return item
+        ? { ...item, ip, verified: true }
+        : { ip, verified: false, risk_level: 'unverified', summary: '威胁情报未返回该 IP，请人工确认。' };
+    });
+    state.selectedQueryIps = new Set(
+      state.queryItems.filter((item) => item.verified ? item.should_block : false).map((item) => item.ip),
+    );
+    renderQueryList();
+    toast(`已形成 ${state.queryItems.length} 条 IP 情报清单`);
   } catch (error) {
     toast(error.message, 'error');
   } finally {
@@ -271,10 +326,28 @@ async function executeBlock(ips, reason, button) {
   }
 }
 
-function blockSingle() {
-  if (!state.singleItem?.ip) return;
-  const reason = $('singleReason').value.trim() || state.singleItem.summary || '管理端单 IP 封禁';
-  executeBlock([state.singleItem.ip], reason, $('blockSingle'));
+function selectQueryCandidates() {
+  state.selectedQueryIps = new Set(
+    state.queryItems.filter((item) => item.verified ? item.should_block : false).map((item) => item.ip),
+  );
+  renderQueryList();
+}
+
+function selectQueryAll() {
+  state.selectedQueryIps = new Set(state.queryItems.map((item) => item.ip));
+  renderQueryList();
+}
+
+function clearQuerySelection() {
+  state.selectedQueryIps = new Set();
+  renderQueryList();
+}
+
+function blockQueryList() {
+  const ips = [...state.selectedQueryIps];
+  if (!ips.length) return;
+  const reason = $('queryReason').value.trim() || '根据 Aegis IP 情报清单人工选择封禁';
+  executeBlock(ips, reason, $('blockQueryList'));
 }
 
 function switchTab(name) {
@@ -427,9 +500,14 @@ function bindEvents() {
   $('refreshConfig').addEventListener('click', loadFirewallConfig);
   $('verifyThreatbook').addEventListener('change', updateVerificationControls);
   $('dryRun').addEventListener('change', updateDryRunHint);
-  $('checkSingle').addEventListener('click', checkSingle);
-  $('singleIp').addEventListener('keydown', (event) => { if (event.key === 'Enter') checkSingle(); });
-  $('blockSingle').addEventListener('click', blockSingle);
+  $('checkIpList').addEventListener('click', checkIpList);
+  $('ipListInput').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) checkIpList();
+  });
+  $('selectQueryCandidates').addEventListener('click', selectQueryCandidates);
+  $('selectQueryAll').addEventListener('click', selectQueryAll);
+  $('clearQuerySelection').addEventListener('click', clearQuerySelection);
+  $('blockQueryList').addEventListener('click', blockQueryList);
   document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
   $('downloadTemplate').addEventListener('click', downloadTemplate);
   $('dropZone').addEventListener('click', () => $('excelFile').click());

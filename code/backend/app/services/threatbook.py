@@ -40,7 +40,7 @@ def normalize_ip_list(raw_items: List[str]) -> List[str]:
     values: List[str] = []
     seen: Set[str] = set()
     for raw in raw_items:
-        for part in str(raw).replace("\n", ",").replace("\t", ",").split(","):
+        for part in re.split(r"[\s,，;；]+", str(raw)):
             candidate = part.strip()
             if not candidate:
                 continue
